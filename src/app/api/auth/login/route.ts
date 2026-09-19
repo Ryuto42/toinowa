@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/database/server';
 import { resolveStudentEmail } from '@/lib/shared/env.server';
+import { roleFromClaims } from '@/lib/auth/claims';
 
 const loginSchema = z.object({
   schoolCode: z.string().trim().min(1).max(32),
@@ -33,5 +34,15 @@ export async function POST(request: Request) {
     password: parsed.data.password,
   });
   if (error) return Response.json({ error: 'invalid_credentials' }, { status: 401 });
-  return Response.json({ ok: true });
+
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const role = roleFromClaims(claimsData?.claims?.app_role);
+  const redirectTo = role === 'student'
+    ? '/student/home'
+    : role === 'teacher'
+      ? '/teacher/dashboard'
+      : role === 'admin'
+        ? '/admin/tenant'
+        : '/';
+  return Response.json({ ok: true, redirectTo });
 }

@@ -26,8 +26,9 @@ export default function LoginPage() {
       setBusy(false);
       return;
     }
+    const result = await response.json().catch(() => ({}));
     const next = new URL(window.location.href).searchParams.get('next');
-    router.replace(next || '/');
+    router.replace(next || result.redirectTo || '/');
     router.refresh();
   }
 

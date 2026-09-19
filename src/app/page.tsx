@@ -1,7 +1,17 @@
 import { BRAND } from "@/lib/shared/branding";
 import Link from "next/link";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/database/server';
+import { roleFromClaims } from '@/lib/auth/claims';
 
-export default function Home() {
+export default async function Home() {
+  // ログイン済みでトップへ戻った場合は、権限に対応する画面へ送る。
+  const { data } = await (await createClient()).auth.getClaims();
+  const role = roleFromClaims(data?.claims?.app_role);
+  if (role === 'student') redirect('/student/home');
+  if (role === 'teacher') redirect('/teacher/dashboard');
+  if (role === 'admin') redirect('/admin/tenant');
+
   return (
     <main className="min-h-full bg-[#f6f8f7] text-slate-900">
       <section className="mx-auto flex min-h-[620px] w-full max-w-6xl flex-col px-6 py-8 sm:px-10 lg:px-16">
@@ -9,9 +19,17 @@ export default function Home() {
           <Link className="text-lg font-semibold tracking-tight" href="/">
             {BRAND.shortName}
           </Link>
-          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            Web版 · 準備中
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+              Web版
+            </span>
+            <Link
+              href="/login"
+              className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            >
+              ログイン
+            </Link>
+          </div>
         </header>
 
         <div className="grid flex-1 items-center gap-14 py-20 lg:grid-cols-[1.1fr_0.9fr]">
@@ -34,9 +52,12 @@ export default function Home() {
               >
                 できることを見る
               </a>
-              <span className="rounded-full border border-slate-300 bg-white px-5 py-3 text-slate-600">
-                生徒・先生向け画面を開発中
-              </span>
+              <Link
+                href="/login"
+                className="rounded-full border border-slate-300 bg-white px-5 py-3 text-slate-700 transition hover:border-emerald-400 hover:text-emerald-800"
+              >
+                生徒・先生としてログイン
+              </Link>
             </div>
           </div>
 
