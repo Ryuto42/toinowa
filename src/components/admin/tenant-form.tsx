@@ -1,0 +1,9 @@
+'use client';
+
+import { FormEvent, useState } from 'react';
+
+export function TenantForm({ tenant, mode }: { tenant: { name: string; retention_days: number; ai_budget_limit_usd: number }; mode: 'identity' | 'retention' | 'limits' }) {
+  const [status,setStatus]=useState('');
+  async function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();setStatus('保存中…');const form=new FormData(event.currentTarget);const body=mode==='identity'?{name:form.get('name')}:mode==='retention'?{retentionDays:Number(form.get('retentionDays'))}:{aiBudgetLimitUsd:Number(form.get('aiBudgetLimitUsd'))};const response=await fetch('/api/admin/tenant',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(body)});setStatus(response.ok?'保存しました':'保存できませんでした')}
+  return <form onSubmit={submit} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6">{mode==='identity'?<label className="block text-sm font-bold">学校・組織名<input name="name" defaultValue={tenant.name} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"/></label>:null}{mode==='retention'?<label className="block text-sm font-bold">会話・AIログの保持日数<input name="retentionDays" type="number" min={7} max={3650} defaultValue={tenant.retention_days} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"/><span className="mt-2 block text-xs font-normal text-slate-500">夜間ジョブがこの設定を実際の削除処理に使用します。</span></label>:null}{mode==='limits'?<label className="block text-sm font-bold">AI予算上限（USD）<input name="aiBudgetLimitUsd" type="number" min="0.01" step="0.01" defaultValue={tenant.ai_budget_limit_usd} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"/></label>:null}<div className="flex items-center gap-3"><button className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white">保存</button><span className="text-sm text-slate-500">{status}</span></div></form>;
+}

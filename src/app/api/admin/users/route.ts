@@ -1,0 +1,2 @@
+import { requireRole } from '@/lib/auth/guard'; import { adminDb } from '@/lib/database/admin'; import { json, routeError } from '@/lib/api/http';
+export async function GET(){try{const context=await requireRole('admin');const{data,error}=await adminDb().from('users').select('id,role,display_name,email,login_identifier,status,created_at').eq('tenant_id',context.tenantId).order('role').order('display_name');if(error)throw new Error(error.message);return json({users:data??[]})}catch(error){return routeError(error)}}

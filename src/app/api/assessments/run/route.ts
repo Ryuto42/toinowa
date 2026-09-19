@@ -1,0 +1,89 @@
+import { z } from 'zod';
+import { requireAuth } from '@/lib/auth/guard';
+import { assertStudentScope } from '@/lib/auth/student-scope';
+import { adminDb } from '@/lib/database/admin';
+import { assessmentAgent } from '@/lib/agents/catalog';
+import { computeMastery } from '@/lib/mastery/compute';
+import type { DifficultyLevel } from '@/lib/mastery/types';
+import type { Json } from '@/lib/database/types';
+import { json, parseJson, routeError, traceIdFrom } from '@/lib/api/http';
+
+const schema = z.object({
+  studentId: z.uuid().optional(),
+  conceptId: z.uuid(),
+  question: z.string().min(1).max(8_000),
+  answer: z.string().min(1).max(8_000),
+  reasoning: z.string().max(8_000).default(''),
+  rubric: z.string().max(8_000).default(''),
+  evidenceMessageIds: z.array(z.uuid()).max(20).default([]),
+  evidenceAnswerIds: z.array(z.uuid()).max(20).default([]),
+  answerId: z.uuid().optional(),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  hintsUsed: z.number().int().min(0).max(3).default(0),
+  selfRating: z.number().int().min(1).max(5).optional(),
+});
+
+export async function POST(request: Request) {
+  try {
+    const context = await requireAuth();
+    const body = await parseJson(request, schema);
+    const studentId = body.studentId ?? context.userId;
+    await assertStudentScope(context, studentId);
+    if (body.answerId) {
+      const cached = await adminDb().from('assessments').select('*')
+        .eq('tenant_id', context.tenantId).eq('student_id', studentId).eq('concept_id', body.conceptId)
+        .contains('evidence_answer_ids', [body.answerId]).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (cached.error) throw new Error(cached.error.message);
+      if (cached.data) return json({ assessment: cached.data, cached: true });
+    }
+    const traceId = traceIdFrom(request);
+    const result = await assessmentAgent.run({
+      question: body.question,
+      answer: body.answer,
+      reasoning: body.reasoning,
+      rubric: body.rubric,
+    }, { traceId, tenantId: context.tenantId, studentId, userId: context.userId });
+
+    const historyQuery = await adminDb().from('assessments').select('score')
+      .eq('tenant_id', context.tenantId).eq('student_id', studentId).eq('concept_id', body.conceptId)
+      .not('score', 'is', null).order('created_at', { ascending: false }).limit(5);
+    if (historyQuery.error) throw new Error(historyQuery.error.message);
+    const mastery = computeMastery({
+      conceptId: body.conceptId,
+      recent: { score: result.data.score, reasoningQuality: result.data.reasoningQuality, hintsUsed: body.hintsUsed },
+      history: { scores: (historyQuery.data ?? []).flatMap((row) => row.score === null ? [] : [Number(row.score)]) },
+      transfer: null,
+      delayed: null,
+      selfCalib: body.selfRating ? { selfRating: body.selfRating, actualScore: result.data.score } : null,
+      currentDifficulty: body.difficulty as DifficultyLevel,
+    });
+    const reviewerStatus = mastery.needsReview ? 'pending_review' : 'auto_approved';
+    const inserted = await adminDb().from('assessments').insert({
+      tenant_id: context.tenantId,
+      student_id: studentId,
+      concept_id: body.conceptId,
+      score: mastery.score,
+      confidence: mastery.confidence,
+      component_scores: mastery.components as unknown as Json,
+      misconceptions: result.data.misconceptions as unknown as Json,
+      evidence_message_ids: body.evidenceMessageIds,
+      evidence_answer_ids: body.evidenceAnswerIds,
+      difficulty_at_time: body.difficulty,
+      reviewer_status: reviewerStatus,
+      agent_run_id: result.meta.runId,
+    }).select('*').single();
+    if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
+    if (mastery.needsReview) {
+      await adminDb().from('approvals').insert({
+        tenant_id: context.tenantId,
+        resource_type: 'assessment',
+        resource_id: inserted.data.id,
+        requested_by: 'assessment-agent',
+        proposal: { score: mastery.score, confidence: mastery.confidence, evidence: result.data.evidence },
+      });
+    }
+    return json({ assessment: inserted.data, feedback: result.data.feedback, mastery }, { status: 201 });
+  } catch (error) {
+    return routeError(error);
+  }
+}

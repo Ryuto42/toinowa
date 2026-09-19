@@ -179,6 +179,15 @@ export interface Database {
           error_code?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'agent_run_attempts_agent_run_id_fkey';
+            columns: ['agent_run_id'];
+            isOneToOne: false;
+            referencedRelation: 'agent_runs';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       agent_runs: {
         Row: {
@@ -259,6 +268,36 @@ export interface Database {
           conversation_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'agent_runs_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'agent_runs_parent_run_id_fkey';
+            columns: ['parent_run_id'];
+            isOneToOne: false;
+            referencedRelation: 'agent_runs';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'agent_runs_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'agent_runs_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       ai_budget_ledger: {
         Row: {
@@ -288,6 +327,15 @@ export interface Database {
           spent_usd?: number;
           request_count?: number;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'ai_budget_ledger_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       announcements: {
         Row: {
@@ -317,6 +365,29 @@ export interface Database {
           published_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'announcements_author_id_fkey';
+            columns: ['author_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'announcements_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'announcements_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       answers: {
         Row: {
@@ -361,6 +432,36 @@ export interface Database {
           time_spent_sec?: number | null;
           answered_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'answers_assignment_id_fkey';
+            columns: ['assignment_id'];
+            isOneToOne: false;
+            referencedRelation: 'assignments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'answers_question_id_fkey';
+            columns: ['question_id'];
+            isOneToOne: false;
+            referencedRelation: 'questions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'answers_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'answers_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       approvals: {
         Row: {
@@ -405,6 +506,22 @@ export interface Database {
           reject_reason?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'approvals_decided_by_fkey';
+            columns: ['decided_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'approvals_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       assessments: {
         Row: {
@@ -476,6 +593,36 @@ export interface Database {
           agent_run_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'assessments_concept_id_fkey';
+            columns: ['concept_id'];
+            isOneToOne: false;
+            referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assessments_reviewed_by_fkey';
+            columns: ['reviewed_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assessments_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assessments_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       assignments: {
         Row: {
@@ -520,6 +667,43 @@ export interface Database {
           approved_by?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'assignments_approved_by_fkey';
+            columns: ['approved_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignments_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignments_lesson_id_fkey';
+            columns: ['lesson_id'];
+            isOneToOne: false;
+            referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignments_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignments_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       audit_logs: {
         Row: {
@@ -567,6 +751,22 @@ export interface Database {
           trace_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'audit_logs_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'audit_logs_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       channel_link_tokens: {
         Row: {
@@ -596,6 +796,22 @@ export interface Database {
           used_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'channel_link_tokens_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'channel_link_tokens_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       classrooms: {
         Row: {
@@ -622,6 +838,15 @@ export interface Database {
           grade?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'classrooms_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       concepts: {
         Row: {
@@ -657,6 +882,22 @@ export interface Database {
           order_index?: number;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'concepts_lesson_id_fkey';
+            columns: ['lesson_id'];
+            isOneToOne: false;
+            referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'concepts_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       conversations: {
         Row: {
@@ -704,6 +945,36 @@ export interface Database {
           started_at?: string;
           completed_at?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'conversations_concept_id_fkey';
+            columns: ['concept_id'];
+            isOneToOne: false;
+            referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'conversations_lesson_id_fkey';
+            columns: ['lesson_id'];
+            isOneToOne: false;
+            referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'conversations_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'conversations_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       enrollments: {
         Row: {
@@ -733,6 +1004,29 @@ export interface Database {
           active?: boolean;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'enrollments_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'enrollments_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'enrollments_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       escalations: {
         Row: {
@@ -780,6 +1074,36 @@ export interface Database {
           resolved_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'escalations_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'escalations_resolved_by_fkey';
+            columns: ['resolved_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'escalations_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'escalations_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       guard_events: {
         Row: {
@@ -824,6 +1148,36 @@ export interface Database {
           blocked_tools?: string[];
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'guard_events_agent_run_id_fkey';
+            columns: ['agent_run_id'];
+            isOneToOne: false;
+            referencedRelation: 'agent_runs';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'guard_events_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'guard_events_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'guard_events_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       jobs: {
         Row: {
@@ -886,6 +1240,15 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'jobs_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       jobs_dead: {
         Row: {
@@ -951,6 +1314,7 @@ export interface Database {
           updated_at?: string;
           died_at?: string;
         };
+        Relationships: [];
       };
       learning_plans: {
         Row: {
@@ -998,6 +1362,36 @@ export interface Database {
           agent_run_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'learning_plans_approved_by_fkey';
+            columns: ['approved_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_supersedes_plan_id_fkey';
+            columns: ['supersedes_plan_id'];
+            isOneToOne: false;
+            referencedRelation: 'learning_plans';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       lessons: {
         Row: {
@@ -1033,6 +1427,29 @@ export interface Database {
           created_by?: string;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'lessons_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lessons_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lessons_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       line_account_links: {
         Row: {
@@ -1068,6 +1485,22 @@ export interface Database {
           revoked_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'line_account_links_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'line_account_links_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       material_chunks: {
         Row: {
@@ -1115,6 +1548,29 @@ export interface Database {
           quarantined?: boolean;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'material_chunks_lesson_id_fkey';
+            columns: ['lesson_id'];
+            isOneToOne: false;
+            referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'material_chunks_material_id_fkey';
+            columns: ['material_id'];
+            isOneToOne: false;
+            referencedRelation: 'materials';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'material_chunks_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       materials: {
         Row: {
@@ -1159,6 +1615,29 @@ export interface Database {
           created_by?: string;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'materials_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'materials_lesson_id_fkey';
+            columns: ['lesson_id'];
+            isOneToOne: false;
+            referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'materials_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       messages: {
         Row: {
@@ -1203,6 +1682,22 @@ export interface Database {
           agent_run_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'messages_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'messages_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       model_disables: {
         Row: {
@@ -1232,6 +1727,22 @@ export interface Database {
           disabled_at?: string;
           released_at?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'model_disables_disabled_by_fkey';
+            columns: ['disabled_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'model_disables_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       notifications: {
         Row: {
@@ -1279,6 +1790,22 @@ export interface Database {
           read_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'notifications_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       push_subscriptions: {
         Row: {
@@ -1314,6 +1841,22 @@ export interface Database {
           created_at?: string;
           failed_at?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'push_subscriptions_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'push_subscriptions_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       questions: {
         Row: {
@@ -1367,6 +1910,29 @@ export interface Database {
           approved_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'questions_approved_by_fkey';
+            columns: ['approved_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'questions_concept_id_fkey';
+            columns: ['concept_id'];
+            isOneToOne: false;
+            referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'questions_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       review_schedules: {
         Row: {
@@ -1405,6 +1971,36 @@ export interface Database {
           last_assessment_id?: string | null;
           fulfilled_at?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'review_schedules_concept_id_fkey';
+            columns: ['concept_id'];
+            isOneToOne: false;
+            referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'review_schedules_last_assessment_id_fkey';
+            columns: ['last_assessment_id'];
+            isOneToOne: false;
+            referencedRelation: 'assessments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'review_schedules_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'review_schedules_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       school_codes: {
         Row: {
@@ -1422,6 +2018,15 @@ export interface Database {
           tenant_id?: string;
           active?: boolean;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'school_codes_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       student_profiles: {
         Row: {
@@ -1460,6 +2065,22 @@ export interface Database {
           streak_days?: number;
           last_active_on?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'student_profiles_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'student_profiles_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       teacher_questions: {
         Row: {
@@ -1498,6 +2119,43 @@ export interface Database {
           answered_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'teacher_questions_answered_by_fkey';
+            columns: ['answered_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'teacher_questions_concept_id_fkey';
+            columns: ['concept_id'];
+            isOneToOne: false;
+            referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'teacher_questions_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'teacher_questions_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'teacher_questions_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       tenants: {
         Row: {
@@ -1527,6 +2185,7 @@ export interface Database {
           line_channel_config_id?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       users: {
         Row: {
@@ -1559,6 +2218,22 @@ export interface Database {
           status?: UserStatus;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'users_id_fkey';
+            columns: ['id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'users_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       workflow_runs: {
         Row: {
@@ -1597,6 +2272,15 @@ export interface Database {
           last_error?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'workflow_runs_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       workflow_transitions: {
         Row: {
@@ -1629,7 +2313,78 @@ export interface Database {
           trace_id?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: 'workflow_transitions_workflow_run_id_fkey';
+            columns: ['workflow_run_id'];
+            isOneToOne: false;
+            referencedRelation: 'workflow_runs';
+            referencedColumns: ['id'];
+          },
+        ];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      bump_ai_budget: {
+        Args: {
+          p_tenant: string;
+          p_scope: string;
+          p_scope_id: string;
+          p_cost: number;
+        };
+        Returns: void;
+      };
+      claim_jobs: {
+        Args: {
+          p_limit?: number;
+          p_lease_sec?: number;
+        };
+        Returns: unknown[];
+      };
+      fail_job_permanently: {
+        Args: {
+          p_job_id: string;
+          p_error: string;
+        };
+        Returns: void;
+      };
+      match_material_chunks: {
+        Args: {
+          p_tenant: string;
+          p_embedding: number[];
+          p_lesson?: string;
+          p_concept?: string;
+          p_limit?: number;
+          p_min_similarity?: number;
+        };
+        Returns: Json[];
+      };
+      rls_auto_enable: {
+        Args: Record<PropertyKey, never>;
+        Returns: unknown;
+      };
+      search_material_chunks_text: {
+        Args: {
+          p_tenant: string;
+          p_query: string;
+          p_lesson?: string;
+          p_concept?: string;
+          p_limit?: number;
+        };
+        Returns: Json[];
+      };
+      today_ai_spend: {
+        Args: {
+          p_tenant: string;
+        };
+        Returns: number;
+      };
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
     Enums: {
       agent_run_status: AgentRunStatus;

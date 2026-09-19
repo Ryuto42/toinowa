@@ -1,0 +1,2 @@
+import { requireRole } from '@/lib/auth/guard'; import { createClient } from '@/lib/database/server'; import { json, routeError } from '@/lib/api/http';
+export async function GET(){try{const context=await requireRole('teacher','admin');const{data,error}=await(await createClient()).from('escalations').select('*,users(display_name)').eq('tenant_id',context.tenantId).order('created_at',{ascending:false});if(error)throw new Error(error.message);return json({escalations:data??[]})}catch(error){return routeError(error)}}

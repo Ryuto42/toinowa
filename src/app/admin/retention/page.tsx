@@ -1,0 +1,2 @@
+import { requireRole } from '@/lib/auth/guard'; import { getTenant } from '@/lib/admin/data'; import { PageTitle } from '@/components/dashboard'; import { TenantForm } from '@/components/admin/tenant-form';
+export default async function RetentionPage(){const context=await requireRole('admin');const tenant=await getTenant(context.tenantId);return <div className="max-w-3xl"><PageTitle title="データ保持" description="会話本文とAI運用ログの保持期間を学校単位で管理します。"/><TenantForm tenant={tenant} mode="retention"/></div>}

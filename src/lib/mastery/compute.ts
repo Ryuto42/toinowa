@@ -24,7 +24,7 @@ function recentScore(s: { score: number; reasoningQuality: number; hintsUsed: nu
 }
 
 /**
- * 過去結果: 新しいものほど重い指数減衰（比 0.7）。
+ * 過去結果: 新しいものほど重い指数減衰（比 0.5）。
  * 単純平均だと、古い低スコアがいつまでも足を引っ張る。
  */
 function historyScore(scores: number[]): number {
@@ -32,7 +32,8 @@ function historyScore(scores: number[]): number {
   let num = 0;
   let den = 0;
   scores.forEach((v, i) => {
-    const w = Math.pow(0.7, i);
+    // scores は新しい順。半減期を1件に近づけ、直近の変化を確実に反映する。
+    const w = Math.pow(0.5, i);
     num += clamp01(v) * w;
     den += w;
   });
