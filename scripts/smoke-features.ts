@@ -22,8 +22,8 @@ async function main() {
     if(result.error) throw result.error;
     return [...cookies].map(([name,value]) => `${name}=${value}`).join('; ');
   }
-  async function api(cookie: string, path: string, body?: unknown, expected = 200) {
-    const response = await fetch(`${base}${path}`,{ method: body === undefined ? 'GET' : 'POST', headers: { Cookie: cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  async function api(cookie: string, path: string, body?: unknown, expected = 200, method?: 'PATCH') {
+    const response = await fetch(`${base}${path}`,{ method: method ?? (body === undefined ? 'GET' : 'POST'), headers: { Cookie: cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const data = await response.json();
     assert.equal(response.status,expected,`${path}: ${data.error ?? response.status}`);
     return data;
@@ -81,6 +81,23 @@ async function main() {
     const studentCookie = subsequent.cookie;
     await api('', '/api/auth/login', { organizationCode, identifier: loginIdentifier, password: student.credentials.initialPassword }, 401);
     console.log('PASS: メールなし登録・初期パスワード生成・初回変更の強制・変更後の再ログイン・旧パスワード拒否');
+    const profilePatch = { grade: '中学3年', learningGoal: '一次関数の応用を理解したい', examResults: '数学72/100、一次関数20/30', weakAreas: 'グラフと式の対応', dailyTimeLimitMin: 25 };
+    await api(cookie, `/api/admin/users/${student.user.id}`, { displayName: '編集検証生徒', profile: profilePatch }, 200, 'PATCH');
+    const edited = await db.from('student_profiles').select('grade,learning_goal,exam_results,weak_areas,daily_time_limit_min').eq('user_id', student.user.id).single();
+    assert.equal(edited.data?.exam_results, profilePatch.examResults);
+    assert.equal(edited.data?.weak_areas, profilePatch.weakAreas);
+    assert.equal(edited.data?.daily_time_limit_min, 25);
+    await api(studentCookie, `/api/admin/users/${student.user.id}`, { displayName: '不正更新' }, 403, 'PATCH');
+    await api(teacherCookie, `/api/admin/users/${student.user.id}`, { profile: profilePatch }, 403, 'PATCH');
+    await api(cookie, `/api/admin/users/${crypto.randomUUID()}`, { displayName: '不正更新' }, 404, 'PATCH');
+    await api(cookie, `/api/admin/users/${student.user.id}`, { profile: { ...profilePatch, dailyTimeLimitMin: 0 } }, 400, 'PATCH');
+    await sql.query("update users set login_identifier='reserved-id' where id=$1", [teacher.user.id]);
+    await api(cookie, `/api/admin/users/${student.user.id}`, { displayName: '保存されてはいけない名前', loginIdentifier: 'reserved-id', profile: { ...profilePatch, examResults: '保存されてはいけない結果' } }, 400, 'PATCH');
+    const unchanged = await db.from('users').select('display_name').eq('id', student.user.id).single();
+    assert.equal(unchanged.data?.display_name, '編集検証生徒');
+    const unchangedProfile = await db.from('student_profiles').select('exam_results').eq('user_id', student.user.id).single();
+    assert.equal(unchangedProfile.data?.exam_results, profilePatch.examResults);
+    console.log('PASS: 既存生徒の編集・保存内容・管理者限定・不正入力・重複IDでの更新取り消し');
     if (process.env.SMOKE_AUTH_ONLY === '1') return;
     console.log('PASS: 管理者登録・プロフィール・クラス所属・ロール認証');
     await api(studentCookie,'/api/assessments/run',{},403);

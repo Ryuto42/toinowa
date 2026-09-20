@@ -2416,6 +2416,15 @@ export interface Database {
         };
         Returns: Json;
       };
+      edit_managed_user: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_user: string;
+          p_patch: Json;
+        };
+        Returns: void;
+      };
       fail_job_permanently: {
         Args: {
           p_job_id: string;

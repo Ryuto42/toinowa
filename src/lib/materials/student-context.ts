@@ -6,7 +6,7 @@ import type { AuthContext } from '@/lib/auth/types';
 export async function topicStudentContext(context: AuthContext, studentId: string, classroomId: string) {
   const db = await createClient();
   const [profile, conversations] = await Promise.all([
-    db.from('student_profiles').select('grade,learning_goal,weak_areas').eq('tenant_id', context.tenantId).eq('user_id', studentId).maybeSingle(),
+    db.from('student_profiles').select('grade,learning_goal,weak_areas,exam_results').eq('tenant_id', context.tenantId).eq('user_id', studentId).maybeSingle(),
     db.from('conversations').select('id,completed_at,lessons!inner(classroom_id)').eq('tenant_id', context.tenantId).eq('student_id', studentId).eq('state', 'completed').eq('lessons.classroom_id', classroomId).order('completed_at', { ascending: false }).limit(3),
   ]);
   if (profile.error) throw new Error(profile.error.message);
@@ -21,6 +21,7 @@ export async function topicStudentContext(context: AuthContext, studentId: strin
   const history = {
     grade: profile.data?.grade,
     goal: profile.data?.learning_goal?.slice(0, 600),
+    examResults: profile.data?.exam_results?.slice(0, 2500),
     weakAreas: profile.data?.weak_areas?.slice(0, 800),
     conversations: ids.map(id => ({ messages: (messages.data ?? []).filter(row => row.conversation_id === id).sort((a, b) => a.seq - b.seq).slice(0, 8).map(row => ({ speaker: row.actor, text: row.content_redacted.slice(0, 400) })) })),
     feedback: (assessments.data ?? []).map(row => ({ concept: row.concepts?.name?.slice(0, 200), score: row.override_score ?? row.score, teacherCorrection: row.override_note?.slice(0, 500), status: row.reviewer_status, difficulty: row.difficulty_at_time, analysis: row.difficulty_reason?.slice(0, 1000) })),
