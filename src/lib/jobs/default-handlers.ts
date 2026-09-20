@@ -6,6 +6,9 @@ import { callModel } from '@/lib/orcarouter/call';
 import { buildConversationContext } from '@/lib/conversation/context';
 import { assessmentAgent } from '@/lib/agents/catalog';
 import { computeMastery } from '@/lib/mastery/compute';
+import { combinePace, evaluatePace } from '@/lib/integrity/pace';
+import { checkRepeatedMisconception } from '@/lib/interventions/detectors';
+import { markCompleted } from '@/lib/progress/service';
 import type { DifficultyLevel } from '@/lib/mastery/types';
 import type { Json } from '@/lib/database/types';
 
@@ -112,9 +115,24 @@ registerJobHandler('run_assessment', async (job) => {
     .filter((row) => !(row.evidence_answer_ids ?? []).some((id) => currentAnswerIds.has(id)))
     .slice(0, 5)
     .flatMap((row) => row.score === null ? [] : [Number(row.score)]);
+  // 1回答ごとの所要時間から、速すぎ・遅すぎを見る。
+  // 速すぎる説明は自分で組み立てていない可能性があり、遅すぎるのは詰まっている合図。
+  const pacedAnswers = await db.from('answers').select('raw_answer,time_spent_sec')
+    .eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId)
+    .in('id', [...currentAnswerIds]);
+  if (pacedAnswers.error) throw new Error(pacedAnswers.error.message);
+  const pace = combinePace((pacedAnswers.data ?? [])
+    .map((row) => evaluatePace(row.raw_answer.length, row.time_spent_sec)));
+
   const mastery = computeMastery({
     conceptId: question.data.concept_id,
-    recent: { score: result.data.score, reasoningQuality: result.data.reasoningQuality, hintsUsed: answer.data.hint_level },
+    // 直近成分にだけ係数を掛ける。時間は単独の証拠にならないので、
+    // 重み構成そのものは変えず、最大15%の増減に留める。
+    recent: {
+      score: result.data.score * pace.factor,
+      reasoningQuality: result.data.reasoningQuality,
+      hintsUsed: answer.data.hint_level,
+    },
     history: { scores: historyScores },
     transfer: question.data.is_transfer && result.data.score !== undefined ? { scores: [result.data.score] } : null,
     delayed: null,
@@ -127,6 +145,7 @@ registerJobHandler('run_assessment', async (job) => {
     result.data.attentionPoints.length ? `確認したい点: ${result.data.attentionPoints.join(' / ')}` : '',
     result.data.evidence.length ? `根拠: ${result.data.evidence.join(' / ')}` : '',
     conversationId ? '会話全体の説明と根拠から算出しました。' : '説明と過去結果から算出しました。',
+    pace.reason,
     mastery.needsReview ? '観測データがまだ少ないため参考値です。' : '',
   ].filter(Boolean).join(' ');
   const inserted = await db.from('assessments').insert({
@@ -155,6 +174,12 @@ registerJobHandler('run_assessment', async (job) => {
     agent_run_id: result.meta.runId,
   }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
+  // 分析まで終わったので課題を完了にする（生徒の自己申告ではなくここで決める）
+  if (answer.data.assignment_id) {
+    await markCompleted(job.tenant_id, answer.data.assignment_id, payload.studentId);
+  }
+  // 同じつまずきが続いていれば先生へ上げる
+  await checkRepeatedMisconception(job.tenant_id, payload.studentId, question.data.concept_id);
   await queuePlanFromAssessment(job.tenant_id, inserted.data.id);
   return { nextStep: null, state: { assessmentId: inserted.data.id } };
 });

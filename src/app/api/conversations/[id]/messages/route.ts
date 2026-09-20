@@ -3,7 +3,11 @@ import { json, parseJson, routeError, traceIdFrom, uuidParam } from '@/lib/api/h
 import { appendMessage, completeConversation, getConversation, listMessages, messageCreateSchema, maybeQueueConversationSummary, recordConversationAnswer } from '@/lib/conversation/service';
 import { buildConversationContext } from '@/lib/conversation/context';
 import { fastPathMessage, routeConversation } from '@/lib/agents/orchestrator';
+import { after } from 'next/server';
 import { adminDb } from '@/lib/database/admin';
+import { recordAnswerIntegrity } from '@/lib/integrity/record';
+import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
+import { SafetyBlocked } from '@/lib/orcarouter/errors';
 import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
 
@@ -57,6 +61,25 @@ export async function GET(request: Request, route: Context) {
     const afterSeq = Number(new URL(request.url).searchParams.get('afterSeq') ?? 0);
     return json({ messages: await listMessages(context, conversationId, Number.isFinite(afterSeq) ? afterSeq : 0) });
   } catch (error) {
+    // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
+    // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    if (error instanceof SafetyBlocked) {
+      const context = await requireAuth().catch(() => null);
+      if (context?.role === 'student') {
+        after(async () => {
+          await raiseEscalation({
+            tenantId: context.tenantId,
+            studentId: context.userId,
+            classroomId: await classroomOfStudent(context.tenantId, context.userId),
+            kind: 'safety',
+            priority: 'urgent',
+            title: '安全性チェックで生徒の入力を遮断しました',
+            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
+            dedupeHours: 6,
+          });
+        });
+      }
+    }
     return routeError(error);
   }
 }
@@ -101,17 +124,34 @@ export async function POST(request: Request, route: Context) {
       channel: body.channel,
       channelMessageId: body.channelMessageId,
     });
+    const traceId = traceIdFrom(request);
     if (context.role === 'student' && body.assignmentId && body.questionId) {
-      await recordConversationAnswer({
+      const answer = await recordConversationAnswer({
         context,
         conversationId,
         assignmentId: body.assignmentId,
         questionId: body.questionId,
         answer: studentMessage.content_redacted,
+        telemetry: body.telemetry,
       });
+      // AI判定は返信を待たせない。灰色のときだけLLMを呼ぶので、多くは即終わる。
+      const assignmentId = body.assignmentId;
+      after(() => recordAnswerIntegrity({
+        tenantId: context.tenantId,
+        traceId,
+        answerId: answer.id,
+        studentId: context.userId,
+        assignmentId,
+        text: studentMessage.content_redacted,
+        signals: {
+          elapsedSec: body.telemetry?.elapsedSec ?? null,
+          typingMs: body.telemetry?.typingMs ?? null,
+          keystrokes: body.telemetry?.keystrokes ?? null,
+          pasteCount: body.telemetry?.pasteCount ?? null,
+        },
+      }));
     }
 
-    const traceId = traceIdFrom(request);
     const fullMessages = await listMessages(context, conversationId, 0);
     const studentTurn = fullMessages.filter((item) => item.actor === 'student').length;
     const atMaxTurns = studentTurn >= MAX_EXPLANATION_TURNS;
@@ -160,6 +200,25 @@ export async function POST(request: Request, route: Context) {
     const payload = { message, traceId, runId, decision, conversationCompleted };
     return body.stream ? eventStream(payload) : json(payload);
   } catch (error) {
+    // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
+    // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    if (error instanceof SafetyBlocked) {
+      const context = await requireAuth().catch(() => null);
+      if (context?.role === 'student') {
+        after(async () => {
+          await raiseEscalation({
+            tenantId: context.tenantId,
+            studentId: context.userId,
+            classroomId: await classroomOfStudent(context.tenantId, context.userId),
+            kind: 'safety',
+            priority: 'urgent',
+            title: '安全性チェックで生徒の入力を遮断しました',
+            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
+            dedupeHours: 6,
+          });
+        });
+      }
+    }
     return routeError(error);
   }
 }

@@ -2,6 +2,7 @@
 
 import { ConversationFeedback } from './feedback-card';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useWorkTelemetry } from './use-work-telemetry';
 
 export interface ChatMessage {
   id: string;
@@ -26,6 +27,8 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const sequence = useRef(Math.max(0, ...initialMessages.map((message) => message.seq)));
+  // 取り組みの様子を裏で記録する（生徒には見せない）
+  const telemetry = useWorkTelemetry(assignmentId);
   const endOfMessages = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,6 +39,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     event.preventDefault();
     const content = input.trim();
     if (!content || busy || completed) return;
+    const measured = telemetry.consume();
     setInput('');
     setBusy(true);
     setError('');
@@ -57,6 +61,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           stream: true,
           ...(assignmentId ? { assignmentId } : {}),
           ...(questionId ? { questionId } : {}),
+          telemetry: measured,
         }),
       });
       if (!response.ok || !response.body) {
@@ -132,7 +137,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       </div>
       <form onSubmit={send} className="flex gap-2">
         <label className="sr-only" htmlFor="chat-input">AIへの説明</label>
-        <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} rows={3} maxLength={8000} placeholder="AIに教える内容を、自分の言葉で書いてください" className="min-h-16 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-emerald-600" />
+        <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={telemetry.onKeyDown} onPaste={telemetry.onPaste} rows={3} maxLength={8000} placeholder="AIに教える内容を、自分の言葉で書いてください" className="min-h-16 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-emerald-600" />
         <button disabled={busy || !input.trim()} className="self-end rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? <span className="inline-flex items-center gap-2"><Spinner light />考え中…</span> : '送信'}</button>
       </form>
     </>}
