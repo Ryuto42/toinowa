@@ -9,18 +9,6 @@ import { computeMastery } from '@/lib/mastery/compute';
 import type { DifficultyLevel } from '@/lib/mastery/types';
 import type { Json } from '@/lib/database/types';
 
-async function ensureAssessmentReview(tenantId: string, assessmentId: string) {
-  const db = adminDb();
-  const assessment = await db.from('assessments').select('reviewer_status,confidence,score').eq('tenant_id', tenantId).eq('id', assessmentId).single();
-  if (assessment.error) throw new Error(assessment.error.message);
-  if (assessment.data.reviewer_status !== 'pending_review') return;
-  const existing = await db.from('approvals').select('id').eq('tenant_id', tenantId).eq('resource_type', 'assessment').eq('resource_id', assessmentId).limit(1);
-  if (existing.error) throw new Error(existing.error.message);
-  if (existing.data.length) return;
-  const approval = await db.from('approvals').upsert({ id: assessmentId, tenant_id: tenantId, resource_type: 'assessment', resource_id: assessmentId, requested_by: 'assessment-agent', proposal: { confidence: assessment.data.confidence, score: assessment.data.score } }, { onConflict: 'id', ignoreDuplicates: true });
-  if (approval.error) throw new Error(approval.error.message);
-}
-
 /** M10で公開する授業分析ジョブ。AI生成自体は専用ステップへ拡張できる。 */
 registerJobHandler('analyze_lesson', async (job) => {
   const payload = job.payload && typeof job.payload === 'object' && !Array.isArray(job.payload)
@@ -80,7 +68,7 @@ registerJobHandler('run_assessment', async (job) => {
     if (state.data.state !== 'completed') return { nextStep: null, state: { skipped: 'conversation_in_progress' } };
     const existing = await db.from('assessments').select('id').eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).eq('is_final', true).maybeSingle();
     if (existing.error) throw new Error(existing.error.message);
-    if (existing.data) { await ensureAssessmentReview(job.tenant_id, existing.data.id); await queuePlanFromAssessment(job.tenant_id, existing.data.id); return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } }; }
+    if (existing.data) { await queuePlanFromAssessment(job.tenant_id, existing.data.id); return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } }; }
   }
   let conversationSummary = '';
   let conversationMessages: Array<{ id: string; actor: string; content_redacted: string; seq: number }> = [];
@@ -139,7 +127,7 @@ registerJobHandler('run_assessment', async (job) => {
     result.data.attentionPoints.length ? `確認したい点: ${result.data.attentionPoints.join(' / ')}` : '',
     result.data.evidence.length ? `根拠: ${result.data.evidence.join(' / ')}` : '',
     conversationId ? '会話全体の説明と根拠から算出しました。' : '説明と過去結果から算出しました。',
-    mastery.needsReview ? '確信度が低いため先生の確認が必要です。' : '',
+    mastery.needsReview ? '観測データがまだ少ないため参考値です。' : '',
   ].filter(Boolean).join(' ');
   const inserted = await db.from('assessments').insert({
     id: job.id,
@@ -163,11 +151,10 @@ registerJobHandler('run_assessment', async (job) => {
     difficulty_at_time: question.data.difficulty,
     recommended_difficulty: question.data.difficulty,
     difficulty_reason: analysisNote,
-    reviewer_status: (result.meta.degraded || mastery.needsReview) ? 'pending_review' : 'auto_approved',
+    reviewer_status: 'auto_approved',
     agent_run_id: result.meta.runId,
   }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
-  await ensureAssessmentReview(job.tenant_id, inserted.data.id);
   await queuePlanFromAssessment(job.tenant_id, inserted.data.id);
   return { nextStep: null, state: { assessmentId: inserted.data.id } };
 });

@@ -30,7 +30,6 @@ export async function GET(_request: Request, route: Context) {
         students: studentIds.length,
         assessments: rows.length,
         averageScore: scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
-        pendingReview: rows.filter((row) => row.reviewer_status === 'pending_review').length,
         lowConfidence: rows.filter((row) => Number(row.confidence) < 0.6).length,
       },
     });

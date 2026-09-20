@@ -6,11 +6,11 @@ import { EmptyState, MetricCard, PageTitle, Panel, ScoreBar, StatusPill } from '
 export default async function TeacherDashboardPage() {
   const context = await requireRole('teacher', 'admin');
   const db = await createClient();
-  const [assessments, concepts, escalations, approvals, runs] = await Promise.all([
+  const [assessments, concepts, escalations, analyzed, runs] = await Promise.all([
     db.from('assessments').select('score,override_score,concept_id').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(100),
     db.from('concepts').select('id,name').eq('tenant_id', context.tenantId),
     db.from('escalations').select('id,title,priority,status').eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }).limit(5),
-    db.from('approvals').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).is('decision', null),
+    db.from('assessments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
     db.from('agent_runs').select('estimated_cost_usd').eq('tenant_id', context.tenantId),
   ]);
   const conceptNames = new Map((concepts.data ?? []).map((concept) => [concept.id, concept.name]));
@@ -27,7 +27,7 @@ export default async function TeacherDashboardPage() {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="平均理解度" value={average === null ? '—' : `${average}%`} note={average === null ? 'データ収集中' : `${scores.length}単元の観測データ`} />
       <MetricCard label="要介入" value={escalations.data?.length ?? 0} tone={escalations.data?.length ? 'rose' : 'emerald'} note="緊急対応が必要な生徒" />
-      <MetricCard label="承認待ち" value={approvals.count ?? 0} tone={approvals.count ? 'amber' : 'emerald'} note="未処理のタスク" />
+      <MetricCard label="AI分析済み" value={analyzed.count ?? 0} tone="slate" note="説明ワークの分析件数" />
       <MetricCard label="AI費用（直近）" value={`$${cost.toFixed(4)}`} tone="slate" note="記録されたAI実行・フォールバックを含む" />
     </div>
 

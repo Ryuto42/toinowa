@@ -5,7 +5,6 @@ export interface SimpleFeedback {
   encouragement: string;
   goodPoint: string;
   nextStep: string;
-  pendingReview: boolean;
   createdAt: string;
 }
 
@@ -19,14 +18,13 @@ export function simplifyFeedback(row: {
     ? row.component_scores as Record<string, unknown> : {};
   const simple = detail.studentFeedback && typeof detail.studentFeedback === 'object'
     ? detail.studentFeedback as Record<string, unknown> : {};
-  const pendingReview = ['pending_review', 'rejected', 'overridden'].includes(row.reviewer_status);
   const text = (key: string, fallback: string) => typeof simple[key] === 'string'
     ? (simple[key] as string).slice(0, 240) : fallback;
   return {
     id: row.id, conversationId: row.conversation_id, concept,
     encouragement: '最後まで自分の言葉で説明できたね。よく頑張ったね！',
-    goodPoint: pendingReview ? '説明の内容は先生と一緒に確認しています。' : text('goodPoint', '自分の言葉で説明する練習を積み重ねられました。'),
-    nextStep: pendingReview ? 'ひと休みして、先生からの確認を待とう。' : text('nextStep', '次は身近な例でも説明してみよう。'),
-    pendingReview, createdAt: row.created_at,
+    goodPoint: text('goodPoint', '自分の言葉で説明する練習を積み重ねられました。'),
+    nextStep: text('nextStep', '次は身近な例でも説明してみよう。'),
+    createdAt: row.created_at,
   };
 }

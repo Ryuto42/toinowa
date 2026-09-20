@@ -27,7 +27,6 @@ export async function GET(_request: Request, route: Context) {
       studentId,
       concepts: rows,
       overall: scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
-      pendingReview: rows.filter((row) => row.reviewer_status === 'pending_review').length,
     });
   } catch (error) {
     return routeError(error);
