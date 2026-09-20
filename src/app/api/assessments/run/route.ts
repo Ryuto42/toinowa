@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       question: body.question,
       answer: body.answer,
       reasoning: body.reasoning,
+      conversationContext: '',
       rubric: body.rubric,
     }, { traceId, tenantId: context.tenantId, studentId, userId: context.userId });
 
@@ -58,17 +59,30 @@ export async function POST(request: Request) {
       currentDifficulty: body.difficulty as DifficultyLevel,
     });
     const reviewerStatus = mastery.needsReview ? 'pending_review' : 'auto_approved';
+    const analysisNote = [
+      result.data.feedback,
+      result.data.strongPoints.length ? `良かった点: ${result.data.strongPoints.join(' / ')}` : '',
+      result.data.attentionPoints.length ? `確認したい点: ${result.data.attentionPoints.join(' / ')}` : '',
+      result.data.evidence.length ? `根拠: ${result.data.evidence.join(' / ')}` : '',
+      mastery.needsReview ? '確信度が低いため先生の確認が必要です。' : '直近の説明と過去結果から算出しました。',
+    ].filter(Boolean).join(' ');
     const inserted = await adminDb().from('assessments').insert({
       tenant_id: context.tenantId,
       student_id: studentId,
       concept_id: body.conceptId,
       score: mastery.score,
       confidence: mastery.confidence,
-      component_scores: mastery.components as unknown as Json,
+      component_scores: {
+        mastery: mastery.components,
+        dimensions: result.data.dimensionScores,
+        strongPoints: result.data.strongPoints,
+        attentionPoints: result.data.attentionPoints,
+      } as unknown as Json,
       misconceptions: result.data.misconceptions as unknown as Json,
       evidence_message_ids: body.evidenceMessageIds,
       evidence_answer_ids: body.evidenceAnswerIds,
       difficulty_at_time: body.difficulty,
+      difficulty_reason: analysisNote,
       reviewer_status: reviewerStatus,
       agent_run_id: result.meta.runId,
     }).select('*').single();

@@ -1,2 +1,6 @@
-import { requireRole } from '@/lib/auth/guard'; import { assertStudentScope } from '@/lib/auth/student-scope'; import { createClient } from '@/lib/database/server'; import { EmptyState, PageTitle, Panel, StatusPill } from '@/components/dashboard'; import { formatDateTime } from '@/lib/shared/format';
-export default async function StudentConversationsPage({params}:PageProps<'/teacher/students/[id]/conversations'>){const context=await requireRole('teacher','admin');const{id}=await params;await assertStudentScope(context,id);const{data}=await(await createClient()).from('conversations').select('*,lessons(title)').eq('student_id',id).order('started_at',{ascending:false});return <div><PageTitle title="質問・会話履歴" description="WebとLINEを同じ学習履歴として表示します。"/><Panel title="会話">{data?.length?<div className="divide-y divide-slate-100">{data.map(item=><article key={item.id} className="py-4 first:pt-0"><div className="flex justify-between"><div><p className="font-bold">{item.lessons?.title??'学習チャット'}</p><p className="mt-1 text-sm text-slate-500">{item.message_count}件 · {formatDateTime(item.started_at)}</p></div><StatusPill tone={item.channel==='line'?'emerald':'blue'}>{item.channel}</StatusPill></div>{item.summary?<p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{item.summary}</p>:null}</article>)}</div>:<EmptyState>会話履歴はありません</EmptyState>}</Panel></div>}
+import { redirect } from 'next/navigation';
+
+export default async function StudentConversationsPage({ params }: PageProps<'/teacher/students/[id]/conversations'>) {
+  const { id } = await params;
+  redirect(`/teacher/students/${id}`);
+}

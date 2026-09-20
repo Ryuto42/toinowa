@@ -26,33 +26,47 @@ export const lessonAnalysisAgent = defineAgent({
 
 const learningSupportInput = z.object({
   studentMessage: z.string().min(1).max(8_000),
-  context: z.string().max(12_000).default(''),
+  context: z.string().max(48_000).default(''),
   hintLevel: z.number().int().min(0).max(3).default(0),
+  studentTurn: z.number().int().min(1).max(12).default(1),
+  maxTurns: z.number().int().min(1).max(12).default(6),
+  requiredFocus: z.enum(['definition', 'relationship', 'example', 'boundary', 'summary', 'finish']).default('relationship'),
 });
 const learningSupportOutput = z.object({
   message: z.string().min(1),
-  nextStep: z.string().min(1),
   hintLevel: z.number().int().min(0).max(3),
   evidence: z.array(z.string()).max(6),
+  shouldFinish: z.boolean(),
+  understandingLevel: z.number().min(0).max(1),
 });
 
 export const learningSupportAgent = defineAgent({
   name: 'learning-support', router: 'studentChat', requestType: 'learning_support',
   inputSchema: learningSupportInput, outputSchema: learningSupportOutput,
-  systemPrompt: `${BRAND.name}の学習支援担当です。答えを先に言わず、生徒の考えを一歩進める質問と方法を返してください。3段目のヒントも答えそのものにしません。`,
-  buildUserMessage: (input) => `<student_message>\n${input.studentMessage}\n</student_message>\n<context>\n${input.context}\n</context>\n<hint_level>${input.hintLevel}</hint_level>`,
-  degrade: () => ({ message: '今の考え方を一つずつ整理してみましょう。どこまで分かっているか教えてください。', nextStep: '分かるところを一文で書く', hintLevel: 0, evidence: [] }),
+  systemPrompt: `${BRAND.name}の概念説明ワークに参加する、何も知らない聞き手です。生徒が先生になって、授業で学んだ概念をあなたに教えます。生徒の説明を正しいと知っている前提で評価・採点・指導したり、長く説明したりしないでください。返答は短く、やわらかく、親しみやすい日本語で1〜3文にしてください。ひらがなを少し使い、「〜かな？」「〜ほしいな！」のような可愛らしい語尾を自然に使ってください。まず生徒の説明を短く言い換えて「私はこう理解したよ」と確認し、まだ分からない点を一つだけ質問してください。会話の<context>にある過去のAI質問を必ず読み、同じ質問やほぼ同じ質問を二度と繰り返さないでください。毎回、指定された次の観点へ進んでください。説明に間違いや矛盾がありそうなときも、知らない聞き手として確認する質問を返してください。生徒の説明から概念の意味やつながりが十分に分かったら、短いお礼で会話を終えてください。最大ターン数に達したら、理解できた範囲を短く伝えて必ず終えてください。終了するときは質問をしないでください。点数、評価、模範解答、「次の一歩」や改善提案は出さないでください。`,
+  buildUserMessage: (input) => `<student_message>\n${input.studentMessage}\n</student_message>\n<context>\n${input.context}\n</context>\n<student_turn>${input.studentTurn}</student_turn>\n<max_turns>${input.maxTurns}</max_turns>\n<required_focus>${input.requiredFocus}</required_focus>\n<hint_level>${input.hintLevel}</hint_level>`,
+  degrade: () => ({ message: 'まだよく分からないところがあるの。もう少し教えてほしいな！', hintLevel: 0, evidence: [], shouldFinish: false, understandingLevel: 0 }),
 });
 
 const assessmentInput = z.object({
   question: z.string().min(1).max(8_000),
   answer: z.string().min(1).max(8_000),
   reasoning: z.string().max(8_000).default(''),
+  conversationContext: z.string().max(60_000).default(''),
   rubric: z.string().max(8_000).default(''),
 });
 const assessmentOutput = z.object({
   score: z.number().min(0).max(1),
   reasoningQuality: z.number().min(0).max(1),
+  dimensionScores: z.object({
+    definition: z.number().min(0).max(1),
+    logic: z.number().min(0).max(1),
+    example: z.number().min(0).max(1),
+    accuracy: z.number().min(0).max(1),
+    clarity: z.number().min(0).max(1),
+  }).default({ definition: 0, logic: 0, example: 0, accuracy: 0, clarity: 0 }),
+  strongPoints: z.array(z.string()).max(5).default([]),
+  attentionPoints: z.array(z.string()).max(5).default([]),
   misconceptions: z.array(z.object({ code: z.string(), label: z.string(), evidence: z.string() })).max(5),
   evidence: z.array(z.string()).min(1).max(8),
   feedback: z.string().min(1),
@@ -61,9 +75,9 @@ const assessmentOutput = z.object({
 export const assessmentAgent = defineAgent({
   name: 'assessment', router: 'assessment', requestType: 'assess_answer',
   inputSchema: assessmentInput, outputSchema: assessmentOutput,
-  systemPrompt: `${BRAND.name}の評価担当です。正答だけでなく解答過程を別々に評価し、入力されたルーブリックの根拠を示してください。確信が低い場合は無理に断定しません。`,
-  buildUserMessage: (input) => `<question>\n${input.question}\n</question>\n<student_answer>\n${input.answer}\n</student_answer>\n<reasoning>\n${input.reasoning}\n</reasoning>\n<rubric>\n${input.rubric}\n</rubric>`,
-  degrade: () => ({ score: 0, reasoningQuality: 0, misconceptions: [], evidence: [], feedback: '評価を確定できないため、先生の確認に回しました。' }),
+  systemPrompt: `${BRAND.name}の概念説明評価担当です。これは問題の正誤を一発判定する採点ではなく、会話全体を一つの説明として分析する評価です。会話のすべての生徒発話と説明文を読み、最も情報量の多い説明を中心に、(1)概念の定義と核、(2)理由・因果・他の考えとの論理的なつながり、(3)具体例やたとえ、(4)誤解を招かない正確さ、(5)初学者への伝わりやすさを分けて評価してください。dimensionScores にはこの5観点を0〜1で入れ、strongPoints と attentionPoints には先生が読める具体的な根拠を短く入れてください。後半の「はい」「そうです」のような短い確認は、前の説明への相づちとして扱い、それだけを新しい誤答や低い証拠として点数を下げないでください。一方、会話のどこかにある誤りや矛盾は見落とさず、misconceptions と evidence に残してください。入力されたルーブリックを根拠にし、説明に書かれていないことは推測しないでください。点数やフィードバックは直近一発ではなく会話全体に対するものとして返し、良い点と確認したい点を短く返します。確信が低い場合は無理に断定しません。`,
+  buildUserMessage: (input) => `<concept_prompt>\n${input.question}\n</concept_prompt>\n<student_explanation>\n${input.answer}\n</student_explanation>\n<supporting_example_or_note>\n${input.reasoning}\n</supporting_example_or_note>\n<conversation_context>\n${input.conversationContext}\n</conversation_context>\n<rubric>\n${input.rubric}\n</rubric>`,
+  degrade: () => ({ score: 0, reasoningQuality: 0, dimensionScores: { definition: 0, logic: 0, example: 0, accuracy: 0, clarity: 0 }, strongPoints: [], attentionPoints: [], misconceptions: [], evidence: ['自動分析を確定できませんでした。'], feedback: '説明の分析を確定できないため、先生の確認に回しました。' }),
 });
 
 const curriculumInput = z.object({

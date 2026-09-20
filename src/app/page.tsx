@@ -1,109 +1,69 @@
-import { BRAND } from "@/lib/shared/branding";
-import Link from "next/link";
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/database/server';
+import { BRAND } from '@/lib/shared/branding';
 import { roleFromClaims } from '@/lib/auth/claims';
+import { createClient } from '@/lib/database/server';
+
+function BrandMark() {
+  return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#087c73] text-xs font-bold text-white">{BRAND.shortName.charAt(0) || 'S'}</span>;
+}
+
+const subjects = ['国語', '英語', '数学', '理科', '社会'];
 
 export default async function Home() {
-  // ログイン済みでトップへ戻った場合は、権限に対応する画面へ送る。
   const { data } = await (await createClient()).auth.getClaims();
   const role = roleFromClaims(data?.claims?.app_role);
   if (role === 'student') redirect('/student/home');
   if (role === 'teacher') redirect('/teacher/dashboard');
-  if (role === 'admin') redirect('/admin/tenant');
+  if (role === 'admin') redirect('/admin/overview');
 
-  return (
-    <main className="min-h-full bg-[#f6f8f7] text-slate-900">
-      <section className="mx-auto flex min-h-[620px] w-full max-w-6xl flex-col px-6 py-8 sm:px-10 lg:px-16">
-        <header className="flex items-center justify-between">
-          <Link className="text-lg font-semibold tracking-tight" href="/">
-            {BRAND.shortName}
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              Web版
-            </span>
-            <Link
-              href="/login"
-              className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
-            >
-              ログイン
-            </Link>
-          </div>
-        </header>
+  return <div className="min-h-screen bg-[#faf9ff] text-[#17233d]">
+    <div className="h-1 bg-[#7167f6]" />
+    <header className="border-b border-[#eceaf4] bg-white/90">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6 lg:px-10">
+        <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#096f68]"><BrandMark />{BRAND.shortName}</Link>
+        <nav className="hidden items-center gap-8 text-xs font-semibold text-[#4b5369] sm:flex">
+          <a href="#process" className="rounded-full bg-[#e9edff] px-4 py-2 text-[#4e5bc5]">学びのプロセス</a>
+          <a href="#cases" className="hover:text-[#087c73]">導入事例</a>
+          <Link href="/login" className="hover:text-[#087c73]">ログイン</Link>
+        </nav>
+        <Link href="/login" aria-label="ログイン" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3d35c8] text-white shadow-sm"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="3" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></Link>
+      </div>
+    </header>
 
-        <div className="grid flex-1 items-center gap-14 py-20 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <p className="mb-5 text-sm font-semibold tracking-[0.18em] text-emerald-700">
-              LEARNING, ONE STEP AT A TIME
-            </p>
-            <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-              授業のあとを、
-              <span className="text-emerald-700">一緒に設計する。</span>
-            </h1>
-            <p className="mt-7 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">
-              {BRAND.name} は、授業の理解度とつまずきを丁寧に読み取り、
-              次に取り組む一歩を生徒と先生に届けます。
-            </p>
-            <div className="mt-9 flex flex-wrap gap-3 text-sm font-medium">
-              <a
-                href="#overview"
-                className="rounded-full bg-emerald-700 px-5 py-3 text-white transition hover:bg-emerald-800"
-              >
-                できることを見る
-              </a>
-              <Link
-                href="/login"
-                className="rounded-full border border-slate-300 bg-white px-5 py-3 text-slate-700 transition hover:border-emerald-400 hover:text-emerald-800"
-              >
-                生徒・先生としてログイン
-              </Link>
-            </div>
+    <main>
+      <section className="mx-auto grid max-w-[1440px] items-center gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[1.02fr_0.82fr] lg:px-14 lg:py-20">
+        <div className="max-w-[650px]">
+          <p className="text-sm font-bold tracking-[0.2em] text-[#087c73]">対話で理解を深める学習</p>
+          <h1 className="mt-7 text-4xl font-bold leading-[1.25] tracking-tight text-[#17233d] sm:text-[56px]">その「わかった」、<br /><span className="text-[#087c73]">本物ですか。</span></h1>
+          <p className="mt-7 max-w-xl text-base leading-8 text-[#59647a] sm:text-lg">正解を急がせない、対話から深める学び。<br />授業のあとの小さなつまずきを、確かな理解へ。</p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Link href="/login" className="inline-flex items-center gap-2 rounded-full bg-[#087c73] px-6 py-3 text-sm font-bold text-white shadow-[0_8px_16px_-10px_rgba(0,100,90,0.7)] transition hover:bg-[#05675f]">授業の対話を体験する <span aria-hidden="true">→</span></Link>
+            <a href="#cases" className="rounded-full border border-[#e6e5ed] bg-white px-6 py-3 text-sm font-bold text-[#4a5369] shadow-sm transition hover:border-[#b9dcd5]">資料請求・デモ</a>
           </div>
+          <div className="mt-8 flex flex-wrap gap-2 text-xs font-semibold text-[#66807d]">{subjects.map((subject) => <span key={subject} className="rounded-full bg-[#e7f5f1] px-3 py-1.5">{subject}</span>)}</div>
+        </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.35)]">
-            <div className="rounded-2xl bg-slate-900 p-6 text-white">
-              <div className="flex items-center justify-between text-sm text-slate-300">
-                <span>今日の学び</span>
-                <span className="rounded-full bg-white/10 px-2 py-1 text-xs">preview</span>
-              </div>
-              <p className="mt-10 text-2xl font-medium leading-relaxed">
-                「傾き」と「切片」の違いを、
-                <br />
-                自分の言葉で説明できるようにする
-              </p>
-              <div className="mt-8 h-2 overflow-hidden rounded-full bg-white/15">
-                <div className="h-full w-2/3 rounded-full bg-emerald-400" />
-              </div>
-              <p className="mt-3 text-sm text-slate-300">次の一歩まであと少し</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3 pt-5 text-center text-xs text-slate-500">
-              <div><span className="mb-1 block text-lg">01</span>理解する</div>
-              <div><span className="mb-1 block text-lg">02</span>解いてみる</div>
-              <div><span className="mb-1 block text-lg">03</span>振り返る</div>
-            </div>
+        <div className="rounded-[30px] bg-white p-6 shadow-[0_18px_55px_-34px_rgba(40,52,90,0.38)] sm:p-7">
+          <div className="flex items-center justify-between rounded-full bg-[#fafaff] px-4 py-3 text-[11px] text-[#727b92]"><span><b className="text-[#167a70]">現代文 論理文読解 #08</b> · 高校国語</span><span className="rounded-full bg-[#d6f5ee] px-3 py-1 text-[#298d80]">対話中</span></div>
+          <p className="mt-5 text-[11px] text-[#768098]">探究テーマ</p><p className="mt-1 text-sm font-bold">「筆者の主張と具体例の見分け方」</p>
+          <div className="mt-5 space-y-3">
+            <div className="flex gap-3 bg-[#f0f1ff] p-4 text-xs leading-5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#087c73] text-white">◉</span><p><span className="block text-[10px] text-[#69809b]">問いかけ</span>「この段落の『しかし』のあと、筆者は何を一番伝えたかったのかな？」</p></div>
+            <div className="flex gap-3 bg-[#e7faf6] p-4 text-xs leading-5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[#087c73]">≡</span><p><span className="block text-[10px] text-[#69809b]">生徒の気づき</span>「これまでの具体例を否定して、新しい対比の視点を出しているところ！」</p></div>
+            <div className="flex gap-3 bg-[#f0f1ff] p-4 text-xs leading-5"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#087c73] text-white">✓</span><p><span className="block text-[10px] text-[#69809b]">伴走フィードバック</span>「鋭い！形式段落の接続詞から筆者の意図を見抜けているね。」</p></div>
           </div>
+          <div className="mt-6 flex items-center justify-between text-[10px] text-[#5d8983]"><span>● 思考ログを先生のダッシュボードへ共有完了</span><span aria-hidden="true">♧</span></div>
         </div>
       </section>
 
-      <section id="overview" className="border-t border-slate-200 bg-white">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-16 sm:px-10 lg:grid-cols-3 lg:px-16">
-          {[
-            ['理解の変化を見つける', '正答だけでなく、考え方やヒントの使い方まで記録します。'],
-            ['次にやることを決める', 'つまずきに合わせて、無理のない復習の一歩を提案します。'],
-            ['先生に根拠を届ける', '生徒の変化とAIの判断材料を、先生が確認できる形にします。'],
-          ].map(([title, description], index) => (
-            <article key={title} className="rounded-2xl border border-slate-200 p-6">
-              <p className="text-sm font-semibold text-emerald-700">0{index + 1}</p>
-              <h2 className="mt-5 text-lg font-semibold">{title}</h2>
-              <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
-            </article>
-          ))}
-        </div>
+      <section id="process" className="mx-auto grid max-w-[1440px] gap-4 px-6 pb-20 sm:px-10 lg:grid-cols-3 lg:px-14">
+        {[
+          ['01', '対話で理解を可視化', '学んだ概念を自分の言葉で説明し、どの部分が伝わっているかを根拠とともに記録します。', '◉ 概念説明の記録'],
+          ['02', '分からないところを問い返す', 'AIが知らない聞き手として、説明のつながりや曖昧な箇所を一つずつ質問します。', '△ 説明を深める個別問いかけ'],
+          ['03', '先生へ根拠ある気づきを届ける', '表面的なテストの点数では見えない、生徒の概念理解と初学者への伝わりやすさを指導に還元します。', '⌁ 指導カルテとの自動連携'],
+        ].map(([number, title, description, note]) => <article key={number} className="rounded-[22px] border border-[#e8e8ee] bg-white p-7"><p className="text-xs font-bold tracking-[0.18em] text-[#087c73]">{number}</p><h2 className="mt-5 text-base font-bold">{title}</h2><p className="mt-3 text-sm leading-6 text-[#69748b]">{description}</p><p className="mt-5 text-[10px] font-semibold text-[#47857d]">{note}</p></article>)}
       </section>
-      <footer className="mx-auto w-full max-w-6xl px-6 py-8 text-xs text-slate-500 sm:px-10 lg:px-16">
-        {BRAND.name} · 学びの過程を、次の一歩につなげる
-      </footer>
     </main>
-  );
+    <footer id="cases" className="border-t border-[#e7e8f1] bg-[#f1f3ff]"><div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-7 text-[11px] text-[#69738d] sm:px-10 lg:px-14"><span className="flex items-center gap-2 font-semibold text-[#087c73]"><BrandMark />{BRAND.shortName}</span><span>© 2024 StudyPilot. All rights reserved. 問いからはじまる、深い学びを。</span></div></footer>
+  </div>;
 }

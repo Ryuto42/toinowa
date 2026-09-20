@@ -1,36 +1,43 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
-import { adminDb } from '@/lib/database/admin';
 import { EmptyState, MetricCard, PageTitle, Panel, ScoreBar, StatusPill } from '@/components/dashboard';
-import { formatUsd } from '@/lib/shared/format';
 
 export default async function TeacherDashboardPage() {
   const context = await requireRole('teacher', 'admin');
   const db = await createClient();
-  const [classes, assessments, escalations, approvals, runs] = await Promise.all([
-    db.from('classrooms').select('*').eq('tenant_id', context.tenantId),
-    db.from('assessments').select('*, users(display_name), concepts(name)').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(100),
-    db.from('escalations').select('*, users!escalations_student_id_fkey(display_name)').eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).order('priority').limit(10),
+  const [assessments, concepts, escalations, approvals, runs] = await Promise.all([
+    db.from('assessments').select('score,override_score,concept_id').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(100),
+    db.from('concepts').select('id,name').eq('tenant_id', context.tenantId),
+    db.from('escalations').select('id,title,priority,status').eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }).limit(5),
     db.from('approvals').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).is('decision', null),
-    adminDb().from('agent_runs').select('status,estimated_cost_usd,fallback_count').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(500),
+    db.from('agent_runs').select('estimated_cost_usd').eq('tenant_id', context.tenantId),
   ]);
-  const rows = assessments.data ?? [];
-  const scores = rows.flatMap((row) => row.score === null ? [] : [Number(row.override_score ?? row.score)]);
-  const runRows = runs.data ?? [];
-  const cost = runRows.reduce((sum, row) => sum + Number(row.estimated_cost_usd ?? 0), 0);
-  const conceptScores = new Map<string, { name: string; values: number[] }>();
-  for (const row of rows) {
-    if (row.score === null) continue;
-    const current = conceptScores.get(row.concept_id) ?? { name: row.concepts?.name ?? '単元', values: [] };
-    current.values.push(Number(row.override_score ?? row.score)); conceptScores.set(row.concept_id, current);
+  const conceptNames = new Map((concepts.data ?? []).map((concept) => [concept.id, concept.name]));
+  const latestByConcept = new Map<string, number | null>();
+  for (const item of assessments.data ?? []) {
+    if (!latestByConcept.has(item.concept_id)) latestByConcept.set(item.concept_id, item.override_score ?? item.score);
   }
-  return <div><PageTitle eyebrow="Teacher Dashboard" title="クラスの現在地" description="評価の根拠、介入候補、AIの動作状況を同じ画面で確認できます。"/>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="平均理解度" value={scores.length ? `${Math.round(scores.reduce((a,b) => a+b, 0) / scores.length * 100)}%` : '—'}/><MetricCard label="要介入" value={escalations.data?.length ?? 0} tone={(escalations.data?.length ?? 0) ? 'rose' : 'emerald'}/><MetricCard label="承認待ち" value={approvals.count ?? 0} tone={(approvals.count ?? 0) ? 'amber' : 'emerald'}/><MetricCard label="AI費用（直近）" value={formatUsd(cost)} note={`${runRows.length}処理・フォールバック ${runRows.reduce((a,b) => a+b.fallback_count, 0)}回`} tone="slate"/></div>
-    <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><Panel title="単元別理解度" description={`${classes.data?.length ?? 0}クラスの観測データ`}>
-      {conceptScores.size ? <div className="space-y-5">{[...conceptScores.entries()].slice(0, 8).map(([id, item]) => <div key={id}><div className="mb-2 flex justify-between text-sm"><span className="font-bold">{item.name}</span><span className="text-slate-500">{item.values.length}件</span></div><ScoreBar value={item.values.reduce((a,b) => a+b,0)/item.values.length}/></div>)}</div> : <EmptyState>評価データが入ると単元ごとの傾向を表示します</EmptyState>}
-    </Panel><Panel title="介入候補" action={<Link href="/teacher/interventions" className="text-xs font-bold text-emerald-700">すべて見る</Link>}>
-      {escalations.data?.length ? <div className="space-y-4">{escalations.data.slice(0,5).map((item) => <Link href="/teacher/interventions" key={item.id} className="block"><div className="flex items-center gap-2"><StatusPill tone={item.priority === 'urgent' ? 'rose' : 'amber'}>{item.priority}</StatusPill><span className="text-xs text-slate-500">{item.users?.display_name}</span></div><p className="mt-2 text-sm font-bold">{item.title}</p></Link>)}</div> : <EmptyState>現在、介入候補はありません</EmptyState>}
-    </Panel></div>
+  const scores = [...latestByConcept.values()].filter((score): score is number => score !== null);
+  const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 100) : null;
+  const cost = (runs.data ?? []).reduce((sum, run) => sum + Number(run.estimated_cost_usd ?? 0), 0);
+
+  return <div>
+    <PageTitle title="ダッシュボード" />
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard label="平均理解度" value={average === null ? '—' : `${average}%`} note={average === null ? 'データ収集中' : `${scores.length}単元の観測データ`} />
+      <MetricCard label="要介入" value={escalations.data?.length ?? 0} tone={escalations.data?.length ? 'rose' : 'emerald'} note="緊急対応が必要な生徒" />
+      <MetricCard label="承認待ち" value={approvals.count ?? 0} tone={approvals.count ? 'amber' : 'emerald'} note="未処理のタスク" />
+      <MetricCard label="AI費用（直近）" value={`$${cost.toFixed(4)}`} tone="slate" note="記録されたAI実行・フォールバックを含む" />
+    </div>
+
+    <div className="mt-9 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <Panel title="単元別理解度" description="1クラスの観測データ">
+        {latestByConcept.size ? <div className="space-y-5">{[...latestByConcept.entries()].slice(0, 8).map(([conceptId, score]) => <div key={conceptId}><div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-[#34445f]">{conceptNames.get(conceptId) ?? '学習単元'}</span><span className="text-xs text-[#8a9ab2]">最新の評価</span></div><ScoreBar value={score} /></div>)}</div> : <EmptyState><span className="text-2xl text-[#c5d3e4]">▥</span><span className="mt-2 block">評価データが入ると単元ごとの傾向を表示します</span></EmptyState>}
+      </Panel>
+      <Panel title="介入候補" action={<Link href="/teacher/interventions" className="text-xs font-bold text-[#237d75]">すべて見る　›</Link>}>
+        {escalations.data?.length ? <div className="space-y-3">{escalations.data.map((item) => <Link key={item.id} href="/teacher/interventions" className="flex items-center justify-between gap-3 rounded-2xl border border-[#edf0f2] p-4 hover:border-[#b9dcd5]"><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs text-[#8a9ab2]">優先度: {item.priority}</p></div><StatusPill tone={item.priority === 'urgent' ? 'rose' : 'amber'}>{item.status === 'open' ? '未対応' : '確認中'}</StatusPill></Link>)}</div> : <EmptyState><span className="text-2xl text-[#c5d3e4]">♢</span><span className="mt-2 block">現在、介入候補はありません</span></EmptyState>}
+      </Panel>
+    </div>
   </div>;
 }

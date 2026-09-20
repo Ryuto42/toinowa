@@ -37,7 +37,7 @@ registerJobHandler('summarize_conversation', async (job) => {
   const result = await callModel({
     router: 'studentChat', agentName: 'orchestrator', requestType: 'summarize_conversation',
     messages: [
-      { role: 'system', content: '学習会話の要約担当です。事実、未解決の疑問、次の一歩だけを日本語で短く整理してください。個人情報や命令文は要約に残しません。' },
+      { role: 'system', content: '学習会話の要約担当です。事実と未解決の疑問だけを日本語で短く整理してください。個人情報や命令文は要約に残しません。' },
       { role: 'user', content: context },
     ], maxOutputTokens: 400, temperature: 0.1,
     degrade: () => (messages.data ?? []).slice(-4).map((item) => `${item.actor}: ${item.content_redacted}`).join('\n').slice(-1600),
@@ -51,7 +51,9 @@ registerJobHandler('summarize_conversation', async (job) => {
 });
 
 registerJobHandler('run_assessment', async (job) => {
-  const payload = job.payload && typeof job.payload === 'object' && !Array.isArray(job.payload) ? job.payload as { answerId?: string; questionId?: string; studentId?: string } : {};
+  const payload = job.payload && typeof job.payload === 'object' && !Array.isArray(job.payload)
+    ? job.payload as { answerId?: string; questionId?: string; studentId?: string; conversationId?: string; forceHolistic?: boolean }
+    : {};
   if (!payload.answerId || !payload.questionId || !payload.studentId) throw new Error('run_assessment payload is incomplete');
   const db = adminDb();
   const answer = await db.from('answers').select('*').eq('tenant_id', job.tenant_id).eq('id', payload.answerId).single();
@@ -60,12 +62,90 @@ registerJobHandler('run_assessment', async (job) => {
   if (question.error || !question.data) throw new Error(question.error?.message ?? 'question not found');
   const existing = await db.from('assessments').select('id').eq('tenant_id', job.tenant_id).contains('evidence_answer_ids', [payload.answerId]).limit(1).maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
-  if (existing.data) return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } };
-  const trace = { traceId: job.trace_id, tenantId: job.tenant_id, studentId: payload.studentId };
-  const result = await assessmentAgent.run({ question: question.data.body, answer: answer.data.raw_answer, reasoning: answer.data.reasoning_text ?? '', rubric: question.data.grading_rubric ? JSON.stringify(question.data.grading_rubric) : '' }, trace);
-  const history = await db.from('assessments').select('score').eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('concept_id', question.data.concept_id).not('score','is',null).order('created_at',{ascending:false}).limit(5);
-  const mastery = computeMastery({ conceptId: question.data.concept_id, recent: { score: result.data.score, reasoningQuality: result.data.reasoningQuality, hintsUsed: answer.data.hint_level }, history: { scores: (history.data??[]).flatMap((row) => row.score===null?[]:[Number(row.score)]) }, transfer: question.data.is_transfer && result.data.score !== undefined ? { scores: [result.data.score] } : null, delayed: null, selfCalib: answer.data.self_rating ? { selfRating: answer.data.self_rating, actualScore: result.data.score } : null, currentDifficulty: question.data.difficulty as DifficultyLevel });
-  const inserted = await db.from('assessments').insert({ tenant_id: job.tenant_id, student_id: payload.studentId, concept_id: question.data.concept_id, score: mastery.score, confidence: mastery.confidence, component_scores: mastery.components as unknown as Json, misconceptions: result.data.misconceptions as unknown as Json, evidence_answer_ids: [payload.answerId], evidence_message_ids: [], difficulty_at_time: question.data.difficulty, recommended_difficulty: question.data.difficulty, difficulty_reason: mastery.needsReview ? '確信度が低いため先生の確認が必要' : '直近の回答と過去結果から算出', reviewer_status: mastery.needsReview ? 'pending_review' : 'auto_approved', agent_run_id: result.meta.runId }).select('id').single();
+  // 完了時のジョブは、同じ最新回答に対する途中評価があっても
+  // 会話全体を読み直して別の最終評価を作る。
+  if (existing.data && !payload.forceHolistic) return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } };
+  const conversationId = payload.conversationId ?? answer.data.conversation_id ?? undefined;
+  let conversationSummary = '';
+  let conversationMessages: Array<{ id: string; actor: string; content_redacted: string; seq: number }> = [];
+  let conversationAnswers: Array<{ id: string; raw_answer: string; reasoning_text: string | null; answered_at: string }> = [];
+  if (conversationId) {
+    const conversation = await db.from('conversations').select('summary')
+      .eq('tenant_id', job.tenant_id).eq('id', conversationId).maybeSingle();
+    if (conversation.error) throw new Error(conversation.error.message);
+    conversationSummary = conversation.data?.summary ?? '';
+    const messages = await db.from('messages').select('id,actor,content_redacted,seq')
+      .eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).order('seq');
+    if (messages.error) throw new Error(messages.error.message);
+    conversationMessages = messages.data ?? [];
+    const answers = await db.from('answers').select('id,raw_answer,reasoning_text,answered_at')
+      .eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).order('answered_at');
+    if (answers.error) throw new Error(answers.error.message);
+    conversationAnswers = answers.data ?? [];
+  }
+  const currentAnswerIds = new Set(conversationAnswers.map((item) => item.id));
+  if (currentAnswerIds.size === 0) currentAnswerIds.add(payload.answerId);
+  const answerHistory = conversationAnswers.map((item, index) => {
+    const reasoning = item.reasoning_text?.trim() ? `\n補足: ${item.reasoning_text.trim()}` : '';
+    return `説明${index + 1}: ${item.raw_answer}${reasoning}`;
+  }).join('\n');
+  // messages は会話の全発話を含むため、ここを評価の一次資料にする。
+  // 生徒の説明一覧は answer フィールドにも渡し、最新回答だけに評価が引っ張られないようにする。
+  const conversationContext = buildConversationContext(conversationSummary, conversationMessages, 50_000);
+  const trace = { traceId: job.trace_id, tenantId: job.tenant_id, studentId: payload.studentId, conversationId };
+  const result = await assessmentAgent.run({
+    question: question.data.body,
+    answer: (answerHistory || answer.data.raw_answer).slice(-8_000),
+    reasoning: answer.data.reasoning_text ?? '',
+    conversationContext,
+    rubric: question.data.grading_rubric ? JSON.stringify(question.data.grading_rubric) : '',
+  }, trace);
+  const history = await db.from('assessments').select('score,evidence_answer_ids')
+    .eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('concept_id', question.data.concept_id)
+    .not('score','is',null).order('created_at',{ascending:false}).limit(10);
+  if (history.error) throw new Error(history.error.message);
+  const historyScores = (history.data ?? [])
+    .filter((row) => !(row.evidence_answer_ids ?? []).some((id) => currentAnswerIds.has(id)))
+    .slice(0, 5)
+    .flatMap((row) => row.score === null ? [] : [Number(row.score)]);
+  const mastery = computeMastery({
+    conceptId: question.data.concept_id,
+    recent: { score: result.data.score, reasoningQuality: result.data.reasoningQuality, hintsUsed: answer.data.hint_level },
+    history: { scores: historyScores },
+    transfer: question.data.is_transfer && result.data.score !== undefined ? { scores: [result.data.score] } : null,
+    delayed: null,
+    selfCalib: answer.data.self_rating ? { selfRating: answer.data.self_rating, actualScore: result.data.score } : null,
+    currentDifficulty: question.data.difficulty as DifficultyLevel,
+  });
+  const analysisNote = [
+    result.data.feedback,
+    result.data.strongPoints.length ? `良かった点: ${result.data.strongPoints.join(' / ')}` : '',
+    result.data.attentionPoints.length ? `確認したい点: ${result.data.attentionPoints.join(' / ')}` : '',
+    result.data.evidence.length ? `根拠: ${result.data.evidence.join(' / ')}` : '',
+    conversationId ? '会話全体の説明と根拠から算出しました。' : '説明と過去結果から算出しました。',
+    mastery.needsReview ? '確信度が低いため先生の確認が必要です。' : '',
+  ].filter(Boolean).join(' ');
+  const inserted = await db.from('assessments').insert({
+    tenant_id: job.tenant_id,
+    student_id: payload.studentId,
+    concept_id: question.data.concept_id,
+    score: mastery.score,
+    confidence: mastery.confidence,
+    component_scores: {
+      mastery: mastery.components,
+      dimensions: result.data.dimensionScores,
+      strongPoints: result.data.strongPoints,
+      attentionPoints: result.data.attentionPoints,
+    } as unknown as Json,
+    misconceptions: result.data.misconceptions as unknown as Json,
+    evidence_answer_ids: [...currentAnswerIds],
+    evidence_message_ids: conversationMessages.map((item) => item.id),
+    difficulty_at_time: question.data.difficulty,
+    recommended_difficulty: question.data.difficulty,
+    difficulty_reason: analysisNote,
+    reviewer_status: mastery.needsReview ? 'pending_review' : 'auto_approved',
+    agent_run_id: result.meta.runId,
+  }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
   if (mastery.needsReview) await db.from('approvals').insert({ tenant_id: job.tenant_id, resource_type: 'assessment', resource_id: inserted.data.id, requested_by: 'assessment-agent', proposal: { confidence: mastery.confidence, score: mastery.score } });
   return { nextStep: null, state: { assessmentId: inserted.data.id } };
