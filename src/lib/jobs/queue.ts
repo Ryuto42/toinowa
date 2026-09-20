@@ -38,6 +38,7 @@ export async function enqueueJob(input: EnqueueJobInput): Promise<JobRow | null>
   const existing = await db
     .from('jobs')
     .select('*')
+    .eq('tenant_id', input.tenantId)
     .eq('kind', input.kind)
     .eq('idempotency_key', input.idempotencyKey)
     .maybeSingle();
@@ -52,8 +53,12 @@ export function triggerWorkerTick(): void {
     method: 'POST',
     headers: { 'X-Worker-Secret': serverEnv.WORKER_SECRET },
     body: '{}',
-  }).catch((error) => {
-    console.warn('[jobs] immediate worker tick failed:', error);
+    signal: AbortSignal.timeout(110_000),
+    redirect: 'error',
+  }).then(response => {
+    if (!response.ok) console.warn('[jobs] immediate worker tick returned:', response.status);
+  }).catch(() => {
+    console.warn('[jobs] immediate worker tick failed; queued jobs await the next tick');
   });
 
   try {

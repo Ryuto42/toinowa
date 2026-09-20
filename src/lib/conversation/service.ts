@@ -149,6 +149,7 @@ export async function recordConversationAnswer(input: {
 }
 
 export async function completeConversation(context: AuthContext, conversationId: string) {
+  await getConversation(context, conversationId);
   const db = adminDb();
   const { data, error } = await db.from('conversations').update({
     state: 'completed',

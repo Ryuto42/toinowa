@@ -15,15 +15,17 @@ function proposalRecord(value: unknown): Record<string, unknown> {
 
 export function ApprovalQueue({ initial }: { initial: Approval[] }) {
   const [error, setError] = useState('');
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [dueDates, setDueDates] = useState<Record<string, string>>({});
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   async function decide(id: string, decision: 'approved' | 'rejected') {
+    if (decision === 'rejected' && !reasons[id]?.trim()) { setError('却下する理由を入力してください。'); return; }
     setBusy(id); setError('');
     try {
       const response = await fetch(`/api/approvals/${id}/decision`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ decision, ...(dueDates[id] ? { dueAt: new Date(dueDates[id]).toISOString() } : {}), rejectReason: decision === 'rejected' ? '先生が内容を確認して却下' : undefined }),
+        body: JSON.stringify({ decision, ...(dueDates[id] ? { dueAt: new Date(dueDates[id]).toISOString() } : {}), rejectReason: decision === 'rejected' ? reasons[id].trim() : undefined }),
       });
       if (response.ok) setItems(current => current.filter(item => item.id !== id));
       else { const body = await response.json(); setError(body.message ?? '承認を保存できませんでした'); }
@@ -50,6 +52,7 @@ export function ApprovalQueue({ initial }: { initial: Approval[] }) {
           </div>
           <div className="shrink-0 space-y-3">
             {homework ? <label className="block text-sm">宿題の期限<input aria-label="宿題の期限" type="datetime-local" value={dueDates[item.id] ?? ''} onChange={event => setDueDates(current => ({ ...current, [item.id]: event.target.value }))} className="mt-1 block rounded-lg border p-2" /></label> : null}
+            <label className="block text-sm">却下する場合の理由<textarea aria-label="却下理由" maxLength={2000} value={reasons[item.id] ?? ''} onChange={event => setReasons(current => ({ ...current, [item.id]: event.target.value }))} placeholder="例：まだ授業で扱っていないため" className="mt-1 block w-full rounded-lg border p-2" rows={2} /></label>
             <div className="flex gap-2">
               <button disabled={busy !== null} onClick={() => decide(item.id, 'rejected')} className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-50">却下</button>
               <button disabled={busy !== null || (homework && !dueDates[item.id])} onClick={() => decide(item.id, 'approved')} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{homework ? '確認して配信' : '承認'}</button>

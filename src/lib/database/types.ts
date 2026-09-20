@@ -2432,6 +2432,14 @@ export interface Database {
         };
         Returns: void;
       };
+      fail_leased_job: {
+        Args: {
+          p_job_id: string;
+          p_lease_token: string;
+          p_error: string;
+        };
+        Returns: boolean;
+      };
       match_material_chunks: {
         Args: {
           p_tenant: string;
