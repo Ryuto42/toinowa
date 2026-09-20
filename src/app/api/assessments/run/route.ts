@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requireAuth } from '@/lib/auth/guard';
+import { requireRole } from '@/lib/auth/guard';
 import { assertStudentScope } from '@/lib/auth/student-scope';
 import { adminDb } from '@/lib/database/admin';
 import { assessmentAgent } from '@/lib/agents/catalog';
@@ -25,7 +25,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const context = await requireAuth();
+    const context = await requireRole('teacher', 'admin');
     const body = await parseJson(request, schema);
     const studentId = body.studentId ?? context.userId;
     await assertStudentScope(context, studentId);

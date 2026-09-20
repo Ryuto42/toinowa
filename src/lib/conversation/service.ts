@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { createClient } from '@/lib/database/server';
 import { adminDb } from '@/lib/database/admin';
 import type { AuthContext } from '@/lib/auth/guard';
 import { assertStudentScope } from '@/lib/auth/student-scope';
@@ -63,27 +64,29 @@ export async function createConversation(context: AuthContext, input: z.infer<ty
     if (existing.data?.[0]) return existing.data[0];
   }
 
+  if (context.role === 'student' && !input.assignmentId && (input.lessonId || input.conceptId)) throw new Error('宿題を選択してください');
   let lessonId = input.lessonId ?? null;
   let conceptId = input.conceptId ?? null;
   let openingMessage = '';
   if (input.assignmentId) {
-    const assignment = await db.from('assignments').select('lesson_id,question_ids')
+    const assignment = await (await createClient()).from('assignments').select('lesson_id,question_ids')
       .eq('tenant_id', context.tenantId).eq('id', input.assignmentId).maybeSingle();
     if (assignment.error || !assignment.data) throw new Error(assignment.error?.message ?? 'assignment not found');
-    lessonId ??= assignment.data.lesson_id;
+    lessonId = assignment.data.lesson_id;
     const questionId = assignment.data.question_ids[0];
     if (questionId) {
-      const question = await db.from('questions').select('id,concept_id,format')
+      const question = await db.from('questions').select('id,concept_id,format,body')
         .eq('tenant_id', context.tenantId).eq('id', questionId).maybeSingle();
       if (question.error || !question.data) throw new Error(question.error?.message ?? 'work prompt not found');
       if (question.data.format !== 'explain') throw new Error('このワークは概念説明形式ではありません');
-      conceptId ??= question.data.concept_id;
+      conceptId = question.data.concept_id;
       const concept = await db.from('concepts').select('name')
         .eq('tenant_id', context.tenantId).eq('id', question.data.concept_id).maybeSingle();
       const theme = concept.data?.name ?? '学んだ概念';
       openingMessage = [
         '「' + theme + '」について教えてください！',
-        'わたしにもわかる感じで、まずはどんなものか教えてほしいな！',
+        question.data.body,
+        'まずは、あなたの言葉で教えてほしいな！',
       ].join('\n\n');
     }
   }
@@ -121,13 +124,15 @@ export async function recordConversationAnswer(input: {
   answer: string;
 }) {
   const db = adminDb();
-  const assignment = await db.from('assignments').select('id,question_ids')
+  const assignment = await (await createClient()).from('assignments').select('id,question_ids')
     .eq('tenant_id', input.context.tenantId).eq('id', input.assignmentId).maybeSingle();
   if (assignment.error || !assignment.data) throw new Error(assignment.error?.message ?? 'assignment not found');
   if (!assignment.data.question_ids.includes(input.questionId)) throw new Error('question is not part of assignment');
-  const question = await db.from('questions').select('id,format')
+  const conversation = await getConversation(input.context, input.conversationId);
+  const question = await db.from('questions').select('id,format,concept_id')
     .eq('tenant_id', input.context.tenantId).eq('id', input.questionId).maybeSingle();
   if (question.error || !question.data) throw new Error(question.error?.message ?? 'work prompt not found');
+  if (question.data.concept_id !== conversation.concept_id) throw new Error('この会話のお題ではありません');
   if (question.data.format !== 'explain') throw new Error('このワークは概念説明形式ではありません');
   const inserted = await db.from('answers').insert({
     tenant_id: input.context.tenantId,
@@ -140,24 +145,6 @@ export async function recordConversationAnswer(input: {
     hint_level: 0,
   }).select('*').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'conversation answer create failed');
-  // jobs.trace_id は uuid 型。会話IDと回答IDを文字列連結すると
-  // Postgresへ入らないため、追跡用のUUIDを別に発行する。
-  const traceId = crypto.randomUUID();
-  const queued = await enqueueJob({
-    tenantId: input.context.tenantId,
-    kind: 'run_assessment',
-    idempotencyKey: `run_assessment:${inserted.data.id}`,
-    payload: {
-      answerId: inserted.data.id,
-      questionId: input.questionId,
-      studentId: input.context.userId,
-      conversationId: input.conversationId,
-    },
-    priority: 1,
-    traceId,
-  });
-  if (!queued) throw new Error('conversation assessment queue failed');
-  triggerWorkerTick();
   return inserted.data;
 }
 
@@ -171,8 +158,7 @@ export async function completeConversation(context: AuthContext, conversationId:
   if (!data) throw new Error('conversation not found');
 
   // 完了時は、途中の回答ではなく会話全体を根拠にした最終分析を必ず作る。
-  // 途中の評価ジョブは生徒画面の即時フィードバック用に残し、先生画面では
-  // このジョブが作る最新の holistic assessment を優先して表示する。
+  // 途中で評価モデルは呼ばず、完了後に一度だけ高品質な分析を行う。
   const latestAnswer = await db.from('answers')
     .select('id,question_id,student_id')
     .eq('tenant_id', context.tenantId)

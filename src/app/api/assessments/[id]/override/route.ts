@@ -1,3 +1,4 @@
+import { queuePlanFromAssessment } from '@/lib/plans/followup';
 import { z } from 'zod';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
@@ -16,6 +17,7 @@ export async function POST(request: Request, route: Context) {
     const updated=await adminDb().from('assessments').update({override_score:body.score,override_note:body.note,reviewer_status:'overridden',reviewed_by:context.userId,reviewed_at:new Date().toISOString()}).eq('tenant_id',context.tenantId).eq('id',id).select('*').single();
     if(updated.error||!updated.data) throw new Error(updated.error?.message??'assessment override failed');
     recordAudit({tenantId:context.tenantId,actorId:context.userId,actorRole:context.role,action:'assessment.override',resourceType:'assessment',resourceId:id,result:'allow',detail:{score:body.score,note:body.note}});
+    await queuePlanFromAssessment(context.tenantId, id);
     return json({assessment:updated.data});
   } catch(error){return routeError(error)}
 }

@@ -1,5 +1,6 @@
 import 'server-only';
 import type { z } from 'zod';
+import type { ModelClass } from './selection';
 import type { RouterKey } from './routers';
 
 /** どのエージェントからの呼び出しか。agent_runs.agent_name に入る。 */
@@ -15,6 +16,9 @@ export type AgentName =
 /** 1つのユーザー操作に紐づく実行をまとめる文脈 */
 export interface TraceCtx {
   traceId: string;
+  userId?: string | null;
+  modelClass?: ModelClass;
+  routingReason?: string;
   tenantId: string;
   studentId?: string | null;
   conversationId?: string | null;
@@ -23,7 +27,7 @@ export interface TraceCtx {
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
   tool_call_id?: string;
   name?: string;
 }
@@ -78,6 +82,7 @@ export interface CallResult<T> {
 
 export interface CallOptions<T extends z.ZodTypeAny | undefined = undefined> {
   router: RouterKey;
+  modelClass?: ModelClass;
   agentName: AgentName;
   /** 何のための呼び出しか。agent_runs.request_type に入る */
   requestType: string;

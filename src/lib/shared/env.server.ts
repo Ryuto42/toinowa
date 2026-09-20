@@ -16,6 +16,10 @@ const schema = z.object({
   // production … 高性能モデル。「本番環境でテストする」と明示したときだけ
   AI_MODEL_TIER: z.enum(['dev', 'production']).default('dev'),
   // 1日あたりのAI費用上限(USD)。暴走ループでクレジットが溶けるのを防ぐ安全弁。
+  AI_ECONOMY_MODEL: z.string().min(1).default('google/gemini-2.5-flash-lite'),
+  AI_STANDARD_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
+  AI_ADVANCED_MODEL: z.string().min(1).default('orcarouter/auto'),
+  AI_VISION_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
   AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(1.0),
   ORCAROUTER_API_KEY: z.string().startsWith('sk-orca-'),
   ORCAROUTER_BASE_URL: z.url().default('https://api.orcarouter.ai/v1'),

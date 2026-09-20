@@ -1,0 +1,33 @@
+import { z } from 'zod';
+import { createClient as createAuthClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/database/server';
+import { adminDb } from '@/lib/database/admin';
+import { requireAuth } from '@/lib/auth/guard';
+import { newPasswordSchema } from '@/lib/auth/student-credentials';
+import { clientEnv } from '@/lib/shared/env.client';
+import { json, parseJson, routeError, ApiInputError } from '@/lib/api/http';
+
+const schema = z.object({ currentPassword: z.string().min(1).max(256), password: newPasswordSchema }).refine(value => value.password !== value.currentPassword, '初期パスワードと異なるパスワードを設定してください');
+export async function POST(request: Request) {
+  try {
+    const context = await requireAuth({ allowPasswordChange: true });
+    const body = await parseJson(request, schema);
+    const db = adminDb();
+    const user = await db.auth.admin.getUserById(context.userId);
+    if (user.error || !user.data.user.email) throw new Error('account not found');
+    const verifier = createAuthClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    const verified = await verifier.auth.signInWithPassword({ email: user.data.user.email, password: body.currentPassword });
+    if (verified.error || verified.data.user.id !== context.userId) throw new ApiInputError('現在のパスワードが正しくありません');
+    // 変更成功後のみ利用制限を解除する。更新失敗時は制限を残す。
+    try {
+      const updated = await verifier.auth.updateUser({ password: body.password });
+      if (updated.error) throw new ApiInputError('パスワードを変更できませんでした。別のパスワードで再試行してください');
+      const released = await db.from('users').update({ must_change_password: false }).eq('id', context.userId).eq('tenant_id', context.tenantId);
+      if (released.error) throw new Error(released.error.message);
+    } finally { await verifier.auth.signOut({ scope: 'local' }); }
+    const supabase = await createClient();
+    const refreshed = await supabase.auth.refreshSession();
+    // 再ログインでも制限解除後のクレームを取得できる。
+    return json({ ok: true, redirectTo: refreshed.error ? '/login' : context.role === 'student' ? '/student/home' : context.role === 'teacher' ? '/teacher/dashboard' : '/admin/overview' });
+  } catch (error) { return routeError(error); }
+}

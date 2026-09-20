@@ -215,6 +215,7 @@ export interface Database {
           student_id: string | null;
           conversation_id: string | null;
           created_at: string;
+          actor_id: string | null;
         };
         Insert: {
           id?: string;
@@ -241,6 +242,7 @@ export interface Database {
           student_id?: string | null;
           conversation_id?: string | null;
           created_at?: string;
+          actor_id?: string | null;
         };
         Update: {
           id?: string;
@@ -267,8 +269,16 @@ export interface Database {
           student_id?: string | null;
           conversation_id?: string | null;
           created_at?: string;
+          actor_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'agent_runs_actor_id_fkey';
+            columns: ['actor_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'agent_runs_conversation_id_fkey';
             columns: ['conversation_id'];
@@ -546,6 +556,8 @@ export interface Database {
           version: number;
           agent_run_id: string | null;
           created_at: string;
+          conversation_id: string | null;
+          is_final: boolean;
         };
         Insert: {
           id?: string;
@@ -569,6 +581,8 @@ export interface Database {
           version?: number;
           agent_run_id?: string | null;
           created_at?: string;
+          conversation_id?: string | null;
+          is_final?: boolean;
         };
         Update: {
           id?: string;
@@ -592,6 +606,8 @@ export interface Database {
           version?: number;
           agent_run_id?: string | null;
           created_at?: string;
+          conversation_id?: string | null;
+          is_final?: boolean;
         };
         Relationships: [
           {
@@ -599,6 +615,13 @@ export interface Database {
             columns: ['concept_id'];
             isOneToOne: false;
             referencedRelation: 'concepts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assessments_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: true;
+            referencedRelation: 'conversations';
             referencedColumns: ['id'];
           },
           {
@@ -638,6 +661,7 @@ export interface Database {
           published_at: string | null;
           approved_by: string | null;
           created_at: string;
+          source_plan_id: string | null;
         };
         Insert: {
           id?: string;
@@ -652,6 +676,7 @@ export interface Database {
           published_at?: string | null;
           approved_by?: string | null;
           created_at?: string;
+          source_plan_id?: string | null;
         };
         Update: {
           id?: string;
@@ -666,6 +691,7 @@ export interface Database {
           published_at?: string | null;
           approved_by?: string | null;
           created_at?: string;
+          source_plan_id?: string | null;
         };
         Relationships: [
           {
@@ -687,6 +713,13 @@ export interface Database {
             columns: ['lesson_id'];
             isOneToOne: false;
             referencedRelation: 'lessons';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignments_source_plan_id_fkey';
+            columns: ['source_plan_id'];
+            isOneToOne: true;
+            referencedRelation: 'learning_plans';
             referencedColumns: ['id'];
           },
           {
@@ -2040,6 +2073,9 @@ export interface Database {
           current_difficulty: number;
           streak_days: number;
           last_active_on: string | null;
+          learning_goal: string;
+          exam_results: string;
+          weak_areas: string;
         };
         Insert: {
           user_id: string;
@@ -2052,6 +2088,9 @@ export interface Database {
           current_difficulty?: number;
           streak_days?: number;
           last_active_on?: string | null;
+          learning_goal?: string;
+          exam_results?: string;
+          weak_areas?: string;
         };
         Update: {
           user_id?: string;
@@ -2064,6 +2103,9 @@ export interface Database {
           current_difficulty?: number;
           streak_days?: number;
           last_active_on?: string | null;
+          learning_goal?: string;
+          exam_results?: string;
+          weak_areas?: string;
         };
         Relationships: [
           {
@@ -2193,30 +2235,33 @@ export interface Database {
           tenant_id: string;
           role: UserRole;
           display_name: string;
-          email: string;
+          email: string | null;
           login_identifier: string | null;
           status: UserStatus;
           created_at: string;
+          must_change_password: boolean;
         };
         Insert: {
           id: string;
           tenant_id: string;
           role: UserRole;
           display_name: string;
-          email: string;
+          email?: string | null;
           login_identifier?: string | null;
           status?: UserStatus;
           created_at?: string;
+          must_change_password?: boolean;
         };
         Update: {
           id?: string;
           tenant_id?: string;
           role?: UserRole;
           display_name?: string;
-          email?: string;
+          email?: string | null;
           login_identifier?: string | null;
           status?: UserStatus;
           created_at?: string;
+          must_change_password?: boolean;
         };
         Relationships: [
           {
@@ -2343,6 +2388,33 @@ export interface Database {
           p_lease_sec?: number;
         };
         Returns: unknown[];
+      };
+      create_explanation_work: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_classroom: string;
+          p_title: string;
+          p_body: string;
+          p_content: string;
+          p_difficulty: number;
+          p_student?: string;
+          p_plan?: string;
+          p_publish?: boolean;
+          p_due_at?: string;
+        };
+        Returns: string;
+      };
+      decide_learning_approval: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_approval: string;
+          p_decision: string;
+          p_reason?: string;
+          p_due_at?: string;
+        };
+        Returns: Json;
       };
       fail_job_permanently: {
         Args: {

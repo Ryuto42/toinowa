@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 const mocks = vi.hoisted(() => {
   const query = {
@@ -59,6 +60,27 @@ describe('callModel', () => {
     mocks.create.mockReset();
     mocks.recordRun.mockReset();
     mocks.query.data = [];
+  });
+
+  it('用途別モデルが遅い場合はautoを再試行せず別モデルに切り替える', async () => {
+    mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status: 504 }) })
+      .mockReturnValueOnce(queuedResponse(okResponse('recovered')));
+    const result = await callModel({ router: 'assessment', modelClass: 'advanced', agentName: 'assessment', requestType: 'final', messages: [{ role: 'user', content: 'test' }], trace });
+    expect(result.data).toBe('recovered');
+    expect(mocks.create.mock.calls.map(call => call[0].model)).toEqual(['orcarouter/auto', 'google/gemini-2.5-flash']);
+    expect(result.meta.fallbackCount).toBe(1);
+    expect(result.meta.resolvedModel).toBe('google/gemini-2.5-flash');
+    expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed_over' }));
+  });
+
+  it('構造化出力の修復前後の使用量を合算する', async () => {
+    mocks.create.mockReturnValueOnce(queuedResponse(okResponse('invalid json')))
+      .mockReturnValueOnce(queuedResponse(okResponse('{"answer":"ok"}')));
+    const result = await callModel({ router: 'assessment', modelClass: 'advanced', agentName: 'assessment', requestType: 'final', schema: z.object({ answer: z.string() }), messages: [{ role: 'user', content: 'test' }], trace });
+    expect(result.data).toEqual({ answer: 'ok' });
+    expect(result.meta.costUsd).toBe(0.002);
+    expect(result.meta.inputTokens).toBe(6);
+    expect(result.meta.outputTokens).toBe(10);
   });
 
   it('正常応答を返し、Orcaの観測ヘッダーと費用を記録する', async () => {

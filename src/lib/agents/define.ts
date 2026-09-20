@@ -16,6 +16,7 @@ export interface DefineAgentOptions<Input, Output> {
   buildUserMessage(input: Input): string;
   degrade?: (input: Input) => Output;
   skipInputRuleCheck?: boolean;
+  maxOutputTokens?: number;
   outputText?(output: Output): string;
 }
 
@@ -38,6 +39,7 @@ export function defineAgent<Input, Output>(options: DefineAgentOptions<Input, Ou
 
       const result = await callModel({
         router: options.router,
+        modelClass: trace.modelClass ?? (options.name === 'assessment' ? 'advanced' : undefined),
         agentName: options.name,
         requestType: options.requestType,
         messages: [
@@ -45,6 +47,7 @@ export function defineAgent<Input, Output>(options: DefineAgentOptions<Input, Ou
           { role: 'user', content: guarded.masked.text },
         ],
         schema: options.outputSchema,
+        maxOutputTokens: options.maxOutputTokens,
         degrade: options.degrade ? () => options.degrade!(input) : undefined,
         trace,
       });

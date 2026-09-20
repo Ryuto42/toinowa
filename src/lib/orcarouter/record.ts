@@ -49,6 +49,7 @@ async function write(rec: RunRecord): Promise<void> {
     tool_calls: (rec.toolCalls ?? []) as never,
     status: rec.status,
     error_code: rec.errorCode ?? null,
+    actor_id: trace.userId ?? trace.studentId ?? null,
     student_id: trace.studentId ?? null,
     conversation_id: trace.conversationId ?? null,
   });

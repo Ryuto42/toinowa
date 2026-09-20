@@ -3,6 +3,8 @@ import { json, parseJson, routeError, traceIdFrom, uuidParam } from '@/lib/api/h
 import { appendMessage, completeConversation, getConversation, listMessages, messageCreateSchema, maybeQueueConversationSummary, recordConversationAnswer } from '@/lib/conversation/service';
 import { buildConversationContext } from '@/lib/conversation/context';
 import { fastPathMessage, routeConversation } from '@/lib/agents/orchestrator';
+import { adminDb } from '@/lib/database/admin';
+import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
 
 type Context = { params: Promise<{ id: string }> };
@@ -31,9 +33,9 @@ function hasRepeatedQuestion(message: string, previousMessages: Array<{ actor: s
 
 function fallbackQuestion(focus: typeof FOCUS_BY_TURN[number]): string {
   switch (focus) {
-    case 'relationship': return '切片で場所、傾きで向きを決めると、どうして一本の線になるのかな？';
+    case 'relationship': return '今教えてくれたことは、どうつながっているのかな？';
     case 'example': return '身近なたとえを、もう一つだけ教えてほしいな！';
-    case 'boundary': return '傾きが0やマイナスのとき、グラフはどう変わるのかな？';
+    case 'boundary': return 'その説明が当てはまらない場合もあるのかな？';
     case 'summary': return '最後に、この概念をひとことでまとめて教えてほしいな！';
     case 'finish': return '教えてくれてありがとう！';
   }
@@ -43,7 +45,7 @@ function questionMatchesFocus(message: string, focus: typeof FOCUS_BY_TURN[numbe
   const text = normalizedQuestion(message);
   if (focus === 'relationship') return /(関係|つなが|一緒|決ま|形)/u.test(text);
   if (focus === 'example') return /(例|たとえ|身近|具体)/u.test(text);
-  if (focus === 'boundary') return /(0|ゼロ|マイナス|負|変わ|水平|上|下|増|減)/u.test(text);
+  if (focus === 'boundary') return /(場合|条件|例外|当てはま|変わ)/u.test(text);
   if (focus === 'summary') return /(まとめ|ひとこと|一言|要約)/u.test(text);
   return false;
 }
@@ -115,14 +117,16 @@ export async function POST(request: Request, route: Context) {
     const atMaxTurns = studentTurn >= MAX_EXPLANATION_TURNS;
     const requiredFocus = focusForTurn(studentTurn);
     const decision = routeConversation({ message: body.content, state: conversation.state, channel: body.channel });
-    let message: string = fastPathMessage(decision.intent) ?? '';
+    let message: string = conversation.concept_id ? '' : fastPathMessage(decision.intent) ?? '';
     let runId: string | undefined;
-    let understandingLevel: number | undefined;
     let conversationCompleted = atMaxTurns;
     if (!message && !atMaxTurns) {
+      const question = conversation.concept_id ? await adminDb().from('questions').select('difficulty,body').eq('tenant_id', context.tenantId).eq('concept_id', conversation.concept_id).order('created_at', { ascending: false }).limit(1).maybeSingle() : null;
+      if (question?.error) throw new Error(question.error.message);
+      const difficulty = question?.data?.difficulty ?? 2;
       const result = await learningSupportAgent.run({
         studentMessage: body.content,
-        context: buildConversationContext(conversation.summary, fullMessages, 8000),
+        context: `お題: ${question?.data?.body ?? ''}\n${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
         hintLevel: decision.intent === 'hint' ? 1 : 0,
         studentTurn,
         maxTurns: MAX_EXPLANATION_TURNS,
@@ -133,10 +137,11 @@ export async function POST(request: Request, route: Context) {
         studentId: conversation.student_id,
         conversationId,
         userId: context.userId,
+        modelClass: classForDifficulty(difficulty),
+        routingReason: `question_difficulty_${difficulty}`,
       });
       message = result.data.message;
       runId = result.meta.runId;
-      understandingLevel = result.data.understandingLevel;
       conversationCompleted = conversationCompleted || result.data.shouldFinish || requiredFocus === 'finish';
       if (!result.data.shouldFinish && (
         hasRepeatedQuestion(message, fullMessages)
@@ -147,13 +152,12 @@ export async function POST(request: Request, route: Context) {
       }
     }
     if (atMaxTurns) {
-      const percentage = understandingLevel === undefined ? '' : `だいたい${Math.round(understandingLevel * 100)}%くらい`;
-      message = `ここまでで、わたしはこのテーマを${percentage || 'だいぶ'}理解できたよ！教えてくれてありがとう。`;
+      message = '最後まで教えてくれてありがとう！自分の言葉で伝えようと頑張ったね。これで対話はおしまいだよ。';
     }
     await appendMessage({ context, conversationId, actor: 'agent', content: message, channel: body.channel });
     if (conversationCompleted) await completeConversation(context, conversationId);
     maybeQueueConversationSummary({ tenantId: context.tenantId, conversationId, messageCount: conversation.message_count + 2, traceId });
-    const payload = { message, traceId, runId, decision, conversationCompleted, understandingLevel };
+    const payload = { message, traceId, runId, decision, conversationCompleted };
     return body.stream ? eventStream(payload) : json(payload);
   } catch (error) {
     return routeError(error);

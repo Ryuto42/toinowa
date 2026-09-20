@@ -1,4 +1,6 @@
 import { assertSelfOrRole, requireAuth } from '@/lib/auth/guard';
+import { studentFeedback } from '@/lib/mastery/student-feedback';
+import { assertStudentScope } from '@/lib/auth/student-scope';
 import { createClient } from '@/lib/database/server';
 import { json, routeError, uuidParam } from '@/lib/api/http';
 
@@ -9,6 +11,8 @@ export async function GET(_request: Request, route: Context) {
     const context = await requireAuth();
     const studentId = uuidParam((await route.params).id, 'studentId');
     assertSelfOrRole(context, studentId, 'teacher', 'admin');
+    await assertStudentScope(context, studentId);
+    if (context.role === 'student') return json({ feedback: await studentFeedback(context) });
     const db = await createClient();
     const { data, error } = await db.from('assessments')
       .select('*, concepts(name, lesson_id)')

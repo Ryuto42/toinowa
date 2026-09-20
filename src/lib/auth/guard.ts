@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { adminDb } from '@/lib/database/admin';
 import { createClient } from '@/lib/database/server';
 import { AuthRequiredError, ForbiddenError } from './errors';
 import type { AuthContext, Role } from './types';
@@ -15,7 +16,7 @@ const claimsSchema = z.object({
  * Supabaseの署名検証済みJWTクレームから認証コンテキストを作る。
  * getSession()のCookie値は直接信頼せず、getClaims()を使う。
  */
-export async function requireAuth(): Promise<AuthContext> {
+export async function requireAuth(options: { allowPasswordChange?: boolean } = {}): Promise<AuthContext> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims) throw new AuthRequiredError();
@@ -25,6 +26,9 @@ export async function requireAuth(): Promise<AuthContext> {
     throw new AuthRequiredError();
   }
 
+  const user = await adminDb().from('users').select('status,must_change_password').eq('id', parsed.data.sub).eq('tenant_id', parsed.data.tenant_id).single();
+  if (user.error || user.data.status !== 'active') throw new AuthRequiredError();
+  if (user.data.must_change_password && !options.allowPasswordChange) throw new ForbiddenError('初期パスワードを変更してから利用してください');
   return {
     userId: parsed.data.sub,
     tenantId: parsed.data.tenant_id,

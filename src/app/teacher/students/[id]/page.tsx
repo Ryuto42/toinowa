@@ -1,3 +1,4 @@
+import { AssessmentOverride } from '@/components/teacher/assessment-override';
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth/guard';
 import { assertStudentScope } from '@/lib/auth/student-scope';
@@ -42,12 +43,13 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     db.from('users').select('*').eq('id', id).maybeSingle(),
     db.from('student_profiles').select('*').eq('user_id', id).maybeSingle(),
     db.from('assessments').select('*,concepts(name)').eq('student_id', id).order('created_at', { ascending: false }),
-    db.from('learning_plans').select('*').eq('student_id', id).order('period_start', { ascending: false }).limit(3),
+    db.from('learning_plans').select('*').eq('student_id', id).order('created_at', { ascending: false }).limit(3),
     db.from('review_schedules').select('*,concepts(name)').eq('student_id', id).is('fulfilled_at', null).order('due_at').limit(8),
     db.from('answers').select('id,question_id,conversation_id,raw_answer,reasoning_text,hint_level,self_rating,time_spent_sec,answered_at').eq('student_id', id).order('answered_at', { ascending: false }).limit(100),
     db.from('questions').select('id,body').eq('tenant_id', context.tenantId),
     db.from('escalations').select('id,title,kind,priority,status,resolution_note,created_at').eq('tenant_id', context.tenantId).eq('student_id', id).order('created_at', { ascending: false }).limit(5),
   ]);
+  for (const result of [user, profile, assessments, plans, reviews, answers, questions, escalations]) if (result.error) throw new Error(result.error.message);
   if (!user.data) notFound();
 
   const latest = new Map<string, NonNullable<typeof assessments.data>[number]>();
@@ -65,6 +67,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
 
   return <div>
     <PageTitle eyebrow="Student feedback" title={user.data.display_name} description={`学年 ${profile.data?.grade ?? '未設定'}。概念説明のAI評価、説明の根拠、次に学ぶ単元をまとめています。`} />
+<div className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm leading-7"><p><strong>目標：</strong>{profile.data?.learning_goal || '未設定'}</p><p><strong>苦手な範囲：</strong>{profile.data?.weak_areas || '未設定'}</p><details><summary className="cursor-pointer">登録時の模試結果</summary><p className="whitespace-pre-wrap">{profile.data?.exam_results || '未登録'}</p></details></div>
     <div className="grid gap-4 sm:grid-cols-3"><MetricCard label="平均理解度" value={scores.length ? `${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 100)}%` : '—'} /><MetricCard label="学習継続" value={`${profile.data?.streak_days ?? 0}日`} /><MetricCard label="現在の難易度" value={`Lv.${profile.data?.current_difficulty ?? 2}`} /></div>
 
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
@@ -90,11 +93,12 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
             {jsonItems(item.misconceptions).length ? <div className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-900"><p className="font-bold">説明に出ていた誤解・要確認点</p><ul className="mt-1 space-y-2">{jsonItems(item.misconceptions).map((misconception, index) => <li key={index}><span className="font-bold">{String(misconception.label ?? misconception.code ?? '確認項目')}</span>{misconception.evidence ? <span className="mt-1 block">根拠: {String(misconception.evidence)}</span> : null}</li>)}</ul></div> : null}
             {evidenceAnswers.length ? <div className="mt-5"><p className="font-bold">分析に使った生徒の説明</p><div className="mt-3 space-y-3">{evidenceAnswers.map((answer, index) => <div key={answer.id} className="rounded-lg border border-slate-200 p-3"><p className="text-xs font-bold text-slate-500">説明 {index + 1}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{answer.raw_answer}</p>{answer.reasoning_text ? <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-500">補足: {answer.reasoning_text}</p> : null}</div>)}</div></div> : null}
             {evidenceMessages.length ? <details open className="mt-5 rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer font-bold">AIとの会話の根拠（{evidenceMessages.length}件）</summary><div className="mt-3 space-y-2">{evidenceMessages.map((message) => <div key={message.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs font-bold text-slate-500">{message.actor === 'student' ? '生徒' : 'AI'} ・ {message.seq}番目</p><p className="mt-1 whitespace-pre-wrap leading-6 text-slate-700">{message.content_redacted}</p></div>)}</div></details> : null}
+            <AssessmentOverride assessmentId={item.id} initialScore={item.override_score ?? item.score} />
           </article>;
         })}</div> : <EmptyState>説明を送信するとAI評価が表示されます。</EmptyState>}
       </Panel>
       <Panel title="今後の学習" description="AIが提案した次の単元と、先生が確認すべき復習予定です。">
-        {currentPlan ? <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><p className="font-bold">学習計画 {formatDate(currentPlan.period_start)}〜{formatDate(currentPlan.period_end)}</p><StatusPill tone={currentPlan.status === 'active' || currentPlan.status === 'approved' ? 'emerald' : 'amber'}>{currentPlan.status}</StatusPill></div><p className="mt-3 text-sm leading-6 text-slate-600">{currentPlan.rationale || '提案理由はまだありません。'}</p><pre className="mt-4 max-h-52 overflow-auto rounded-lg bg-slate-50 p-3 text-xs">{JSON.stringify(currentPlan.tasks, null, 2)}</pre></div> : <EmptyState>学習計画はまだありません。</EmptyState>}
+        {currentPlan ? <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><p className="font-bold">学習計画 {formatDate(currentPlan.period_start)}〜{formatDate(currentPlan.period_end)}</p><StatusPill tone={currentPlan.status === 'active' || currentPlan.status === 'approved' ? 'emerald' : 'amber'}>{currentPlan.status === 'pending_review' ? '先生の確認待ち' : '学習計画'}</StatusPill></div><p className="mt-3 text-sm leading-6 text-slate-600">{currentPlan.rationale || '提案理由はまだありません。'}</p><ol className="mt-4 space-y-3">{jsonItems(currentPlan.tasks).map((task, index) => <li key={index} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-bold">{index + 1}. {String(task.concept ?? '学習テーマ')}</p><p className="mt-1 whitespace-pre-wrap leading-6">{String(task.prompt ?? task.goal ?? '')}</p><p className="mt-2 text-xs text-slate-500">難易度 Lv.{String(task.difficulty ?? '—')} ・ 目安 {String(task.est_min ?? '—')}分</p></li>)}</ol></div> : <EmptyState>学習計画はまだありません。</EmptyState>}
         <div className="mt-4">{reviews.data?.length ? <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">{reviews.data.map((review) => <li key={review.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="font-semibold">{review.concepts?.name ?? '復習単元'}</span><span className="text-slate-500">{formatDate(review.due_at)}</span></li>)}</ul> : <p className="text-sm text-slate-500">復習予定はありません。</p>}</div>
       </Panel>
     </div>

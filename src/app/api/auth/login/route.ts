@@ -1,60 +1,37 @@
 import { z } from 'zod';
 import { createClient } from '@/lib/database/server';
 import { adminDb } from '@/lib/database/admin';
-import { resolveStudentEmail } from '@/lib/shared/env.server';
-import { roleFromClaims } from '@/lib/auth/claims';
+import { json } from '@/lib/api/http';
 
 const loginSchema = z.object({
-  schoolCode: z.string().trim().min(1).max(32),
+  organizationCode: z.string().trim().min(1).max(32).optional(),
+  schoolCode: z.string().trim().min(1).max(32).optional(),
   identifier: z.string().trim().min(1).max(320),
   password: z.string().min(1).max(256),
-});
+}).refine(value => Boolean(value.organizationCode ?? value.schoolCode));
 
 export async function POST(request: Request) {
   const parsed = loginSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return Response.json({ error: 'invalid_request' }, { status: 400 });
-  }
-
+  if (!parsed.success) return json({ error: 'invalid_request' }, { status: 400 });
   const supabase = await createClient();
-  const { data: school, error: schoolError } = await supabase
-    .from('school_codes')
-    .select('tenant_id')
-    .eq('code', parsed.data.schoolCode)
-    .eq('active', true)
-    .maybeSingle();
-  if (schoolError || !school) {
-    return Response.json({ error: 'invalid_credentials' }, { status: 401 });
+  const db = adminDb();
+  const school = await supabase.from('school_codes').select('tenant_id').eq('code', parsed.data.organizationCode ?? parsed.data.schoolCode!).eq('active', true).maybeSingle();
+  if (school.error || !school.data) return json({ error: 'invalid_credentials' }, { status: 401 });
+  // 所属内の登録情報で解決する。Authユーザー全件の列挙やユーザー編集可能なメタデータに依存しない。
+  const identifier = parsed.data.identifier.toLowerCase();
+  const registered = await db.from('users').select('id,role,must_change_password').eq('tenant_id', school.data.tenant_id).eq('status', 'active')
+    .eq(identifier.includes('@') ? 'email' : 'login_identifier', identifier).maybeSingle();
+  if (registered.error || !registered.data) return json({ error: 'invalid_credentials' }, { status: 401 });
+  const authUser = await db.auth.admin.getUserById(registered.data.id);
+  if (authUser.error || !authUser.data.user.email) return json({ error: 'invalid_credentials' }, { status: 401 });
+  const signedIn = await supabase.auth.signInWithPassword({ email: authUser.data.user.email, password: parsed.data.password });
+  if (signedIn.error) return json({ error: 'invalid_credentials' }, { status: 401 });
+  if (signedIn.data.user.id !== registered.data.id) {
+    await supabase.auth.signOut();
+    return json({ error: 'invalid_credentials' }, { status: 401 });
   }
-
-  let email = parsed.data.identifier;
-  if (!parsed.data.identifier.includes('@')) {
-    // ログイン前は users のRLSを通せないため、Auth管理APIのメタデータだけで
-    // 学校内のログインIDを解決する。見つからない場合は生徒用の規約メールへ戻す。
-    const { data: authUsers } = await adminDb().auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const identifier = parsed.data.identifier.toLowerCase();
-    const matched = authUsers?.users.find((user) => {
-      const metadata = user.user_metadata as { tenant_id?: unknown; login_identifier?: unknown } | undefined;
-      return metadata?.tenant_id === school.tenant_id &&
-        typeof metadata.login_identifier === 'string' &&
-        metadata.login_identifier.toLowerCase() === identifier;
-    });
-    email = matched?.email ?? resolveStudentEmail(parsed.data.schoolCode, parsed.data.identifier);
-  }
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password: parsed.data.password,
-  });
-  if (error) return Response.json({ error: 'invalid_credentials' }, { status: 401 });
-
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const role = roleFromClaims(claimsData?.claims?.app_role);
-  const redirectTo = role === 'student'
-    ? '/student/home'
-    : role === 'teacher'
-      ? '/teacher/dashboard'
-      : role === 'admin'
-        ? '/admin/overview'
-        : '/';
-  return Response.json({ ok: true, redirectTo });
+  const mustChangePassword = registered.data.must_change_password;
+  const role = registered.data.role;
+  const redirectTo = mustChangePassword ? '/change-password' : role === 'student' ? '/student/home' : role === 'teacher' ? '/teacher/dashboard' : '/admin/overview';
+  return json({ ok: true, redirectTo, mustChangePassword });
 }

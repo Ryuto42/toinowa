@@ -13,6 +13,7 @@ import {
   SchemaRepairFailed,
 } from './errors';
 import { fallbackModels, primaryModel, TIER } from './routers';
+import { modelsForClass } from './selection';
 import { recordRun } from './record';
 import type { AttemptRecord, CallMeta, CallOptions, CallResult } from './types';
 
@@ -226,16 +227,20 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
   // ── 梯子の組み立て。無効化されたモデルは実際に外す ──
   const disabled = await disabledModels(opts.trace.tenantId);
-  const primary = primaryModel(opts.router);
-  const chain = fallbackModels(opts.router).filter((m) => !disabled.has(m));
+  const selected = opts.modelClass ? modelsForClass(opts.modelClass, serverEnv) : null;
+  const primary = selected?.[0] ?? primaryModel(opts.router);
+  const chain = (selected ?? fallbackModels(opts.router)).filter((m) => !disabled.has(m));
 
   type Rung = { model: string; useChain: boolean };
   const ladder: Rung[] = [];
   if (!disabled.has(primary)) {
     ladder.push({ model: primary, useChain: false });
-    ladder.push({ model: primary, useChain: false }); // rung1: 同じモデルを1回だけ再試行
+    if (!selected) ladder.push({ model: primary, useChain: false });
   }
-  if (chain.length > 0) {
+  if (selected) {
+    // 用途別ルーティングは遅いautoを再び呼ばず、別モデルへ直接切り替える。
+    for (const model of chain.filter(model => model !== primary)) ladder.push({ model, useChain: false });
+  } else if (chain.length > 0) {
     ladder.push({ model: chain[0], useChain: true });
   }
 
@@ -252,10 +257,13 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
   ladderLoop: for (let rung = 0; rung < ladder.length; rung++) {
     const { model, useChain } = ladder[rung];
+    if (rung > 0 && model !== ladder[rung - 1].model) fallbackCount += 1;
     let messages = opts.messages;
 
     // 構造化出力の修復は「そのモデルの中で」1回だけ
     for (let repair = 0; repair <= (opts.schema ? 1 : 0); repair++) {
+      const remainingMs = 45_000 - (performance.now() - t0);
+      if (remainingMs <= 0) { lastError = new Error('AI request deadline exceeded'); break ladderLoop; }
       const attemptStart = performance.now();
       let attemptRecorded = false;
       try {
@@ -285,7 +293,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
                   extra_body: { route: 'fallback', models: chain.slice(0, 5) },
                 }
               : {}),
-          } as never)
+          } as never, { timeout: Math.min(15_000, Math.ceil(remainingMs)) })
           .withResponse();
 
         // ── ヘッダは .withResponse() でしか読めない ──
@@ -293,7 +301,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         resolvedModel =
           response.headers.get('x-orca-resolved-model') ??
           fallbackModel ??
-          resolvedModel ??
+          res.model ??
           model;
         routerName = response.headers.get('x-orca-router') ?? routerName ?? model;
         orcaRequestId = response.headers.get('x-orca-request-id') ?? orcaRequestId;
@@ -311,9 +319,10 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         const usage = res.usage as
           | { prompt_tokens?: number; completion_tokens?: number; cost_usd?: number }
           | undefined;
-        inputTokens = usage?.prompt_tokens ?? 0;
-        outputTokens = usage?.completion_tokens ?? 0;
-        costUsd = usage?.cost_usd ?? 0; // 無料モデルでは返らない。null にはしない
+        // スキーマ修復や別モデルでの再生成にも課金されるため、取得できた全応答を合算する。
+        inputTokens += usage?.prompt_tokens ?? 0;
+        outputTokens += usage?.completion_tokens ?? 0;
+        costUsd += usage?.cost_usd ?? 0;
 
         const content = res.choices[0]?.message?.content ?? '';
         attempts.push({

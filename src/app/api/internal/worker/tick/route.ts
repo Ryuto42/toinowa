@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { serverEnv } from '@/lib/shared/env.server';
 import { runWorkerTick } from '@/lib/jobs/worker';
 
+export const maxDuration = 120;
+
 function secretMatches(value: string | null): boolean {
   if (!value) return false;
   const expected = Buffer.from(serverEnv.WORKER_SECRET);

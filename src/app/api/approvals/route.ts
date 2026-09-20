@@ -1,3 +1,4 @@
+import { visibleApprovals, assertApprovalScope } from '@/lib/approvals/scope';
 import { z } from 'zod';
 import { requireRole } from '@/lib/auth/guard';
 import { adminDb } from '@/lib/database/admin';
@@ -14,10 +15,7 @@ const schema = z.object({
 export async function GET() {
   try {
     const context = await requireRole('teacher', 'admin');
-    const { data, error } = await adminDb().from('approvals').select('*').eq('tenant_id', context.tenantId)
-      .is('decision', null).order('created_at', { ascending: true });
-    if (error) throw new Error(error.message);
-    return json({ approvals: data ?? [] });
+    return json({ approvals: await visibleApprovals(context) });
   } catch (error) {
     return routeError(error);
   }
@@ -27,6 +25,7 @@ export async function POST(request: Request) {
   try {
     const context = await requireRole('teacher', 'admin');
     const body = await parseJson(request, schema);
+    await assertApprovalScope(context, body.resourceType, body.resourceId);
     const { data, error } = await adminDb().from('approvals').insert({
       tenant_id: context.tenantId,
       resource_type: body.resourceType,

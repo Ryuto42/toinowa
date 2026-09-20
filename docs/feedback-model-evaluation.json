@@ -1,0 +1,51 @@
+{
+  "measuredAt": "2026-09-20T15:11:42.697Z",
+  "note": "人工的な2例のスモーク比較。一般的な教育品質・採点一致率の証明ではない。直接比較のためアプリの利用台帳には含まれない。",
+  "results": [
+    {
+      "requestedModel": "openai/gpt-5-nano",
+      "resolvedModel": "gpt-5-nano-2025-08-07",
+      "case": "正しい説明",
+      "elapsedMs": 7047,
+      "costUsd": 0.000468,
+      "costReported": true,
+      "tokens": 1303,
+      "passed": true,
+      "output": "{\n  \"score\": 1,\n  \"misconceptions\": [],\n  \"feedback\": \"説明は正確で、傾きと切片の意味が正しく、基本料金＋単価の例も分かりやすいです。\"\n}"
+    },
+    {
+      "requestedModel": "openai/gpt-5-nano",
+      "resolvedModel": "gpt-5-nano-2025-08-07",
+      "case": "誤概念を含む説明",
+      "elapsedMs": 9590,
+      "costUsd": 0.000782,
+      "costReported": true,
+      "tokens": 2062,
+      "passed": true,
+      "output": "{\n  \"score\": 0.3,\n  \"misconceptions\": [\n    \"y=2x+3において、傾きは2、切片は3である。これを逆に捉えている。\",\n    \"切片がグラフの傾きを決めると考えている。実際には傾きが傾きを決める。\",\n    \"x=0のときのyを傾きと結びつけて理解している。x=0のときのyは切片(b)の値であり、ここでは3である。\"\n  ],\n  \"feedback\": \"傾きは2、切片は3。y=2x+3ではx=0のときのyは3。傾きはグラフの斜度を決め、切片はy軸との交点（y切片）を表します。\"\n}"
+    },
+    {
+      "requestedModel": "orcarouter/auto",
+      "resolvedModel": "z-ai/glm-5.3-flash",
+      "case": "正しい説明",
+      "elapsedMs": 10870,
+      "costUsd": 0.000234,
+      "costReported": true,
+      "tokens": 1078,
+      "passed": true,
+      "output": "{\"score\":1.0,\"misconceptions\":[],\"feedback\":\"傾きを「xが1増えるとyが2増える」と、切片を「x=0のときのyの値」として正しく説明しており、具体例（基本料金＋従量料金）も傾きと切片の意味に的確に対応しています。\"}"
+    },
+    {
+      "requestedModel": "orcarouter/auto",
+      "resolvedModel": "z-ai/glm-5.3-flash",
+      "case": "誤概念を含む説明",
+      "elapsedMs": 13289,
+      "costUsd": 0.00028,
+      "costReported": true,
+      "tokens": 1239,
+      "passed": true,
+      "output": "{\"score\":0,\"misconceptions\":[\"傾きと切片が入れ替わっている:y=2x+3の傾きは2、切片は3\",\"切片がグラフの傾きを決めると誤解している(傾きはxの係数で決まる)\",\"傾きがx=0のときのyの値だと誤解している(x=0のときのyが切片)\"],\"feedback\":\"傾きと切片が入れ替わっています。y=2x+3ではxの係数2が傾き、x=0のときのy=3が切片です。\"}"
+    }
+  ],
+  "totalCostUsd": 0.001764
+}

@@ -4,9 +4,10 @@ import type { Json } from '@/lib/database/types';
 import type { JobRow, JobStepResult } from './types';
 import { jobHandler } from './registry';
 import './default-handlers';
+import './plan-handler';
 
-export const DEFAULT_LEASE_SECONDS = 90;
-export const MAX_TICK_MS = 45_000;
+export const DEFAULT_LEASE_SECONDS = 180;
+export const MAX_TICK_MS = 100_000;
 
 export function retryDelayMs(attempt: number, random = Math.random()): number {
   const base = Math.min(300, 2 ** Math.max(0, attempt));
@@ -64,6 +65,7 @@ async function retryOrDeadLetter(job: JobRow, error: unknown): Promise<void> {
     .from('jobs')
     .update({
       status: 'queued',
+      attempt: job.attempt + 1,
       run_after: new Date(Date.now() + retryDelayMs(job.attempt)).toISOString(),
       locked_until: null,
       lease_token: null,
@@ -87,7 +89,7 @@ export async function runWorkerTick(options: {
   maxDurationMs?: number;
 } = {}): Promise<WorkerTickResult> {
   const started = Date.now();
-  const jobs = await claimJobs(Math.min(20, Math.max(1, options.limit ?? 5)));
+  const jobs = await claimJobs(Math.min(20, Math.max(1, options.limit ?? 1)));
   const result: WorkerTickResult = {
     claimed: jobs.length,
     succeeded: 0,

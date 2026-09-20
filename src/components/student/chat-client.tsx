@@ -1,5 +1,6 @@
 'use client';
 
+import { ConversationFeedback } from './feedback-card';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
 export interface ChatMessage {
@@ -123,7 +124,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       {busy && !streamingId ? <div role="status" aria-live="polite" className="flex justify-start"><div className="max-w-[88%]"><p className="mb-1 text-xs font-bold text-slate-500">AI</p><div className="flex items-center gap-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm text-slate-600"><Spinner />考えています…</div></div></div> : null}
       <div ref={endOfMessages} aria-hidden="true" />
     </div>
-    {completed ? <p role="status" className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-900">ここまでの説明をもとに、AIの理解度を整理しました。</p> : <>
+    {completed ? <ConversationFeedback conversationId={conversationId} /> : <>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setInput('この概念は何を表すのかを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">意味を説明する</button>
         <button type="button" onClick={() => setInput('理由や他の概念とのつながりを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">つながりを説明する</button>

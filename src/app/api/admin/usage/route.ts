@@ -1,2 +1,33 @@
-import { requireRole } from '@/lib/auth/guard'; import { adminDb } from '@/lib/database/admin'; import { json, routeError } from '@/lib/api/http'; import { MODEL_TIER } from '@/lib/shared/env.server';
-export async function GET(){try{const context=await requireRole('admin');const db=adminDb();const[runs,ledger]=await Promise.all([db.from('agent_runs').select('agent_name,status,resolved_model,input_tokens,output_tokens,estimated_cost_usd,latency_ms,fallback_count,created_at').eq('tenant_id',context.tenantId).order('created_at',{ascending:false}).limit(1000),db.from('ai_budget_ledger').select('*').eq('tenant_id',context.tenantId).order('day',{ascending:false}).limit(100)]);if(runs.error)throw new Error(runs.error.message);if(ledger.error)throw new Error(ledger.error.message);const rows=runs.data??[];return json({modelTier:MODEL_TIER,summary:{requests:rows.length,costUsd:rows.reduce((s,r)=>s+Number(r.estimated_cost_usd??0),0),inputTokens:rows.reduce((s,r)=>s+(r.input_tokens??0),0),outputTokens:rows.reduce((s,r)=>s+(r.output_tokens??0),0),fallbacks:rows.reduce((s,r)=>s+r.fallback_count,0)},runs:rows,ledger:ledger.data??[]})}catch(error){return routeError(error)}}
+import { requireRole } from '@/lib/auth/guard';
+import { adminDb } from '@/lib/database/admin';
+import { json, routeError, ApiInputError } from '@/lib/api/http';
+import { summarizeUsage, type UsageRun } from '@/lib/admin/usage-summary';
+export async function GET(request: Request) {
+  try {
+    const context = await requireRole('admin');
+    const days = Number(new URL(request.url).searchParams.get('days') ?? 1);
+    if (![1, 7, 30].includes(days)) throw new ApiInputError('期間が不正です');
+    const db = adminDb();
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const until = new Date().toISOString();
+    const rows: UsageRun[] = [];
+    let truncated = false;
+    for (let offset = 0; offset < 10000; offset += 1000) {
+      const result = await db.from('agent_runs').select('actor_id,student_id,status,resolved_model,input_tokens,output_tokens,estimated_cost_usd,fallback_count,created_at')
+        .eq('tenant_id', context.tenantId).gte('created_at', since).lte('created_at', until).order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
+      if (result.error) throw new Error(result.error.message);
+      rows.push(...(result.data ?? []));
+      if ((result.data?.length ?? 0) < 1000) break;
+      if (offset === 9000) truncated = true;
+    }
+    const ids = [...new Set(rows.flatMap(row => [row.actor_id ?? row.student_id].filter((id): id is string => Boolean(id))))];
+    const names: Record<string, string> = {};
+    for (let offset = 0; offset < ids.length; offset += 100) {
+      const users = await db.from('users').select('id,display_name').eq('tenant_id', context.tenantId).in('id', ids.slice(offset, offset + 100));
+      if (users.error) throw new Error(users.error.message);
+      for (const user of users.data ?? []) names[user.id] = user.display_name;
+    }
+    const grouped = summarizeUsage(rows, names);
+    return json({ grouped, summary: { requests: rows.length, costUsd: grouped.reduce((n,r) => n+r.costUsd,0), tokens: grouped.reduce((n,r) => n+r.tokens,0) }, truncated, updatedAt: until });
+  } catch (error) { return routeError(error); }
+}

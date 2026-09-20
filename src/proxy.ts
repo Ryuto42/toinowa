@@ -42,6 +42,9 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const role = roleFromClaims(data?.claims?.app_role);
   const pathname = request.nextUrl.pathname;
+  if (data?.claims?.must_change_password === true && (isProtected(pathname) || pathname === '/login')) {
+    return NextResponse.redirect(new URL('/change-password', request.url));
+  }
   if (!isProtected(pathname)) return response;
 
   if (role === 'none') {
@@ -69,5 +72,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mjs)$).*)'],
 };

@@ -1,4 +1,5 @@
 import 'server-only';
+import { queuePlanFromAssessment } from '@/lib/plans/followup';
 import { adminDb } from '@/lib/database/admin';
 import { registerJobHandler } from './registry';
 import { callModel } from '@/lib/orcarouter/call';
@@ -7,6 +8,18 @@ import { assessmentAgent } from '@/lib/agents/catalog';
 import { computeMastery } from '@/lib/mastery/compute';
 import type { DifficultyLevel } from '@/lib/mastery/types';
 import type { Json } from '@/lib/database/types';
+
+async function ensureAssessmentReview(tenantId: string, assessmentId: string) {
+  const db = adminDb();
+  const assessment = await db.from('assessments').select('reviewer_status,confidence,score').eq('tenant_id', tenantId).eq('id', assessmentId).single();
+  if (assessment.error) throw new Error(assessment.error.message);
+  if (assessment.data.reviewer_status !== 'pending_review') return;
+  const existing = await db.from('approvals').select('id').eq('tenant_id', tenantId).eq('resource_type', 'assessment').eq('resource_id', assessmentId).limit(1);
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data.length) return;
+  const approval = await db.from('approvals').upsert({ id: assessmentId, tenant_id: tenantId, resource_type: 'assessment', resource_id: assessmentId, requested_by: 'assessment-agent', proposal: { confidence: assessment.data.confidence, score: assessment.data.score } }, { onConflict: 'id', ignoreDuplicates: true });
+  if (approval.error) throw new Error(approval.error.message);
+}
 
 /** M10で公開する授業分析ジョブ。AI生成自体は専用ステップへ拡張できる。 */
 registerJobHandler('analyze_lesson', async (job) => {
@@ -60,12 +73,15 @@ registerJobHandler('run_assessment', async (job) => {
   const question = await db.from('questions').select('*').eq('tenant_id', job.tenant_id).eq('id', payload.questionId).single();
   if (answer.error || !answer.data) throw new Error(answer.error?.message ?? 'answer not found');
   if (question.error || !question.data) throw new Error(question.error?.message ?? 'question not found');
-  const existing = await db.from('assessments').select('id').eq('tenant_id', job.tenant_id).contains('evidence_answer_ids', [payload.answerId]).limit(1).maybeSingle();
-  if (existing.error) throw new Error(existing.error.message);
-  // 完了時のジョブは、同じ最新回答に対する途中評価があっても
-  // 会話全体を読み直して別の最終評価を作る。
-  if (existing.data && !payload.forceHolistic) return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } };
   const conversationId = payload.conversationId ?? answer.data.conversation_id ?? undefined;
+  if (conversationId) {
+    const state = await db.from('conversations').select('state').eq('tenant_id', job.tenant_id).eq('id', conversationId).single();
+    if (state.error) throw new Error(state.error.message);
+    if (state.data.state !== 'completed') return { nextStep: null, state: { skipped: 'conversation_in_progress' } };
+    const existing = await db.from('assessments').select('id').eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).eq('is_final', true).maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+    if (existing.data) { await ensureAssessmentReview(job.tenant_id, existing.data.id); await queuePlanFromAssessment(job.tenant_id, existing.data.id); return { nextStep: null, state: { assessmentId: existing.data.id, cached: true } }; }
+  }
   let conversationSummary = '';
   let conversationMessages: Array<{ id: string; actor: string; content_redacted: string; seq: number }> = [];
   let conversationAnswers: Array<{ id: string; raw_answer: string; reasoning_text: string | null; answered_at: string }> = [];
@@ -126,12 +142,16 @@ registerJobHandler('run_assessment', async (job) => {
     mastery.needsReview ? '確信度が低いため先生の確認が必要です。' : '',
   ].filter(Boolean).join(' ');
   const inserted = await db.from('assessments').insert({
+    id: job.id,
     tenant_id: job.tenant_id,
     student_id: payload.studentId,
     concept_id: question.data.concept_id,
-    score: mastery.score,
+    conversation_id: conversationId ?? null,
+    is_final: Boolean(conversationId),
+    score: result.meta.degraded ? null : mastery.score,
     confidence: mastery.confidence,
     component_scores: {
+      studentFeedback: result.data.studentFeedback,
       mastery: mastery.components,
       dimensions: result.data.dimensionScores,
       strongPoints: result.data.strongPoints,
@@ -143,10 +163,11 @@ registerJobHandler('run_assessment', async (job) => {
     difficulty_at_time: question.data.difficulty,
     recommended_difficulty: question.data.difficulty,
     difficulty_reason: analysisNote,
-    reviewer_status: mastery.needsReview ? 'pending_review' : 'auto_approved',
+    reviewer_status: (result.meta.degraded || mastery.needsReview) ? 'pending_review' : 'auto_approved',
     agent_run_id: result.meta.runId,
   }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
-  if (mastery.needsReview) await db.from('approvals').insert({ tenant_id: job.tenant_id, resource_type: 'assessment', resource_id: inserted.data.id, requested_by: 'assessment-agent', proposal: { confidence: mastery.confidence, score: mastery.score } });
+  await ensureAssessmentReview(job.tenant_id, inserted.data.id);
+  await queuePlanFromAssessment(job.tenant_id, inserted.data.id);
   return { nextStep: null, state: { assessmentId: inserted.data.id } };
 });
