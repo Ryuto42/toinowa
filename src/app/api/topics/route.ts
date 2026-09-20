@@ -10,7 +10,7 @@ import { preCheck } from '@/lib/security/guard';
 import { recordAudit } from '@/lib/security/audit';
 
 const schema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('propose'), classroomId: z.uuid(), studentId: z.uuid().optional(), content: z.string().trim().min(1).max(20000) }),
+  z.object({ action: z.literal('propose'), classroomId: z.uuid(), studentId: z.uuid().optional(), title: z.string().trim().max(200).default(''), content: z.string().trim().max(20000).default('') }).refine(value => Boolean(value.title || value.content), 'テーマか学んだ内容を入力してください'),
   z.object({ action: z.literal('publish'), dueAt: z.iso.datetime(), studentId: z.uuid().optional(), classroomId: z.uuid(), content: z.string().max(20000), title: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(4000), difficulty: z.number().int().min(1).max(5) }),
 ]);
 export const maxDuration = 60;
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const traceId = traceIdFrom(request);
     if (body.action === 'propose') {
       const history = body.studentId ? await topicStudentContext(context, body.studentId, body.classroomId) : null;
-      const proposal = await topicAgent.run({ content, subject: classroom.data.subject ?? '', grade: classroom.data.grade ?? '', studentContext: history?.text ?? '' }, { tenantId: context.tenantId, userId: context.userId, studentId: body.studentId, traceId, modelClass: 'standard' });
+      const proposal = await topicAgent.run({ content, theme: body.title ? preCheck(body.title).masked.text : '', subject: classroom.data.subject ?? '', grade: classroom.data.grade ?? '', studentContext: history?.text ?? '' }, { tenantId: context.tenantId, userId: context.userId, studentId: body.studentId, traceId, modelClass: 'standard' });
       return json({ proposal: proposal.data, history: { conversationsUsed: history?.conversationsUsed ?? 0, feedbackUsed: history?.feedbackUsed ?? 0 } });
     }
     if (new Date(body.dueAt).getTime() <= Date.now()) throw new ApiInputError('今より後の期限を設定してください');
