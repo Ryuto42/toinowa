@@ -1,4 +1,4 @@
-import { countTokens } from '@/lib/rag/chunk';
+import { countTokens } from '@/lib/text/tokens';
 
 interface ContextMessage { actor: string; content_redacted: string; seq?: number }
 

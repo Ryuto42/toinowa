@@ -3,8 +3,7 @@
 インストール版: **next 16.3.5** / react 19.2.8。
 同梱ドキュメント: `node_modules/next/dist/docs/`（コードを書く前に該当ページを読むこと）。
 
-プラン（`~/.claude/plans/md-dazzling-bee.md`）は Next 15 前提で書かれている箇所があるため、
-以下を上書きする。
+Next 15 以前の書き方が残っている資料は、以下で上書きする。
 
 ## 1. `middleware.ts` → `proxy.ts`（破壊的変更）
 
@@ -37,8 +36,7 @@ export default async function Page(props: PageProps<'/teacher/students/[studentI
 | `refresh()` | Server Action からクライアントルータを更新 | 通知バッジ等 |
 | `cacheLife` / `cacheTag` | `unstable_` 接頭辞が取れて安定版に | |
 
-→ プラン §11 の「`revalidateTag` だけでは既に開いているブラウザが再描画されない」は依然として正しい。
-   サーバ側は `updateTag`、他ブラウザへの反映は SSE + `router.refresh()` の二段構えにする。
+→ `revalidateTag` だけでは既に開いているブラウザが再描画されない。サーバ側は `updateTag`、他ブラウザへの反映は SSE + `router.refresh()` の二段構えにする。
 
 ## 4. PPR は `experimental.ppr` / `experimental_ppr` が削除され `cacheComponents: true` に
 

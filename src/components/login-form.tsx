@@ -25,7 +25,7 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       try {
-        const saved = localStorage.getItem('studypilot.organizationCode');
+        const saved = localStorage.getItem('toinowa.organizationCode');
         if (saved) { setSchoolCode(saved); setRememberCode(true); }
       } catch { /* 保存できないブラウザでもログインは利用できる */ }
     });
@@ -53,8 +53,8 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
       // 開発環境の127.0.0.1ではCookie反映前のリクエストが走り、
       // ログイン画面へ戻ることがある。
       try {
-        if (rememberCode) localStorage.setItem('studypilot.organizationCode', schoolCode.trim());
-        else localStorage.removeItem('studypilot.organizationCode');
+        if (rememberCode) localStorage.setItem('toinowa.organizationCode', schoolCode.trim());
+        else localStorage.removeItem('toinowa.organizationCode');
       } catch { /* 保存の失敗でログインを止めない */ }
       // next はログイン画面へ飛ばされる前のURL。別ロールの画面が入っていることがあるので、
       // ログインしたアカウントのロールで行ける範囲だけを許可し、外れていたら自分のホームへ送る。
@@ -80,7 +80,7 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
           <label className="block text-sm font-bold">所属コード
             <input required value={schoolCode} onChange={(event) => setSchoolCode(event.target.value)} placeholder="例：demo" autoComplete="organization" autoCapitalize="none" spellCheck={false} className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" />
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={rememberCode} onChange={event => { setRememberCode(event.target.checked); if (!event.target.checked) { try { localStorage.removeItem('studypilot.organizationCode'); } catch {} } }} />所属コードをこのブラウザに保存する</label>
+          <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={rememberCode} onChange={event => { setRememberCode(event.target.checked); if (!event.target.checked) { try { localStorage.removeItem('toinowa.organizationCode'); } catch {} } }} />所属コードをこのブラウザに保存する</label>
           <label className="block text-sm font-bold">ログインID またはメールアドレス
             <input required value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="例：student01" autoComplete="username" autoCapitalize="none" spellCheck={false} className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" />
           </label>

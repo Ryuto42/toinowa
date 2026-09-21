@@ -905,51 +905,6 @@ export interface Database {
           },
         ];
       };
-      channel_link_tokens: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          student_id: string;
-          code: string;
-          expires_at: string;
-          used_at: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          student_id: string;
-          code: string;
-          expires_at: string;
-          used_at?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          student_id?: string;
-          code?: string;
-          expires_at?: string;
-          used_at?: string | null;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'channel_link_tokens_student_id_fkey';
-            columns: ['student_id'];
-            isOneToOne: false;
-            referencedRelation: 'users';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'channel_link_tokens_tenant_id_fkey';
-            columns: ['tenant_id'];
-            isOneToOne: false;
-            referencedRelation: 'tenants';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       classrooms: {
         Row: {
           id: string;
@@ -1843,57 +1798,6 @@ export interface Database {
           },
         ];
       };
-      line_account_links: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          student_id: string;
-          line_user_id_encrypted: string | null;
-          line_user_id_hmac: string | null;
-          status: string;
-          linked_at: string | null;
-          revoked_at: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          student_id: string;
-          line_user_id_encrypted?: string | null;
-          line_user_id_hmac?: string | null;
-          status?: string;
-          linked_at?: string | null;
-          revoked_at?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          student_id?: string;
-          line_user_id_encrypted?: string | null;
-          line_user_id_hmac?: string | null;
-          status?: string;
-          linked_at?: string | null;
-          revoked_at?: string | null;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'line_account_links_student_id_fkey';
-            columns: ['student_id'];
-            isOneToOne: false;
-            referencedRelation: 'users';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'line_account_links_tenant_id_fkey';
-            columns: ['tenant_id'];
-            isOneToOne: false;
-            referencedRelation: 'tenants';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
       material_chunks: {
         Row: {
           id: string;
@@ -2611,7 +2515,6 @@ export interface Database {
           plan: string;
           retention_days: number;
           ai_budget_limit_usd: number;
-          line_channel_config_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -2620,7 +2523,6 @@ export interface Database {
           plan?: string;
           retention_days?: number;
           ai_budget_limit_usd?: number;
-          line_channel_config_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -2629,7 +2531,6 @@ export interface Database {
           plan?: string;
           retention_days?: number;
           ai_budget_limit_usd?: number;
-          line_channel_config_id?: string | null;
           created_at?: string;
         };
         Relationships: [];

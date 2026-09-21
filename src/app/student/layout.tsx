@@ -13,7 +13,7 @@ export default async function StudentLayout({ children }: LayoutProps<'/student'
     db.from('assignments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('status', 'published').gt('created_at', seen.student_study),
     db.from('assessments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('student_id', context.userId).gt('created_at', seen.student_records),
   ]);
-  return <AppShell roleLabel="生徒" userName={user.data?.display_name ?? '生徒'} homeHref="/student/home" nav={[
+  return <AppShell role="student" userName={user.data?.display_name ?? '生徒'} homeHref="/student/home" nav={[
     { href: '/student/home', label: '今日の学習', icon: 'home' },
     { href: '/student/study', label: '課題', icon: 'chat', badge: works.count ?? 0, badgeKey: 'student_study' },
     { href: '/student/records', label: 'フィードバック', icon: 'chart', badge: feedback.count ?? 0, badgeKey: 'student_records' },

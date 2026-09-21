@@ -11,7 +11,7 @@ export function modelsForClass(kind: ModelClass, config: {
 }): string[] {
   const economy = config.AI_ECONOMY_MODEL ?? 'google/gemini-2.5-flash-lite';
   const standard = config.AI_STANDARD_MODEL ?? 'google/gemini-2.5-flash';
-  const advanced = config.AI_ADVANCED_MODEL ?? 'orcarouter/studypilot-advanced';
+  const advanced = config.AI_ADVANCED_MODEL ?? 'orcarouter/toinowa-advanced';
   const vision = config.AI_VISION_MODEL ?? 'google/gemini-2.5-flash';
   // 音声入力に対応するのは Google 系だけ（カタログ199件を実測して確認）。
   // 他社を混ぜると必ず 400 になるので、段は同社内で積む。
@@ -25,7 +25,11 @@ export function modelsForClass(kind: ModelClass, config: {
     economy: [economy, 'openai/gpt-4o-mini'],
     standard: [standard, 'openai/gpt-4o-mini'],
     advanced: [advanced, 'google/gemini-2.5-flash', 'openai/gpt-5-nano'],
-    vision: [vision, 'openai/gpt-4o-mini'],
+    // 模試読み取りの実測（実物2回分・9入力×3モデル＝27回、必要項目450件で採点）。
+    // 必要項目の正確な取得は flash 88.7% / flash-lite 72.2% / gpt-4o-mini 6.9%。
+    // mini は設問別結果を科目全体へ要約して必要項目を358件落とすので、2段目に置かない。
+    // docs/exam-model-benchmark.md
+    vision: [vision, 'google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini'],
     audio: [audio, audioStandard, audioAdvanced],
   };
   return [...new Set(chains[kind])];

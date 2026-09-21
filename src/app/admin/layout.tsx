@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
     db.from('escalations').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).gt('created_at', seen.admin_interventions),
     db.from('handoffs').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('status', 'pending').gt('created_at', seen.admin_handoffs),
   ]);
-  return <AppShell roleLabel="管理者" userName={user.data?.display_name ?? '管理者'} homeHref="/admin/overview" nav={[
+  return <AppShell role="admin" userName={user.data?.display_name ?? '管理者'} homeHref="/admin/overview" nav={[
     { href: '/admin/overview', label: 'ダッシュボード', icon: 'dashboard' },
     { href: '/admin/students', label: '生徒', icon: 'users' },
     { href: '/admin/users', label: 'ユーザー管理', icon: 'key' },

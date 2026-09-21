@@ -7,6 +7,7 @@ import { adminDb } from '@/lib/database/admin';
 import { EmptyState, PageTitle, Panel, StatusPill } from '@/components/dashboard';
 import { formatDateTime } from '@/lib/shared/format';
 import { AssessmentOverride } from '@/components/teacher/assessment-override';
+import { AnswerIntegrity } from '@/components/teacher/answer-integrity';
 import {
   DimensionBars, MASTERY_LABELS, MisconceptionChips, PointChips, ScoreRing,
   jsonItems, jsonRecord, stringItems,
@@ -32,7 +33,7 @@ export default async function AssessmentDetailPage({ params }: PageProps<'/teach
 
   const [answers, messages, student] = await Promise.all([
     row.evidence_answer_ids?.length
-      ? db.from('answers').select('id,raw_answer,reasoning_text,answered_at,time_spent_sec').in('id', row.evidence_answer_ids).order('answered_at')
+      ? db.from('answers').select('id,raw_answer,reasoning_text,answered_at,time_spent_sec,ai_likelihood,ai_signals').in('id', row.evidence_answer_ids).order('answered_at')
       : Promise.resolve({ data: [], error: null }),
     row.evidence_message_ids?.length
       ? adminDb().from('messages').select('id,actor,content_redacted,seq').in('id', row.evidence_message_ids).order('seq')
@@ -97,6 +98,7 @@ export default async function AssessmentDetailPage({ params }: PageProps<'/teach
         {answers.data?.length ? <div className="space-y-3">{answers.data.map((answer, index) => <div key={answer.id} className="rounded-xl border border-slate-200 p-3">
           <p className="text-xs font-bold text-slate-500">説明 {index + 1}{answer.time_spent_sec ? ` ・ ${answer.time_spent_sec}秒` : ''}</p>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-slate-700">{answer.raw_answer}</p>
+          <AnswerIntegrity likelihood={answer.ai_likelihood === null ? null : Number(answer.ai_likelihood)} signals={answer.ai_signals} />
         </div>)}</div> : <EmptyState>根拠にした説明はありません</EmptyState>}
       </Panel>
 

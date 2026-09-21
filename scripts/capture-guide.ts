@@ -14,9 +14,9 @@ const CODE = process.env.GUIDE_ORG_CODE ?? 'demo';
 const PASSWORD = process.env.GUIDE_PASSWORD ?? '';
 
 const ACCOUNTS = {
-  teacher: process.env.GUIDE_TEACHER ?? 'teacher@demo.studypilot.local',
+  teacher: process.env.GUIDE_TEACHER ?? 'teacher@demo.toinowa.local',
   student: process.env.GUIDE_STUDENT ?? 'student01',
-  admin: process.env.GUIDE_ADMIN ?? 'admin@demo.studypilot.local',
+  admin: process.env.GUIDE_ADMIN ?? 'admin@demo.toinowa.local',
 };
 
 async function login(page: Page, identifier: string) {

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { LogoutButton } from '@/components/logout-button';
+import { Icon } from '@/components/icon';
+import { ROLE_THEME, type AppRole } from '@/components/role-theme';
 
 export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart' | 'handoff' | 'settings' | 'key' | 'bell';
 
@@ -62,9 +64,8 @@ function NavIcon({ name }: { name: NavIconName }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="m4 11 8-7 8 7" /><path {...common} d="M6 10v9h12v-9M10 19v-5h4v5" /></svg>;
 }
 
-export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavItem[]; homeHref: string; userName: string }) {
+export function SidebarNav({ items, homeHref, userName, role }: { items: SidebarNavItem[]; homeHref: string; userName: string; role: AppRole }) {
   const pathname = usePathname();
-  const initial = userName.trim().charAt(0) || 'U';
   const activeHref = items.find((item) => pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`)))?.href ?? null;
   const badgeOf = useSeenBadges(items, activeHref, true);
   return <>
@@ -82,8 +83,10 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
       })}
     </nav>
     <div className="mt-auto flex items-center gap-3 px-2 pt-8">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1f2b45] text-sm font-bold text-white">{initial}</span>
-      <div className="min-w-0 flex-1"><p className="text-[11px] text-[#78928f]">ログイン中</p><p className="truncate text-sm font-bold text-slate-900">{userName}</p></div>
+      <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm ${ROLE_THEME[role].gradient}`}>
+        <Icon name="person" className="text-[22px]" />
+      </span>
+      <div className="min-w-0 flex-1"><p className="text-[11px] text-[#78928f]">{ROLE_THEME[role].label}としてログイン中</p><p className="truncate text-sm font-bold text-slate-900">{userName}</p></div>
       <LogoutButton />
     </div>
   </>;

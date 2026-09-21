@@ -77,7 +77,7 @@ describe('callModel', () => {
       .mockReturnValueOnce(queuedResponse(okResponse('recovered')));
     const result = await callModel({ router: 'assessment', modelClass: 'advanced', agentName: 'assessment', requestType: 'final', messages: [{ role: 'user', content: 'test' }], trace });
     expect(result.data).toBe('recovered');
-    expect(mocks.create.mock.calls.map(call => call[0].model)).toEqual(['orcarouter/studypilot-advanced', 'google/gemini-2.5-flash']);
+    expect(mocks.create.mock.calls.map(call => call[0].model)).toEqual(['orcarouter/toinowa-advanced', 'google/gemini-2.5-flash']);
     expect(result.meta.fallbackCount).toBe(1);
     expect(result.meta.resolvedModel).toBe('google/gemini-2.5-flash');
     expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed_over' }));

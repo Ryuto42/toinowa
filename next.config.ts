@@ -6,7 +6,12 @@ import type { NextConfig } from "next";
  * 生徒の学習記録を扱うので、埋め込み（クリックジャッキング）と
  * 参照元の漏れは塞いでおく。CSP は Next.js のインラインスクリプトが必要なため
  * script-src に 'unsafe-inline' を許すが、frame-ancestors と form-action は厳しくする。
+ *
+ * 'unsafe-eval' は開発時のみ。HMR が eval を使う一方、本番で必要なのは
+ * pdf.js だけだったので `isEvalSupported: false`（document-reader.tsx）で外した。
  */
+const dev = process.env.NODE_ENV !== 'production';
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -14,7 +19,7 @@ const csp = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   // Next.js のハイドレーション用インラインスクリプト
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
   // Google Fonts（Material Symbols）
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
@@ -23,9 +28,14 @@ const csp = [
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
+  "media-src 'self' blob:",
+  "frame-src 'none'",
+  "upgrade-insecure-requests",
 ].join('; ');
 
 const nextConfig: NextConfig = {
+  // サーバの実装を名乗らない。
+  poweredByHeader: false,
   async headers() {
     return [{
       source: '/:path*',

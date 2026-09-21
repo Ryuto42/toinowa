@@ -9,7 +9,6 @@ const LINKS = [
   { href: '/admin/limits', title: '利用上限', body: 'AIの予算上限を決めます。超過した呼び出しはモデルに届く前に止まります。' },
   { href: '/admin/retention', title: 'データ保持', body: '会話とAIログを何日で消すかを決めます。夜間のジョブが実際に削除します。' },
   { href: '/admin/audit', title: '監査ログ', body: '誰が何をしたかを、許可・拒否・エラーとも同じ形式で記録しています。' },
-  { href: '/admin/line', title: 'LINE連携', body: '接続状態だけを確認できます。連携の実装は次の段階です。' },
 ];
 
 export default async function AdminSettingsPage() {

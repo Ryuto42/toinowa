@@ -10,7 +10,7 @@ import type { Channel, MsgActor } from '@/lib/database/types';
 
 export const conversationCreateSchema = z.object({
   studentId: z.uuid().optional(),
-  channel: z.enum(['web', 'line']).default('web'),
+  channel: z.literal('web').default('web'),
   externalThreadId: z.string().trim().max(200).optional(),
   lessonId: z.uuid().optional(),
   conceptId: z.uuid().optional(),
@@ -19,7 +19,7 @@ export const conversationCreateSchema = z.object({
 
 export const messageCreateSchema = z.object({
   content: z.string().trim().min(1).max(8_000),
-  channel: z.enum(['web', 'line']).default('web'),
+  channel: z.literal('web').default('web'),
   channelMessageId: z.string().trim().max(200).optional(),
   stream: z.boolean().default(true),
   assignmentId: z.uuid().optional(),

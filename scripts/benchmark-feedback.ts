@@ -33,7 +33,7 @@ async function main() {
     }
   }
   const report = { measuredAt: new Date().toISOString(), note: '人工的な2例のスモーク比較。一般的な教育品質・採点一致率の証明ではない。直接比較のためアプリの利用台帳には含まれない。', results, totalCostUsd: spent };
-  await writeFile('docs/feedback-model-evaluation.json', JSON.stringify(report, null, 2)+'\n');
+  await writeFile('docs/data/feedback-model-evaluation.json', JSON.stringify(report, null, 2)+'\n');
   console.log(JSON.stringify(report, null, 2));
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

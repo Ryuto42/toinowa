@@ -1,4 +1,4 @@
-# StudyPilot
+# トイノワ
 
 ファインマンテクニックに着想を得た、授業後の復習を支えるAIエージェントです。先生が授業記録を渡すと、生徒別の課題と学習計画を準備します。先生の確認・配信後、生徒がAIに概念を説明し、対話の分析から次の学習計画を更新します。
 
@@ -20,8 +20,8 @@ http://localhost:3000 を開きます。接続先DBの既存マイグレーシ�
 
 - [先生・生徒・管理者の使い方ガイド](docs/user-guide.md)
 - [操作・モデル設定・検証方法](docs/feature-guide.md)
-- [ハッカソンの目的・テーマ・評価基準と合意事項](docs/hackathon.md)
-- [評価基準への対応・残る課題・4分デモ案](docs/hackathon-review.md)
+- [改善と検証の記録](docs/improvements.md)
+- [文書の一覧](docs/README.md)
 
 ```bash
 npm test

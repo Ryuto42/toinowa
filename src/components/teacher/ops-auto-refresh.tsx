@@ -39,7 +39,10 @@ export function OpsAutoRefresh({ intervalMs = 10_000 }: { intervalMs?: number })
     return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', poll); };
   }, [router, intervalMs]);
 
-  return <p role="status" aria-live="polite" className="mb-3 text-xs text-[#8a9ab2]">
-    {updatedAt ? `新しい記録を受け取りました（${updatedAt}）` : '自動更新中'}
+  // 更新が来たときだけ知らせる。待っている間は何も出さない。
+  // 読み上げ用の領域は常に置いたままにする（後から差し込むと通知されない）。
+  return <p role="status" aria-live="polite"
+    className={updatedAt ? 'mb-3 text-xs text-[#8a9ab2]' : 'sr-only'}>
+    {updatedAt ? `新しい記録を受け取りました（${updatedAt}）` : ''}
   </p>;
 }

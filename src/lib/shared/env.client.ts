@@ -14,23 +14,14 @@ const raw = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  NEXT_PUBLIC_DEMO_MODE: process.env.NEXT_PUBLIC_DEMO_MODE,
-  NEXT_PUBLIC_LINE_ADD_FRIEND_URL: process.env.NEXT_PUBLIC_LINE_ADD_FRIEND_URL,
 };
 
-const boolish = z
-  .enum(['true', 'false'])
-  .default('false')
-  .transform((v) => v === 'true');
-
 const schema = z.object({
-  NEXT_PUBLIC_APP_NAME: z.string().min(1).default('StudyPilot AI'),
-  NEXT_PUBLIC_APP_SHORT_NAME: z.string().min(1).default('StudyPilot'),
+  NEXT_PUBLIC_APP_NAME: z.string().min(1).default('トイノワ'),
+  NEXT_PUBLIC_APP_SHORT_NAME: z.string().min(1).default('トイノワ'),
   NEXT_PUBLIC_APP_TAGLINE: z.string().default(''),
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  NEXT_PUBLIC_DEMO_MODE: boolish,
-  NEXT_PUBLIC_LINE_ADD_FRIEND_URL: z.union([z.url(), z.literal('')]).default(''),
 });
 
 const parsed = schema.safeParse(raw);

@@ -7,10 +7,9 @@ import type { Database } from './types';
 /**
  * ⚠️⚠️ service role クライアント。**RLS を完全にバイパスする**。 ⚠️⚠️
  *
- * このファイルを import してよいのは次の3箇所だけ:
+ * このファイルを import してよいのは次の2箇所だけ:
  *   1. src/lib/jobs/worker.ts       … ジョブ実行（利用者のセッションが無い）
- *   2. src/app/api/webhooks/line/   … 認証前に line_user_id から生徒を引く必要がある
- *   3. src/lib/security/audit.ts    … 監査ログは利用者の権限に関係なく必ず書く
+ *   2. src/lib/security/audit.ts    … 監査ログは利用者の権限に関係なく必ず書く
  *
  * ESLint の import 制限と CI の grep 検査で、これ以外からの参照を落としている。
  *
