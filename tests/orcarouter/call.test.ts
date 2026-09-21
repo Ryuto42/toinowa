@@ -66,6 +66,12 @@ describe('callModel', () => {
     trace.tenantId = crypto.randomUUID();
   });
 
+  it('自己紹介のeconomy指定はFlash Liteを優先する', async () => {
+    mocks.create.mockReturnValueOnce(queuedResponse(okResponse('hello')));
+    await callModel({ router: 'studentChat', modelClass: 'economy', agentName: 'learning-support', requestType: 'student_tutorial', messages: [{ role: 'user', content: 'test' }], trace });
+    expect(mocks.create.mock.calls[0][0].model).toBe('google/gemini-2.5-flash-lite');
+  });
+
   it('用途別モデルが遅い場合はautoを再試行せず別モデルに切り替える', async () => {
     mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status: 504 }) })
       .mockReturnValueOnce(queuedResponse(okResponse('recovered')));

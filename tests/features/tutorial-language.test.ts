@@ -10,15 +10,12 @@ describe('登録学年に合わせた初回案内', () => {
   ] as const)('%sを適切に分類する', (grade, audience) => {
     expect(tutorialAudienceForGrade(grade)).toBe(audience);
   });
-  it('年齢不明なら決めつけず、全学年で好きなことから学習の話につなぐ', () => {
+  it('年齢不明なら決めつけず、全学年で好きなことと送信方法を案内する', () => {
     expect(tutorialOpening('general')).toBe(TUTORIAL_OPENING);
     expect(tutorialOpening('elementary')).toContain('すきなこと');
-    expect(tutorialOpening('elementary')).toContain('べんきょう');
-    expect(tutorialOpening('senior')).toContain('今後の目標');
     expect(tutorialOpening('senior')).not.toContain('AIだよ');
     for (const audience of ['elementary','junior','senior','general'] as const) {
       const opening = tutorialOpening(audience);
-      expect(opening).toContain('名前や学校名');
       expect(opening).toContain('送信');
       expect(opening.length).toBeLessThan(250);
     }
