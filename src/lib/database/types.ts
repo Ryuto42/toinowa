@@ -744,6 +744,7 @@ export interface Database {
           approved_by: string | null;
           created_at: string;
           source_plan_id: string | null;
+          revision: number;
         };
         Insert: {
           id?: string;
@@ -759,6 +760,7 @@ export interface Database {
           approved_by?: string | null;
           created_at?: string;
           source_plan_id?: string | null;
+          revision?: number;
         };
         Update: {
           id?: string;
@@ -774,6 +776,7 @@ export interface Database {
           approved_by?: string | null;
           created_at?: string;
           source_plan_id?: string | null;
+          revision?: number;
         };
         Relationships: [
           {
@@ -936,6 +939,8 @@ export interface Database {
           subject: string;
           grade: string | null;
           created_at: string;
+          individual_student_id: string | null;
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -944,6 +949,8 @@ export interface Database {
           subject: string;
           grade?: string | null;
           created_at?: string;
+          individual_student_id?: string | null;
+          archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -952,8 +959,17 @@ export interface Database {
           subject?: string;
           grade?: string | null;
           created_at?: string;
+          individual_student_id?: string | null;
+          archived_at?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'classrooms_individual_student_id_fkey';
+            columns: ['individual_student_id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'classrooms_tenant_id_fkey';
             columns: ['tenant_id'];
@@ -1510,6 +1526,10 @@ export interface Database {
           supersedes_plan_id: string | null;
           agent_run_id: string | null;
           created_at: string;
+          preparation_id: string | null;
+          classroom_id: string | null;
+          source_assessment_id: string | null;
+          review_notes: Json;
         };
         Insert: {
           id?: string;
@@ -1525,6 +1545,10 @@ export interface Database {
           supersedes_plan_id?: string | null;
           agent_run_id?: string | null;
           created_at?: string;
+          preparation_id?: string | null;
+          classroom_id?: string | null;
+          source_assessment_id?: string | null;
+          review_notes?: Json;
         };
         Update: {
           id?: string;
@@ -1540,6 +1564,10 @@ export interface Database {
           supersedes_plan_id?: string | null;
           agent_run_id?: string | null;
           created_at?: string;
+          preparation_id?: string | null;
+          classroom_id?: string | null;
+          source_assessment_id?: string | null;
+          review_notes?: Json;
         };
         Relationships: [
           {
@@ -1547,6 +1575,27 @@ export interface Database {
             columns: ['approved_by'];
             isOneToOne: false;
             referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_preparation_id_fkey';
+            columns: ['preparation_id'];
+            isOneToOne: false;
+            referencedRelation: 'lesson_preparations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'learning_plans_source_assessment_id_fkey';
+            columns: ['source_assessment_id'];
+            isOneToOne: false;
+            referencedRelation: 'assessments';
             referencedColumns: ['id'];
           },
           {
@@ -1565,6 +1614,64 @@ export interface Database {
           },
           {
             foreignKeyName: 'learning_plans_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      lesson_preparations: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          classroom_id: string;
+          created_by: string;
+          title: string;
+          content: string;
+          due_at: string;
+          student_ids: string[];
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          tenant_id: string;
+          classroom_id: string;
+          created_by: string;
+          title: string;
+          content: string;
+          due_at: string;
+          student_ids: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          classroom_id?: string;
+          created_by?: string;
+          title?: string;
+          content?: string;
+          due_at?: string;
+          student_ids?: string[];
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'lesson_preparations_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lesson_preparations_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'lesson_preparations_tenant_id_fkey';
             columns: ['tenant_id'];
             isOneToOne: false;
             referencedRelation: 'tenants';
@@ -2398,6 +2505,8 @@ export interface Database {
           must_change_password: boolean;
           password_revision: number;
           password_operation_until: string | null;
+          archived_at: string | null;
+          archived_previous_status: UserStatus | null;
         };
         Insert: {
           id: string;
@@ -2411,6 +2520,8 @@ export interface Database {
           must_change_password?: boolean;
           password_revision?: number;
           password_operation_until?: string | null;
+          archived_at?: string | null;
+          archived_previous_status?: UserStatus | null;
         };
         Update: {
           id?: string;
@@ -2424,6 +2535,8 @@ export interface Database {
           must_change_password?: boolean;
           password_revision?: number;
           password_operation_until?: string | null;
+          archived_at?: string | null;
+          archived_previous_status?: UserStatus | null;
         };
         Relationships: [
           {
@@ -2633,6 +2746,34 @@ export interface Database {
         };
         Returns: boolean;
       };
+      learning_work_active: {
+        Args: {
+          p_tenant: string;
+          p_payload: Json;
+        };
+        Returns: boolean;
+      };
+      manage_resource: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_kind: string;
+          p_id: string;
+          p_action: string;
+          p_confirmation?: string;
+          p_fingerprint?: string;
+        };
+        Returns: void;
+      };
+      managed_resource_preview: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_kind: string;
+          p_id: string;
+        };
+        Returns: Json;
+      };
       match_material_chunks: {
         Args: {
           p_tenant: string;
@@ -2653,6 +2794,35 @@ export interface Database {
           p_baseline: Json;
         };
         Returns: void;
+      };
+      queue_lesson_preparation: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_id: string;
+          p_classroom: string;
+          p_title: string;
+          p_content: string;
+          p_due: string;
+        };
+        Returns: string;
+      };
+      retry_lesson_preparation: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_id: string;
+        };
+        Returns: number;
+      };
+      review_explanation_works: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_items: Json;
+          p_publish: boolean;
+        };
+        Returns: number;
       };
       rls_auto_enable: {
         Args: Record<PropertyKey, never>;
@@ -2677,6 +2847,15 @@ export interface Database {
           p_students: string[];
         };
         Returns: void;
+      };
+      set_student_teachers: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_student: string;
+          p_teachers: string[];
+        };
+        Returns: string;
       };
       today_ai_spend: {
         Args: {

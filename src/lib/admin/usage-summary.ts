@@ -34,7 +34,7 @@ export function usageFeature(requestType: string): { feature: string; location: 
     analyze_lesson: ['授業の分析', '先生：授業資料'],
     learning_support: ['生徒との対話', '生徒：説明ワーク'],
     assess_answer: ['最終フィードバック', '対話完了後の自動処理'],
-    build_learning_plan: ['学習計画・次回の提案', '登録・分析・対話完了後の自動処理'],
+    build_learning_plan: ['学習計画・次回の提案', '授業記録・模試・対話完了後の個別計画'],
     teacher_insight: ['クラスの分析', '先生：クラスの状況'],
     summarize_conversation: ['対話履歴の要約', '長い対話の自動処理'],
     ai_text_judge: ['回答の整合性チェック', '生徒の説明の分析'],

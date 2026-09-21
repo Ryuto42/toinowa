@@ -34,7 +34,7 @@ export function AppShell(props: {
       <div className="flex items-center gap-2"><span className="rounded-full bg-[#def3ed] px-3 py-1 text-xs font-bold text-[#237d75]">{props.roleLabel}</span><LogoutButton /></div>
     </header>
     <main className="min-h-screen lg:ml-[286px]">
-      <div className="mx-auto max-w-[1440px] px-5 pb-28 pt-8 sm:px-8 lg:px-10 lg:pb-12 lg:pt-12">{props.children}</div>
+      <div className="mx-auto max-w-[1440px] px-5 pb-28 pt-8 sm:px-8 lg:px-10 lg:pb-12 lg:pt-12"><div className="mb-5 flex justify-end"><Link href={props.roleLabel === '生徒' ? '/student/guide' : props.roleLabel === '管理者' ? '/admin/guide' : '/teacher/guide'} className="text-sm font-semibold text-[#237d75] underline underline-offset-4">使い方ガイド</Link></div>{props.children}</div>
     </main>
     <MobileNav items={props.nav} homeHref={props.homeHref} />
   </div>;

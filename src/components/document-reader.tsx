@@ -39,7 +39,8 @@ async function imageData(file: File): Promise<string[]> {
   } finally { bitmap.close(); }
 }
 
-export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, onAnalyzed }: {
+export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, onAnalyzed, onBusyChange }: {
+  onBusyChange?: (busy: boolean) => void;
   purpose: 'exam' | 'lesson'; onRead: (text: string) => void;
   baseline?: ExamBaseline; onAnalysisStarted?: (id: string) => void | Promise<void>;
   onAnalyzed?: (id: string, result: ExamAnalysisResult, baseline: ExamBaseline) => void;
@@ -53,7 +54,7 @@ export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, o
     if (busy) return;
     const id = crypto.randomUUID();
     const snapshot = baseline ?? { learningGoal: '', weakAreas: '', examResults: '', dailyTimeLimitMin: null };
-    setBusy(true); setStatus('ファイルをアップロードしています。登録はそのまま進められます。'); setUncertainties([]);
+    setBusy(true); onBusyChange?.(true); setStatus(purpose === 'exam' ? 'ファイルをアップロードしています。登録はそのまま進められます。' : '授業資料を読み取っています。読み取り完了まで、この画面を開いておいてください。'); setUncertainties([]);
     try {
       // IDを変換・アップロード前に通知し、先に登録されても同じ分析に結びつける。
       if (purpose === 'exam') await onAnalysisStarted?.(id);
@@ -88,7 +89,7 @@ export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, o
     } catch (error) {
       if (purpose === 'exam') void fetch(`/api/admin/exam-analyses/${id}`, { method: 'PATCH' }).catch(() => undefined);
       if (mounted.current) setStatus(error instanceof Error ? error.message : '読み取れませんでした。'); }
-    finally { if (mounted.current) setBusy(false); }
+    finally { if (mounted.current) { setBusy(false); onBusyChange?.(false); } }
   }
   return <div className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 p-4">
     <p className="text-sm font-bold">{purpose === 'exam' ? '模試結果（任意）' : '授業資料'}をPDF・写真から入力</p>

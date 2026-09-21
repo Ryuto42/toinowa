@@ -6,14 +6,7 @@ type TopicFormProps = { classrooms: Array<{ id: string; name: string }>; student
 type Mode = 'auto' | 'manual';
 
 export function TopicForm(props: TopicFormProps) {
-  const [mode, setMode] = useState<Mode>('auto');
-  return <div>
-    <div className="mb-6 grid gap-3 sm:grid-cols-2" role="group" aria-label="お題の作成モード">
-      {([{ value: 'auto', title: '授業記録・資料からAIが作る', description: '授業メモやPDF・画像をもとに、お題と難易度を自動で提案します。' }, { value: 'manual', title: '先生がお題を作る', description: '先生がテーマや学んだ内容を入力し、AIがお題を考えます。' }] as const).map(item => <button key={item.value} type="button" aria-pressed={mode === item.value} onClick={() => setMode(item.value)} className={`rounded-xl border-2 p-4 text-left ${mode === item.value ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white'}`}><span className="block font-bold">{item.title}</span><span className="mt-2 block text-sm leading-6 text-slate-600">{item.description}</span></button>)}
-    </div>
-    <div hidden={mode !== 'auto'}><TopicEditor {...props} mode="auto" /></div>
-    <div hidden={mode !== 'manual'}><TopicEditor {...props} mode="manual" /></div>
-  </div>;
+  return <TopicEditor {...props} mode="manual" />;
 }
 
 function TopicEditor({ classrooms, students, mode }: TopicFormProps & { mode: Mode }) {

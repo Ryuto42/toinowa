@@ -21,7 +21,7 @@ export async function PATCH(request: Request, route: Context) {
       name: preCheck(body.name).masked.text,
       subject: preCheck(body.subject).masked.text,
       grade: body.grade ? preCheck(body.grade).masked.text : null,
-    }).eq('tenant_id', context.tenantId).eq('id', id).select('id,name,subject,grade').maybeSingle();
+    }).eq('tenant_id', context.tenantId).eq('id', id).is('individual_student_id',null).is('archived_at',null).select('id,name,subject,grade').maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return json({ message: 'クラスが見つかりません' }, { status: 404 });
     recordAudit({

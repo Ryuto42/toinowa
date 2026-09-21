@@ -1,5 +1,6 @@
 'use client';
 
+import { ResourceLifecycle } from './resource-lifecycle';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
@@ -9,6 +10,7 @@ export interface ClassroomRow {
   name: string;
   subject: string;
   grade: string | null;
+  archived_at: string | null;
   teacherIds: string[];
   studentIds: string[];
 }
@@ -43,13 +45,14 @@ const dialogClass = 'm-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow
 
 export function ClassroomManager({ classrooms, members }: { classrooms: ClassroomRow[]; members: MemberOption[] }) {
   const router = useRouter();
+  const [showArchived, setShowArchived] = useState(false);
   const teachers = members.filter((m) => m.role === 'teacher' || m.role === 'admin');
   const students = members.filter((m) => m.role === 'student');
   const nameById = new Map(members.map((m) => [m.id, m.name]));
 
   return <div className="space-y-6">
-    <div className="flex justify-end"><CreateClassroom onDone={() => router.refresh()} /></div>
-    {classrooms.length ? <div className="space-y-3">{classrooms.map((classroom) => (
+    <div className="flex flex-wrap items-center justify-between gap-3"><label className="text-sm"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)} /> アーカイブ済みも表示</label><CreateClassroom onDone={() => router.refresh()} /></div>
+    {classrooms.length ? <div className="space-y-3">{classrooms.filter(c => showArchived || !c.archived_at).map((classroom) => (
       <ClassroomCard
         key={classroom.id}
         classroom={classroom}
@@ -60,7 +63,7 @@ export function ClassroomManager({ classrooms, members }: { classrooms: Classroo
       />
     ))}</div> : (
       <p className="rounded-2xl border border-dashed border-[#b9dcd5] bg-[#fbfdfd] p-8 text-center text-sm text-[#8ca0bb]">
-        クラスがまだありません。「クラスを追加」から作成してください。
+        クラスは任意です。個別指導ではユーザー管理で生徒に担当の先生を設定してください。
       </p>
     )}
   </div>;
@@ -189,12 +192,13 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
           担当の先生がいないと、このクラスのお題を作れません。
         </p> : null}
       </div>
-      <button type="button" onClick={openEditor} aria-haspopup="dialog"
+      <button type="button" disabled={!!classroom.archived_at} onClick={openEditor} aria-haspopup="dialog"
         className="shrink-0 rounded-xl border border-emerald-700 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
         担当・在籍を編集
       </button>
     </div>
 
+    <ResourceLifecycle kind="classroom" id={classroom.id} archived={!!classroom.archived_at} />
     <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreDialog}
       onCancel={(e) => { if (busy) e.preventDefault(); }} className={dialogClass}>
       <div className="flex items-start justify-between gap-4">

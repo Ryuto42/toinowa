@@ -13,9 +13,10 @@ export async function PATCH(request: Request, route: Context) {
     const id = uuidParam((await route.params).id);
     const body = await parseJson(request, userUpdateSchema);
     const db = adminDb();
-    const current = await db.from('users').select('role,email').eq('tenant_id', context.tenantId).eq('id', id).maybeSingle();
+    const current = await db.from('users').select('role,email,archived_at').eq('tenant_id', context.tenantId).eq('id', id).maybeSingle();
     if (current.error) throw new Error(current.error.message);
     if (!current.data) return json({ message: 'ユーザーが見つかりません' }, { status: 404 });
+    if (current.data.archived_at) throw new ApiInputError('編集するには先にアーカイブから復元してください');
     if ((body.profile || body.examAnalysisId || body.loginIdentifier !== undefined) && current.data.role !== 'student') throw new ApiInputError('この項目は生徒のみ変更できます');
     if (body.loginIdentifier === null && !current.data.email) throw new ApiInputError('ログインIDは必須です');
     if (id === context.userId && body.status && body.status !== 'active') throw new ApiInputError('自分自身の利用を停止することはできません');

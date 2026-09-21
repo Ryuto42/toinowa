@@ -122,6 +122,13 @@ export async function runWorkerTick(options: {
     }
 
     try {
+      const active = await adminDb().rpc('learning_work_active', { p_tenant: job.tenant_id, p_payload: job.payload });
+      if(active.error) throw new Error(active.error.message);
+      if(!active.data) {
+        await completeStep(job, { nextStep: null, state: { cancelledByArchive: true } });
+        result.succeeded += 1;
+        continue;
+      }
       const next = await handler(job);
       await completeStep(job, next);
       result.succeeded += next.nextStep === null ? 1 : 0;

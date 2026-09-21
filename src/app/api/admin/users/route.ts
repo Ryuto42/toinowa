@@ -17,7 +17,8 @@ const createUserSchema = z.object({
   loginIdentifier: z.string().trim().min(1).max(120).optional(),
   intake: studentIntakeSchema.optional(),
   examAnalysisId: z.uuid().optional(),
-}).refine(value => value.role !== 'student' || Boolean(value.intake && value.loginIdentifier), '生徒のログインID・学年・クラスを入力してください').refine(value => value.role === 'student' || Boolean(value.email), '先生・管理者のメールアドレスを入力してください');
+  teacherIds: z.array(z.uuid()).max(30).default([]),
+}).refine(value => value.role !== 'student' || Boolean(value.intake && value.loginIdentifier), '生徒のログインID・学年を入力してください').refine(value => value.role === 'student' || Boolean(value.email), '先生・管理者のメールアドレスを入力してください');
 
 export async function GET() {
   try {
@@ -48,9 +49,11 @@ export async function POST(request: Request) {
     const codes = await (await createClient()).from('school_codes').select('code').eq('tenant_id', context.tenantId).eq('active', true).order('code').limit(1);
     if (codes?.error) throw new Error(codes.error.message);
     if (credentials && !codes?.data?.length) throw new ApiInputError('有効な所属コードを設定してからユーザーを登録してください');
-    if (body.intake) {
-      const classroom = await db.from('classrooms').select('id').eq('tenant_id', context.tenantId).eq('id', body.intake.classroomId).maybeSingle();
+    if (body.intake?.classroomId) {
+      const classroom = await db.from('classrooms').select('id').eq('tenant_id', context.tenantId).eq('id', body.intake.classroomId).is('individual_student_id', null).is('archived_at', null).maybeSingle();
       if (classroom.error || !classroom.data) throw new Error('クラスが見つかりません');
+    }
+    if (body.intake) {
       body.intake.learningGoal = preCheck(body.intake.learningGoal).masked.text;
       if (body.intake.examResults) body.intake.examResults = preCheck(body.intake.examResults).masked.text;
       if (body.intake.weakAreas) body.intake.weakAreas = preCheck(body.intake.weakAreas).masked.text;
@@ -63,14 +66,18 @@ export async function POST(request: Request) {
     if (body.role === 'student') {
       const { error: profileError } = await db.from('student_profiles').insert({ user_id: authUserId, tenant_id: context.tenantId, grade: body.intake!.grade, learning_goal: body.intake!.learningGoal, exam_results: body.intake!.examResults, weak_areas: body.intake!.weakAreas, daily_time_limit_min: body.intake!.dailyTimeLimitMin });
       if (profileError) throw new Error(profileError.message);
+      const personal = await db.rpc('set_student_teachers', { p_tenant: context.tenantId, p_actor: context.userId, p_student: authUserId, p_teachers: body.teacherIds });
+      if (personal.error) throw new ApiInputError(personal.error.code==='P0001' ? personal.error.message : '担当を設定できませんでした');
+      if (body.intake!.classroomId) {
       const enrollment = await db.from('enrollments').insert({ tenant_id: context.tenantId, classroom_id: body.intake!.classroomId, user_id: authUserId, role: 'student', active: true });
       if (enrollment.error) throw new Error(enrollment.error.message);
+      }
       if (body.examAnalysisId) {
         const attached = await db.rpc('attach_exam_analysis', { p_tenant: context.tenantId, p_actor: context.userId, p_student: authUserId, p_analysis: body.examAnalysisId });
         if (attached.error) throw new Error(attached.error.message);
         await applyExamAnalysis(context.tenantId, body.examAnalysisId);
       } else {
-      const job = await enqueueJob({ tenantId: context.tenantId, kind: 'build_learning_plan', idempotencyKey: `onboarding:${authUserId}`, payload: { studentId: authUserId, requestedBy: context.userId, classroomId: body.intake!.classroomId }, traceId: crypto.randomUUID() });
+      const job = await enqueueJob({ tenantId: context.tenantId, kind: 'build_learning_plan', idempotencyKey: `onboarding:${authUserId}`, payload: { studentId: authUserId, requestedBy: context.userId, classroomId: body.intake!.classroomId ?? personal.data }, traceId: crypto.randomUUID() });
       if (!job) throw new Error('学習計画を予約できませんでした');
       triggerWorkerTick();
       }

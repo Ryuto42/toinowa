@@ -4,7 +4,7 @@ import { examAnalysisResultSchema } from '@/lib/materials/exam-analysis';
 import { summarizeUsage, usageFeature } from '@/lib/admin/usage-summary';
 describe('optional intake and usage attribution', () => {
   it('allows optional fields to be absent without inventing a user preference', () => {
-    const result = studentIntakeSchema.parse({ grade:'中2',classroomId:crypto.randomUUID() });
+    const result = studentIntakeSchema.parse({ grade:'中2' });
     expect(result.learningGoal).toBe(''); expect(result.weakAreas).toBe(''); expect(result.dailyTimeLimitMin).toBeNull();
   });
   it('allows uncertain model recommendations but rejects out-of-range minutes', () => {

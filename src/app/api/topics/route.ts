@@ -19,11 +19,15 @@ export async function POST(request: Request) {
     const context = await requireRole('teacher', 'admin');
     const body = await parseJson(request, schema);
     const db = await createClient();
-    const classroom = await db.from('classrooms').select('id,subject,grade').eq('tenant_id', context.tenantId).eq('id', body.classroomId).maybeSingle();
+    const classroom = await db.from('classrooms').select('id,subject,grade,individual_student_id').is('archived_at',null).eq('tenant_id', context.tenantId).eq('id', body.classroomId).maybeSingle();
     if (classroom.error) throw new Error(classroom.error.message);
     if (!classroom.data) throw new ApiInputError('担当クラスを選択してください');
+    body.studentId ??= classroom.data.individual_student_id ?? undefined;
     if (body.studentId) {
       await assertStudentScope(context, body.studentId);
+      const student = await db.from('users').select('id').eq('tenant_id',context.tenantId).eq('id',body.studentId).eq('status','active').is('archived_at',null).maybeSingle();
+      if(student.error) throw new Error(student.error.message);
+      if(!student.data) throw new ApiInputError('この生徒の学習は停止されています');
       const enrollment = await db.from('enrollments').select('id').eq('tenant_id', context.tenantId).eq('classroom_id', body.classroomId).eq('user_id', body.studentId).eq('role', 'student').eq('active', true).maybeSingle();
       if (enrollment.error) throw new Error(enrollment.error.message);
       if (!enrollment.data) throw new ApiInputError('選択したクラスの生徒を指定してください');

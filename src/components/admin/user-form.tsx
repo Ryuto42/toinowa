@@ -1,5 +1,6 @@
 'use client';
 
+import { TeacherPicker, type TeacherOption } from './teacher-assignment';
 import { useRouter } from 'next/navigation';
 import { IntakeFields, useIntake, emptyIntake, RequiredMark } from './intake-fields';
 import { CredentialsReceipt, type Credentials } from './credentials-receipt';
@@ -7,7 +8,7 @@ import { FormEvent, useEffect, useId, useRef, useState } from 'react';
 
 const fieldClass = 'mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100';
 
-export function UserForm({ classrooms }: { classrooms: Array<{ id: string; name: string }> }) {
+export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: string; name: string }>; teachers: TeacherOption[] }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const previousOverflow = useRef<string | null>(null);
@@ -53,7 +54,7 @@ export function UserForm({ classrooms }: { classrooms: Array<{ id: string; name:
         email: role === 'student' ? undefined : form.get('email'),
         role: form.get('role'),
         loginIdentifier: form.get('loginIdentifier') || undefined,
-        ...(role === 'student' ? { examAnalysisId: profile.getAnalysisId(), intake: { ...profile.intake, grade: form.get('grade'), classroomId: form.get('classroomId') } } : {}),
+        ...(role === 'student' ? { teacherIds: form.getAll('teacherIds'), examAnalysisId: profile.getAnalysisId(), intake: { ...profile.intake, grade: form.get('grade'), classroomId: form.get('classroomId') || undefined } } : {}),
       }),
     });
     if (response.ok) {
@@ -91,7 +92,8 @@ export function UserForm({ classrooms }: { classrooms: Array<{ id: string; name:
       </>}
       {role === 'student' ? <>
         <label className="text-sm font-bold">学年<RequiredMark /><input name="grade" required maxLength={40} placeholder="例：高校2年生" className={fieldClass} /></label>
-        <label className="text-sm font-bold">担当クラス<RequiredMark /><select name="classroomId" required className={fieldClass}><option value="">クラスを選択</option>{classrooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="text-sm font-bold">クラス（任意）<select name="classroomId" className={fieldClass}><option value="">クラスなし（個別指導）</option>{classrooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <div className="sm:col-span-2"><TeacherPicker teachers={teachers} /></div>
         <IntakeFields key={readerKey} state={profile} />
         <p className="text-sm text-emerald-900 sm:col-span-2">分析を待たずに登録できます。完了後は生徒情報と学習計画に反映します。</p>
       </> : null}

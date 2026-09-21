@@ -9,9 +9,10 @@ export async function POST(_request: Request, route: { params: Promise<{ id: str
     const context = await requireRole('admin');
     const id = uuidParam((await route.params).id);
     const db = adminDb();
-    const target = await db.from('users').select('id,email,login_identifier').eq('tenant_id', context.tenantId).eq('id', id).maybeSingle();
+    const target = await db.from('users').select('id,email,login_identifier,archived_at').eq('tenant_id', context.tenantId).eq('id', id).maybeSingle();
     if (target.error) throw new Error(target.error.message);
     if (!target.data) return json({ message: 'ユーザーが見つかりません' }, { status: 404 });
+    if (target.data.archived_at) throw new ApiInputError('先にアーカイブから復元してください');
     const codes = await (await createClient()).from('school_codes').select('code').eq('tenant_id', context.tenantId).eq('active', true).order('code').limit(1);
     if (codes.error) throw new Error(codes.error.message);
     if (!codes.data?.length) throw new ApiInputError('有効な所属コードを設定してください');

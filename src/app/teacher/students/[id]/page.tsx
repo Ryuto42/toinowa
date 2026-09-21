@@ -25,7 +25,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     db.from('student_profiles').select('*').eq('user_id', id).maybeSingle(),
     db.from('assessments').select('id,concept_id,score,override_score,confidence,reviewer_status,component_scores,misconceptions,created_at,concepts(name)')
       .eq('student_id', id).eq('is_final', true).order('created_at', { ascending: false }),
-    db.from('learning_plans').select('*').eq('student_id', id).order('created_at', { ascending: false }).limit(1),
+    db.from('learning_plans').select('*,classrooms(name)').eq('student_id', id).order('created_at', { ascending: false }).limit(8),
     db.from('review_schedules').select('*,concepts(name)').eq('student_id', id).is('fulfilled_at', null).order('due_at').limit(6),
     db.from('escalations').select('id,kind,title,priority,created_at').eq('student_id', id).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }),
     db.from('assignment_progress').select('assignment_id,status,active_seconds,completed_at').eq('student_id', id),
@@ -136,9 +136,17 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
       </Panel>
 
       <div className="space-y-6">
-        <Panel title="今後の学習" description="AIが提案した次の順番です">
-          {planTasks.length ? <PlanTimeline tasks={planTasks} /> : <EmptyState>学習計画はまだありません</EmptyState>}
-        </Panel>
+        <div id="learning-plan"><Panel title="学習計画と変更理由" description="先生向けの提案です。計画が更新されても、新しい課題は承認するまで配信されません。">
+          {plans.data?.[0] ? <div className="mb-5 space-y-3">
+            <p className="text-xs text-slate-500">{plans.data[0].classrooms?.name ?? 'クラス未設定'} · 最新の提案 · {formatDateTime(plans.data[0].created_at)} · {plans.data[0].preparation_id ? '授業記録を受けて作成' : plans.data[0].source_assessment_id ? '説明の評価を受けて更新' : '登録情報・模試などをもとに作成'}</p>
+            <p className="whitespace-pre-wrap rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">{plans.data[0].rationale}</p>
+            {Array.isArray(plans.data[0].review_notes) ? plans.data[0].review_notes.map((note,index) => <p key={index} className="text-sm text-amber-800">{String(note)}</p>) : null}
+            {plans.data[0].source_assessment_id ? <Link className="block text-sm font-bold text-emerald-800 underline" href={`/teacher/students/${id}/assessments/${plans.data[0].source_assessment_id}`}>今回の変更の根拠となった説明・評価を見る</Link> : null}
+            <Link href="/teacher/assignments#review" className="block text-sm font-bold text-emerald-800 underline">課題案を確認して配信する</Link>
+          </div> : null}
+          {planTasks.length ? <PlanTimeline tasks={planTasks} /> : <EmptyState>授業記録や模試の分析後に、学習計画が届きます。</EmptyState>}
+          {(plans.data?.length ?? 0)>1 ? <details className="mt-5 border-t border-slate-200 pt-4"><summary className="cursor-pointer text-sm font-bold">過去の提案・他クラスの計画を見る</summary><div className="mt-4 space-y-5">{plans.data?.slice(1).map(plan => <div key={plan.id}><p className="text-xs text-slate-500">{plan.classrooms?.name ?? 'クラス未設定'} · {formatDateTime(plan.created_at)}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7">{plan.rationale}</p><PlanTimeline tasks={jsonItems(plan.tasks)} /></div>)}</div></details> : null}
+        </Panel></div>
         <Panel title="復習の予定">
           {reviews.data?.length ? <ul className="space-y-2 text-sm">
             {reviews.data.map((review) => <li key={review.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#f7faf9] px-3 py-2">

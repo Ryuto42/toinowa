@@ -8,13 +8,14 @@ import { EmptyState, MetricCard, PageTitle, Panel, ScoreBar, StatusPill } from '
 export default async function TeacherDashboardPage() {
   const context = await requireRole('teacher', 'admin');
   const db = await createClient();
-  const [assessments, concepts, escalations, analyzed, runs] = await Promise.all([
+  const [assessments, concepts, escalations, analyzed, runs, drafts] = await Promise.all([
     db.from('assessments').select('score,override_score,concept_id').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(100),
     db.from('concepts').select('id,name').eq('tenant_id', context.tenantId),
     db.from('escalations').select('id,title,priority,status').eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }).limit(5),
     db.from('assessments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
     // agent_runs は内部表でRLSポリシーを持たないため、service role で読む。
     adminDb().from('agent_runs').select('estimated_cost_usd').eq('tenant_id', context.tenantId),
+    db.from('assignments').select('id', {count:'exact',head:true}).eq('tenant_id',context.tenantId).eq('status','draft'),
   ]);
   const conceptNames = new Map((concepts.data ?? []).map((concept) => [concept.id, concept.name]));
   const latestByConcept = new Map<string, number | null>();
@@ -27,7 +28,12 @@ export default async function TeacherDashboardPage() {
 
   return <div>
     <OpsAutoRefresh />
-    <PageTitle title="ダッシュボード" />
+    <PageTitle title="授業のあとを、AIと一緒に" description="先生はわかりやすく教える。AIは復習の設計・対話・分析を進め、次の学習を提案します。" />
+    <div className="mb-7 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+      <p className="text-lg font-bold text-emerald-950">{drafts.count ? `確認を待っている課題が${drafts.count}件あります` : '今日の授業記録を渡してください'}</p>
+      <p className="mt-2 text-sm leading-7 text-emerald-900">授業メモ・プリント・板書の写真から、生徒別の課題と学習計画を準備します。先生が確認して配信すると、生徒がAIへの説明に取り組めます。</p>
+      <div className="mt-4 flex flex-wrap gap-3"><Link href="/teacher/assignments" className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">授業記録を渡す</Link>{drafts.count ? <Link href="/teacher/assignments#review" className="rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-800">課題案を確認して配信</Link> : null}</div>
+    </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="平均理解度" value={average === null ? '—' : `${average}%`} note={average === null ? 'データ収集中' : `${scores.length}単元の観測データ`} />
       <MetricCard label="要介入" value={escalations.data?.length ?? 0} tone={escalations.data?.length ? 'rose' : 'emerald'} note="緊急対応が必要な生徒" />

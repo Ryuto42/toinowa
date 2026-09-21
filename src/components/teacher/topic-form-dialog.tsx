@@ -35,7 +35,7 @@ export function TopicFormDialog({ classrooms, students }: Props) {
     if (dialogRef.current?.open) return;
     setMounted(true);
     previousOverflow.current = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.setProperty('overflow', 'hidden');
     dialogRef.current?.showModal();
   }
 
@@ -48,9 +48,9 @@ export function TopicFormDialog({ classrooms, students }: Props) {
       type="button"
       onClick={open}
       aria-haspopup="dialog"
-      className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-800"
+      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
     >
-      説明ワークを作成
+      個別に課題を指定（必要なとき）
     </button>
 
     <dialog
@@ -68,8 +68,8 @@ export function TopicFormDialog({ classrooms, students }: Props) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id={headingId} className="text-xl font-bold">説明ワークを作成</h2>
-          <p className="mt-1 text-sm text-slate-500">授業で扱った概念を、生徒が初学者にも伝わるように説明するワークとして公開します。</p>
+          <h2 id={headingId} className="text-xl font-bold">個別に課題を指定（必要なとき）</h2>
+          <p className="mt-1 text-sm text-slate-500">普段は授業記録からAIに任せられます。特定のテーマやお題を指定したい場合に使います。</p>
         </div>
         <button
           type="button"

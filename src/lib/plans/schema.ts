@@ -5,7 +5,7 @@ export const studentIntakeSchema = z.object({
   examResults: z.string().trim().max(20000).default(''),
   weakAreas: z.string().trim().max(4000).default(''),
   dailyTimeLimitMin: z.number().int().min(5).max(240).nullable().default(null),
-  classroomId: z.uuid(),
+  classroomId: z.uuid().optional(),
 });
 
 export function schedulePlan(tasks: Array<{ concept: string; goal: string; prompt?: string; difficulty: number; minutes: number }>, dailyMinutes: number, start: string) {

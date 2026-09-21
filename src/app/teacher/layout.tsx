@@ -11,7 +11,7 @@ export default async function TeacherLayout({ children }: LayoutProps<'/teacher'
   ]);
   return <AppShell roleLabel="先生" userName={user.data?.display_name ?? '先生'} homeHref="/teacher/dashboard" nav={[
     { href: '/teacher/dashboard', label: 'ダッシュボード', icon: 'dashboard' },
-    { href: '/teacher/assignments', label: '説明ワーク', icon: 'book' },
+    { href: '/teacher/assignments', label: '授業と宿題', icon: 'book' },
     { href: '/teacher/students', label: '生徒', icon: 'users' },
     { href: '/teacher/interventions', label: '介入', icon: 'bolt', badge: pending.count ?? 0 },
     { href: '/teacher/ops', label: 'AIの稼働', icon: 'screen' },
