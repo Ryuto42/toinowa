@@ -1,4 +1,5 @@
 import { studentTutorialAudience } from '@/lib/tutorial/student';
+import { composeTutorialReply } from '@/lib/tutorial/flow';
 import { tutorialAgent } from '@/lib/tutorial/agent';
 import { TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { requireAuth } from '@/lib/auth/guard';
@@ -130,12 +131,14 @@ export async function POST(request: Request, route: Context) {
       let runId: string | undefined;
       if (!finishRequested) {
         const [history, audience] = await Promise.all([listMessages(context, conversationId), studentTutorialAudience(context.tenantId, conversation.student_id)]);
-        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000), audience }, {
+        const studentTurn = Math.max(1, history.filter(item => item.actor === 'student').length);
+        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000), audience, studentTurn }, {
           traceId, tenantId: context.tenantId, studentId: conversation.student_id,
-          conversationId, userId: context.userId, modelClass: 'standard', routingReason: 'onboarding_tutorial',
+          conversationId, userId: context.userId, modelClass: 'economy', routingReason: 'onboarding_tutorial',
         });
-        conversationCompleted = result.data.shouldFinish;
-        message = conversationCompleted && /[?？]/u.test(result.data.message) ? TUTORIAL_FINISH : result.data.message;
+        const reply = composeTutorialReply(result.data, studentTurn, audience);
+        conversationCompleted = reply.conversationCompleted;
+        message = reply.message;
         runId = result.meta.runId;
       }
       await appendMessage({context,conversationId,actor:'agent',content:message,channel:body.channel});

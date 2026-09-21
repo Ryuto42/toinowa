@@ -33,7 +33,7 @@ export function ChatWorkspace({ title, tutorial = false, children }: { title: st
         <div className="min-w-0"><Link href="/student/study" className="text-xs font-semibold text-emerald-800 underline underline-offset-4">← AIワークへ</Link><h1 className="mt-1 max-h-16 overflow-y-auto text-lg font-bold leading-snug text-slate-900 sm:text-2xl">{title}</h1></div>
         <Link href="/student/guide" className="mt-1 shrink-0 text-xs font-semibold text-emerald-800 underline underline-offset-4">使い方ガイド</Link>
       </header>
-      <p className="chat-instructions shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-6 text-emerald-900">{tutorial ? 'まずは短いやり取りを練習しよう。正解や点数はありません。' : 'AIはまだ知らない聞き手です。あなたの言葉で教えてあげよう。'}</p>
+      <p className="chat-instructions shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-6 text-emerald-900">{tutorial ? '話せることから、自分の言葉で伝えてみよう。正解や点数はありません。' : 'AIはまだ知らない聞き手です。あなたの言葉で教えてあげよう。'}</p>
       {children}
     </div>
   </section>;
