@@ -44,3 +44,7 @@ next-env.d.ts
 !.env.example
 
 /public/pdf.worker.min.mjs
+
+# Local evaluation inputs, credentials and raw traces
+/benchmark-data/
+/.orca/
