@@ -33,6 +33,7 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
   }
   const [credentials, setCredentials] = useState<Credentials | null>(null);
   const [role, setRole] = useState('student');
+  const [classroomId, setClassroomId] = useState('');
   const profile = useIntake();
   const [readerKey, setReaderKey] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -45,6 +46,13 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
     setBusy(true);
     setStatus('登録中…');
     const form = new FormData(element);
+    // クラスなしの個別指導は、担当を決めないと誰の一覧にも出ない。
+    // 先生がまだ1人も登録されていない学校では選びようがないので、その場合は通す。
+    if (role === 'student' && !classroomId && teachers.length > 0 && form.getAll('teacherIds').length === 0) {
+      setBusy(false);
+      setStatus('担当する先生を選んでください。');
+      return;
+    }
     try {
     const response = await fetch('/api/admin/users', {
       method: 'POST',
@@ -59,7 +67,7 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
     if (response.ok) {
       const result = await response.json();
       setCredentials(result.credentials ?? null);
-      element.reset(); profile.startAnalysis(undefined); profile.setIntake(emptyIntake); setReaderKey(current => current + 1);
+      element.reset(); setClassroomId(''); profile.startAnalysis(undefined); profile.setIntake(emptyIntake); setReaderKey(current => current + 1);
       setStatus('登録しました。');
       if (dialogRef.current) dialogRef.current.scrollTop = 0;
       router.refresh();
@@ -70,13 +78,13 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
     } catch { setStatus('通信に失敗しました。もう一度お試しください。'); } finally { setBusy(false); }
   }
 
-  return <div className="mb-6">
+  return <div>
     <button type="button" onClick={open} aria-haspopup="dialog" className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800">ユーザーを追加する</button>
     <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreScroll} onCancel={event => { if (busy || credentials) event.preventDefault(); }} onClick={event => {
       if (event.target !== event.currentTarget || busy || credentials) return;
       const rect = event.currentTarget.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close();
-    }} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
+    }} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
     <div className="flex items-center justify-between gap-4"><h2 id={headingId} className="text-xl font-bold">{credentials ? '登録が完了しました' : 'ユーザーを追加'}</h2><button type="button" aria-label="ユーザー追加を閉じる" disabled={busy || credentials !== null} onClick={close} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 disabled:opacity-40">閉じる</button></div>
     {credentials ? <CredentialsReceipt credentials={credentials} onClose={close} /> : null}
     <form onSubmit={submit} className={credentials ? 'hidden' : 'mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2'}>
@@ -90,8 +98,16 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
       </>}
       {role === 'student' ? <>
         <label className="text-sm font-bold">学年<RequiredMark /><input name="grade" required maxLength={40} placeholder="例：高校2年生" className={fieldClass} /></label>
-        <label className="text-sm font-bold">クラス（任意）<select name="classroomId" className={fieldClass}><option value="">クラスなし（個別指導）</option>{classrooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <div className="sm:col-span-2"><TeacherPicker teachers={teachers} /></div>
+        <label className="text-sm font-bold">クラス（任意）<select name="classroomId" value={classroomId} onChange={event => setClassroomId(event.target.value)} className={fieldClass}><option value="">クラスなし（個別指導）</option>{classrooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        {/* クラスに入れないと誰の担当にもならず、先生側の一覧に出てこない。
+            個別指導クラスを作るこの場で、担当の先生を決めてもらう。 */}
+        {classroomId ? null : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:col-span-2">
+          <p className="text-sm font-bold text-emerald-950">この生徒だけの「個別指導」クラスを作成します</p>
+          <p className="mt-1 text-sm leading-6 text-emerald-900">担当する先生を選んでください。選ばないと、どの先生の生徒一覧にも表示されません。</p>
+          <div className="mt-3"><TeacherPicker teachers={teachers}
+            legend="担当の先生（複数選択可）"
+            hint="選んだ先生が、この生徒の学習記録と分析を見られるようになります。あとからユーザー編集で変更できます。" /></div>
+        </div>}
         <IntakeFields key={readerKey} state={profile} />
         <p className="text-sm text-emerald-900 sm:col-span-2">分析を待たずに登録できます。完了後は生徒情報と学習計画に反映します。</p>
       </> : null}

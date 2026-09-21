@@ -41,11 +41,9 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
         </Link>;
       })}
     </nav>
-    <div className="mt-auto pt-8">
-      <div className="flex items-center gap-3 px-2 pb-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2b45] text-sm font-bold text-white">{initial}</span>
-        <div className="min-w-0"><p className="text-[11px] text-[#78928f]">ログイン中</p><p className="truncate text-sm font-bold text-slate-900">{userName}</p></div>
-      </div>
+    <div className="mt-auto flex items-center gap-3 px-2 pt-8">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1f2b45] text-sm font-bold text-white">{initial}</span>
+      <div className="min-w-0 flex-1"><p className="text-[11px] text-[#78928f]">ログイン中</p><p className="truncate text-sm font-bold text-slate-900">{userName}</p></div>
       <LogoutButton />
     </div>
   </>;

@@ -1,9 +1,7 @@
-import Link from 'next/link';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
-import { EmptyState, PageTitle, Panel, StatusPill } from '@/components/dashboard';
-
-const STATUS_LABELS: Record<string, string> = { active: '在籍中', suspended: '停止中', invited: '招待済み' };
+import { EmptyState, PageTitle, Panel } from '@/components/dashboard';
+import { StudentsTable } from '@/components/teacher/students-table';
 
 export default async function TeacherStudentsPage() {
   const context = await requireRole('teacher', 'admin');
@@ -25,18 +23,10 @@ export default async function TeacherStudentsPage() {
 
   return <div>
     <PageTitle title="生徒" description="個別に担当する生徒と、担当クラスの生徒が表示されます。" />
-    <Panel title="在籍生徒" description={list.length ? `${list.length}名` : undefined}>
-      {list.length ? <div className="divide-y divide-slate-100">{list.map((student) => <Link
-        key={student.id}
-        href={`/teacher/students/${student.id}`}
-        className="flex items-center justify-between gap-4 py-4 first:pt-0"
-      >
-        <div className="min-w-0">
-          <p className="font-bold">{student.name}</p>
-          <p className="mt-1 truncate text-sm text-slate-500">{student.classrooms.join(' · ') || 'クラス未設定'}</p>
-        </div>
-        <StatusPill tone={student.status === 'active' ? 'emerald' : 'amber'}>{STATUS_LABELS[student.status] ?? student.status}</StatusPill>
-      </Link>)}</div> : <EmptyState>担当の生徒はいません。管理者に担当の設定を依頼してください。</EmptyState>}
+    <Panel>
+      {list.length
+        ? <StudentsTable rows={list} />
+        : <EmptyState>担当の生徒はいません。管理者に担当の設定を依頼してください。</EmptyState>}
     </Panel>
   </div>;
 }

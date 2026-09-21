@@ -15,7 +15,7 @@ export default async function NotificationsPage() {
   return <div>
     <MarkNotificationsRead unread={unread} />
     <PageTitle title="お知らせ" description="復習予定、先生からの返信、学習計画の更新をまとめています。" />
-    <Panel title="通知">
+    <Panel>
       {items.length ? <div className="divide-y divide-slate-100">{items.map((item) => <Link
         href={item.href ?? '/student/home'}
         key={item.id}

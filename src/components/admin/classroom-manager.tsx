@@ -4,6 +4,9 @@ import { ResourceLifecycle } from './resource-lifecycle';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
+import { DataTable } from '@/components/data-table';
+import { IconButton } from '@/components/icon';
+import { isBackdropClick } from '@/components/dialog-backdrop';
 
 export interface ClassroomRow {
   id: string;
@@ -41,7 +44,7 @@ function useDialog() {
   };
 }
 
-const dialogClass = 'm-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7';
+const dialogClass = 'm-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7';
 
 export function ClassroomManager({ classrooms, members }: { classrooms: ClassroomRow[]; members: MemberOption[] }) {
   const router = useRouter();
@@ -50,26 +53,55 @@ export function ClassroomManager({ classrooms, members }: { classrooms: Classroo
   const students = members.filter((m) => m.role === 'student');
   const nameById = new Map(members.map((m) => [m.id, m.name]));
 
-  return <div className="space-y-6">
-    <div className="flex flex-wrap items-center justify-between gap-3"><label className="text-sm"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)} /> アーカイブ済みも表示</label><CreateClassroom onDone={() => router.refresh()} /></div>
-    {classrooms.length ? <div className="space-y-3">{classrooms.filter(c => showArchived || !c.archived_at).map((classroom) => (
-      <ClassroomCard
-        key={classroom.id}
-        classroom={classroom}
-        teachers={teachers}
-        students={students}
-        nameById={nameById}
-        onDone={() => router.refresh()}
-      />
-    ))}</div> : (
-      <p className="rounded-2xl border border-dashed border-[#b9dcd5] bg-[#fbfdfd] p-8 text-center text-sm text-[#8ca0bb]">
-        クラスは任意です。個別指導ではユーザー管理で生徒に担当の先生を設定してください。
-      </p>
-    )}
-  </div>;
+  const rows = classrooms.filter((classroom) => showArchived || !classroom.archived_at);
+  const teacherNames = (classroom: ClassroomRow) => classroom.teacherIds.map((id) => nameById.get(id) ?? '（不明）');
+
+  return <DataTable
+      rows={rows}
+      getKey={(classroom) => classroom.id}
+      searchIn={(classroom) => `${classroom.name} ${classroom.subject} ${classroom.grade ?? ''} ${teacherNames(classroom).join(' ')}`}
+      searchPlaceholder="クラス名・科目・担当で検索"
+      unit="クラス"
+      empty="クラスは任意です。個別指導ではユーザー管理で生徒に担当の先生を設定してください。"
+      initialSort={{ key: 'name' }}
+      filters={[
+        {
+          key: 'subject', label: '科目',
+          options: [...new Set(classrooms.map((classroom) => classroom.subject))].sort((a, b) => a.localeCompare(b, 'ja')).map((subject) => ({ value: subject, label: subject })),
+          match: (classroom, value) => classroom.subject === value,
+        },
+        {
+          key: 'teacher', label: '担当',
+          options: [{ value: 'assigned', label: '設定済み' }, { value: 'none', label: '未設定' }],
+          match: (classroom, value) => value === 'none' ? !classroom.teacherIds.length : classroom.teacherIds.length > 0,
+        },
+      ]}
+      toolbar={<label className="flex items-center gap-2 text-sm text-slate-600">
+        <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />アーカイブ済みも表示
+      </label>}
+      columns={[
+        { key: 'name', label: 'クラス名', sortBy: (classroom) => classroom.name, render: (classroom) => <span className="flex flex-wrap items-center gap-2">
+          <span className="font-bold">{classroom.name}</span>
+          {classroom.archived_at ? <StatusPill tone="slate">アーカイブ中</StatusPill> : null}
+        </span> },
+        { key: 'subject', label: '科目', sortBy: (classroom) => classroom.subject, render: (classroom) => <StatusPill tone="blue">{classroom.subject}</StatusPill> },
+        { key: 'grade', label: '学年', hideOnMobile: true, sortBy: (classroom) => classroom.grade, render: (classroom) => classroom.grade ?? '—' },
+        { key: 'teachers', label: '担当の先生', sortBy: (classroom) => teacherNames(classroom).join('、') || null, render: (classroom) => {
+          const names = teacherNames(classroom);
+          // 担当が空だとお題を作れない。一覧の時点で赤く出して気付けるようにする。
+          return names.length ? <span>{names.join('、')}</span> : <span className="font-bold text-rose-600">未設定</span>;
+        } },
+        { key: 'students', label: '生徒', align: 'right', sortBy: (classroom) => classroom.studentIds.length, render: (classroom) => `${classroom.studentIds.length}人` },
+        { key: 'actions', label: '操作', align: 'right', render: (classroom) => <ClassroomActions
+          classroom={classroom} teachers={teachers} students={students} onDone={() => router.refresh()} /> },
+      ]}
+    />;
 }
 
-function CreateClassroom({ onDone }: { onDone: () => void }) {
+/** ページ見出しの操作ボタンとして使う。作成後は一覧を読み直す。 */
+export function CreateClassroom() {
+  const router = useRouter();
+  const onDone = () => router.refresh();
   const { ref: dialogRef, open: openDialog, close: closeDialog, restore: restoreDialog } = useDialog();
   const headingId = useId();
   const [busy, setBusy] = useState(false);
@@ -132,11 +164,11 @@ function CreateClassroom({ onDone }: { onDone: () => void }) {
   </>;
 }
 
-function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
+/** 一覧の行から開く、担当・在籍の編集とアーカイブ操作。 */
+function ClassroomActions({ classroom, teachers, students, onDone }: {
   classroom: ClassroomRow;
   teachers: MemberOption[];
   students: MemberOption[];
-  nameById: Map<string, string>;
   onDone: () => void;
 }) {
   const { ref: dialogRef, open: openDialog, close: closeDialog, restore: restoreDialog } = useDialog();
@@ -174,33 +206,13 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
     } finally { setBusy(false); }
   }
 
-  const teacherNames = classroom.teacherIds.map((id) => nameById.get(id) ?? '（不明）');
-
-  return <article className="rounded-xl border border-slate-200 p-4">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-bold">{classroom.name}</p>
-          <StatusPill tone="blue">{classroom.subject}</StatusPill>
-          {classroom.grade ? <span className="text-xs text-slate-500">{classroom.grade}</span> : null}
-        </div>
-        <p className="mt-1 text-sm text-slate-500">
-          担当: {teacherNames.length ? teacherNames.join('、') : <span className="font-bold text-rose-600">未設定</span>}
-          {' · '}生徒 {classroom.studentIds.length}人
-        </p>
-        {!teacherNames.length ? <p className="mt-1 text-xs text-rose-600">
-          担当の先生がいないと、このクラスのお題を作れません。
-        </p> : null}
-      </div>
-      <button type="button" disabled={!!classroom.archived_at} onClick={openEditor} aria-haspopup="dialog"
-        className="shrink-0 rounded-xl border border-emerald-700 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
-        担当・在籍を編集
-      </button>
-    </div>
-
-    <ResourceLifecycle kind="classroom" id={classroom.id} archived={!!classroom.archived_at} />
+  return <span className="flex items-center justify-end gap-1">
+    <IconButton icon="edit" label={`${classroom.name}の担当・在籍を編集`}
+      disabled={!!classroom.archived_at} onClick={openEditor} />
+    <ResourceLifecycle kind="classroom" id={classroom.id} archived={!!classroom.archived_at} compact />
     <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreDialog}
-      onCancel={(e) => { if (busy) e.preventDefault(); }} className={dialogClass}>
+      onCancel={(e) => { if (busy) e.preventDefault(); }}
+      onClick={(e) => { if (!busy && isBackdropClick(e)) closeDialog(); }} className={dialogClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id={headingId} className="text-xl font-bold">{classroom.name} の担当・在籍</h2>
@@ -225,7 +237,7 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
         {status ? <span role="status" className="text-sm">{status}</span> : null}
       </div>
     </dialog>
-  </article>;
+  </span>;
 }
 
 function MemberPicker({ label, options, selected, onToggle, busy, empty }: {

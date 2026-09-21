@@ -16,7 +16,6 @@ export function AppShell(props: {
   homeHref: string;
   nav: NavItem[];
   children: React.ReactNode;
-  modelTier?: string;
 }) {
   return <div className="min-h-screen bg-[#fbfcfb] text-[#17233d]">
     <FlashNotice />
@@ -27,7 +26,6 @@ export function AppShell(props: {
       </Link>
       <div className="mt-5 flex flex-wrap gap-2 px-1">
         <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#237d75]">{props.roleLabel}</span>
-        {props.modelTier ? <span className="rounded-full bg-[#fff0d7] px-3 py-1 text-xs font-bold text-[#b76b12]">{props.modelTier === 'production' ? '本番モデル' : '開発モデル'}</span> : null}
       </div>
       <div className="mt-9 flex min-h-0 flex-1 flex-col"><SidebarNav items={props.nav} homeHref={props.homeHref} userName={props.userName} /></div>
     </aside>

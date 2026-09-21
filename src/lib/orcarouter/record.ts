@@ -72,19 +72,22 @@ async function write(rec: RunRecord): Promise<void> {
   }
 
   // 予算台帳。free枠でも件数は積むので、無料枠の消費が見える。
-  await db.rpc('bump_ai_budget', {
+  // 失敗は必ず残す。ここを黙って捨てると、予算が0のまま上限チェックも効かなくなる。
+  const ledger = await db.rpc('bump_ai_budget', {
     p_tenant: trace.tenantId,
     p_scope: 'tenant',
     p_scope_id: trace.tenantId,
     p_cost: meta.costUsd,
   });
+  if (ledger.error) console.error('[ai_budget] テナントの記録に失敗:', ledger.error.message);
   if (trace.studentId) {
-    await db.rpc('bump_ai_budget', {
+    const perStudent = await db.rpc('bump_ai_budget', {
       p_tenant: trace.tenantId,
       p_scope: 'student',
       p_scope_id: trace.studentId,
       p_cost: meta.costUsd,
     });
+    if (perStudent.error) console.error('[ai_budget] 生徒別の記録に失敗:', perStudent.error.message);
   }
 }
 

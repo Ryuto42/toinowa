@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { DataTable } from '@/components/data-table';
 
 export interface HandoffRow {
   id: string;
@@ -46,11 +47,13 @@ function asSnapshot(value: unknown): Snapshot {
  * `mode` は「自分が受け取る側か、送った側か、管理者として全部見ているか」。
  * 出せるボタンが変わるだけで、中身の見せ方は同じにしてある。
  */
-export function HandoffList({ initial, mode, names, linkStudents = true }: {
+export function HandoffList({ initial, mode, names, linkStudents = true, studentBase = '/teacher/students' }: {
   initial: HandoffRow[];
   mode: 'inbox' | 'outbox' | 'admin';
   names: Record<string, string>;
   linkStudents?: boolean;
+  /** 生徒の記録へのリンク先。管理者は /admin/students を見る。 */
+  studentBase?: string;
 }) {
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
@@ -74,9 +77,25 @@ export function HandoffList({ initial, mode, names, linkStudents = true }: {
     }
   }
 
-  return <div className="space-y-3">
-    {error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
-    {items.map((item) => {
+  return <div>
+    {error ? <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+    <DataTable
+      rows={items}
+      getKey={(item) => item.id}
+      searchIn={(item) => `${names[item.student_id] ?? ''} ${names[item.from_user] ?? ''} ${names[item.to_user] ?? ''} ${item.note}`}
+      searchPlaceholder="生徒名・先生名・申し送りで検索"
+      empty="該当する引き継ぎはありません"
+      initialSort={{ key: 'created', direction: 'desc' }}
+      filters={[
+        { key: 'status', label: '状態', options: Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })), match: (item, value) => item.status === value },
+        { key: 'reason', label: '理由', options: Object.entries(REASON_LABELS).map(([value, label]) => ({ value, label })), match: (item, value) => item.reason === value },
+      ]}
+      columns={[
+        { key: 'created', label: '作成日時', sortBy: (item) => item.created_at, render: () => null },
+        { key: 'student', label: '生徒名', sortBy: (item) => names[item.student_id] ?? null, render: () => null },
+        { key: 'status', label: '状態', sortBy: (item) => STATUS_LABELS[item.status] ?? item.status, render: () => null },
+      ]}
+      renderCard={(item) => {
       const snapshot = asSnapshot(item.snapshot);
       const studentName = names[item.student_id] ?? '生徒';
       const pending = item.status === 'pending';
@@ -96,7 +115,7 @@ export function HandoffList({ initial, mode, names, linkStudents = true }: {
             </div>
             <p className="mt-2 font-bold">
               {linkStudents
-                ? <Link href={`/teacher/students/${item.student_id}`} className="text-[#237d75] underline">{studentName}</Link>
+                ? <Link href={`${studentBase}/${item.student_id}`} className="text-[#237d75] underline">{studentName}</Link>
                 : studentName}
               <span className="ml-2 text-sm font-normal text-slate-500">
                 {names[item.from_user] ?? '先生'} → {names[item.to_user] ?? '先生'}
@@ -160,6 +179,7 @@ export function HandoffList({ initial, mode, names, linkStudents = true }: {
 
         {item.response_note ? <p className="mt-3 text-sm text-slate-600">返信: {item.response_note}</p> : null}
       </article>;
-    })}
+    }}
+    />
   </div>;
 }

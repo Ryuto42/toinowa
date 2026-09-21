@@ -16,6 +16,5 @@ export default async function TeacherLayout({ children }: LayoutProps<'/teacher'
     { href: '/teacher/students', label: '生徒', icon: 'users' },
     { href: '/teacher/interventions', label: '要フォロー', icon: 'bolt', badge: pending.count ?? 0 },
     { href: '/teacher/handoffs', label: '引き継ぎ', icon: 'handoff', badge: handoffs.count ?? 0 },
-    { href: '/teacher/ops', label: 'AIの稼働', icon: 'screen' },
   ]}>{children}</AppShell>;
 }
