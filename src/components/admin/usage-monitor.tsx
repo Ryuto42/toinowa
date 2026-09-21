@@ -6,7 +6,7 @@ import { formatUsd, formatDateTime } from '@/lib/shared/format';
 import { DataTable } from '@/components/data-table';
 import type { summarizeUsage } from '@/lib/admin/usage-summary';
 
-interface Usage { recent: Array<{ id: string; requestType: string; userName: string; model: string | null; costUsd: number; createdAt: string; status: string }>; budget: { limitUsd: number; spentUsd: number }; unpricedRuns: number; grouped: ReturnType<typeof summarizeUsage>; summary: { requests: number; costUsd: number; tokens: number }; truncated: boolean; updatedAt: string }
+interface Usage { recent: Array<{ id: string; requestType: string; userName: string; model: string | null; costUsd: number; createdAt: string; status: string }>; budget: { limitUsd: number; spentUsd: number }; unpricedRuns: number; grouped: ReturnType<typeof summarizeUsage>; summary: { requests: number; costUsd: number; tokens: number; inputTokens: number; cachedTokens: number }; truncated: boolean; updatedAt: string }
 /** 本日の予算の使用割合。バーだと残りが読み取りにくいので、円で「残り」を面で見せる。 */
 function BudgetDonut({ spent, limit }: { spent: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(spent / limit, 1) : 0;
@@ -77,7 +77,7 @@ export function UsageMonitor({ modelStatus }: { modelStatus?: React.ReactNode })
       <p className="text-xs text-slate-500">10秒ごとに更新{data ? ` · 最終更新 ${formatDateTime(data.updatedAt)}` : ''}</p>
     </div>
     {error ? <p role="alert" className="mt-3 text-rose-700">{error}</p> : null}
-    {data ? <><div className="mt-4 mb-5 grid gap-3 sm:grid-cols-3">{[['呼び出し', `${data.summary.requests}回`], ['入出力トークン', data.summary.tokens.toLocaleString()], ['記録された費用', formatUsd(data.summary.costUsd)]].map(([name, value]) => <div key={name} className="rounded-xl bg-white p-5"><p className="text-sm text-slate-500">{name}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>)}</div>
+    {data ? <><div className="mt-4 mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['呼び出し', `${data.summary.requests}回`], ['入出力トークン', data.summary.tokens.toLocaleString()], ['記録された費用', formatUsd(data.summary.costUsd)], ['キャッシュ再利用', data.summary.inputTokens ? `${Math.round((data.summary.cachedTokens / data.summary.inputTokens) * 100)}%` : '—']].map(([name, value]) => <div key={name} className="rounded-xl bg-white p-5"><p className="text-sm text-slate-500">{name}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>)}</div>
     {data.unpricedRuns ? <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">費用を確認できない実行が{data.unpricedRuns}件あります。表示額に含まれていない費用があるため、OrcaRouter側でも確認してください。</p> : null}
     {data.truncated ? <p className="mb-3 text-amber-800">件数上限のため最新10,000件の集計です。期間を短くしてください。</p> : null}
     <div className="rounded-xl bg-white p-4"><DataTable

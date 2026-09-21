@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Toast } from '@/components/toast';
 
 const MESSAGES: Record<string, string> = {
   'password-changed': 'パスワードを変更しました',
@@ -23,16 +24,10 @@ function Notice() {
     rest.delete('notice');
     const query = rest.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    const timer = window.setTimeout(() => setMessage(null), 5000);
-    return () => window.clearTimeout(timer);
   }, [message, pathname, router]);
 
   if (!message) return null;
-  return <div role="status" aria-live="polite"
-    className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-bold text-emerald-800 shadow-[0_18px_45px_-18px_rgba(15,23,42,0.45)]">
-    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</span>
-    {message}
-  </div>;
+  return <Toast message={message} onClose={() => setMessage(null)} />;
 }
 
 /** 画面遷移のあとに一度だけ出す通知。`?notice=` を読んで表示し、URLから取り除く。 */

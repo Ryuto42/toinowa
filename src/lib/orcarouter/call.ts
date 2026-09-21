@@ -52,7 +52,7 @@ async function disabledModels(tenantId: string): Promise<Set<string>> {
  * 予算チェック。**呼び出しの前に**行う。
  * 超過を発見したリクエストで課金しないための順序。
  */
-async function assertBudget(tenantId: string, accruedCost = 0): Promise<void> {
+async function assertBudget(tenantId: string, accruedCost = 0, studentId?: string | null): Promise<void> {
   const tenant = await adminDb().from('tenants').select('ai_budget_limit_usd').eq('id', tenantId);
   const rawLimit = tenant.data?.[0]?.ai_budget_limit_usd;
   const tenantLimit = Number(rawLimit);
@@ -66,6 +66,16 @@ async function assertBudget(tenantId: string, accruedCost = 0): Promise<void> {
     throw new Error('AI利用額を確認できませんでした');
   }
   if (spent + accruedCost >= limit) throw new BudgetExceeded(tenantId, spent + accruedCost, limit);
+
+  // 生徒単位の上限。テナント枠だけだと、1人の連投で学校全体が止まる。
+  if (!studentId) return;
+  const perStudent = await adminDb().rpc('today_student_ai_spend', { p_tenant: tenantId, p_student: studentId });
+  const used = Number(perStudent.data);
+  if (perStudent.error || perStudent.data == null || !Number.isFinite(used) || used < 0) {
+    throw new Error('AI利用額を確認できませんでした');
+  }
+  const studentLimit = Math.min(serverEnv.AI_STUDENT_DAILY_BUDGET_USD, limit);
+  if (used + accruedCost >= studentLimit) throw new BudgetExceeded(tenantId, used + accruedCost, studentLimit);
 }
 
 /** 構造化出力の修復プロンプト。1回だけ使う。 */
@@ -133,6 +143,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
   let orcaRequestId: string | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cachedInputTokens = 0;
   let costUsd = 0;
   let fallbackCount = 0;
   let schemaValid = true;
@@ -150,6 +161,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
       orcaRequestId,
       inputTokens,
       outputTokens,
+      cachedInputTokens,
       costUsd,
       latencyMs: Math.round(performance.now() - t0),
       fallbackCount,
@@ -193,6 +205,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         orcaRequestId,
         inputTokens,
         outputTokens,
+        cachedInputTokens,
         costUsd,
         latencyMs: Math.round(performance.now() - t0),
         fallbackCount,
@@ -213,7 +226,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
   // ── 予算チェックは呼び出しの前 ──
   try {
-    await assertBudget(opts.trace.tenantId);
+    await assertBudget(opts.trace.tenantId, 0, opts.trace.studentId);
   } catch (err) {
     if (err instanceof BudgetExceeded && opts.degrade) {
       return finish(opts.degrade() as Out, { degraded: true, status: 'degraded' });
@@ -267,7 +280,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
     // 構造化出力の修復は「そのモデルの中で」1回だけ
     for (let repair = 0; repair <= (opts.schema ? 1 : 0); repair++) {
       if (attempts.length) {
-        try { await assertBudget(opts.trace.tenantId, costUsd); } catch (error) {
+        try { await assertBudget(opts.trace.tenantId, costUsd, opts.trace.studentId); } catch (error) {
           if (error instanceof BudgetExceeded && opts.degrade) return finish(opts.degrade() as Out, { degraded: true });
           recordTerminal(error instanceof BudgetExceeded ? 'rate_limited' : 'error', errorCodeOf(error));
           throw error;
@@ -328,11 +341,14 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         }
 
         const usage = res.usage as
-          | { prompt_tokens?: number; completion_tokens?: number; cost_usd?: number }
+          | { prompt_tokens?: number; completion_tokens?: number; cost_usd?: number;
+              prompt_tokens_details?: { cached_tokens?: number } }
           | undefined;
         // スキーマ修復や別モデルでの再生成にも課金されるため、取得できた全応答を合算する。
         inputTokens += usage?.prompt_tokens ?? 0;
         outputTokens += usage?.completion_tokens ?? 0;
+        // 入力のうちキャッシュから返った分。並べ方の効果を後から測るために残す。
+        cachedInputTokens += usage?.prompt_tokens_details?.cached_tokens ?? 0;
         const observedCost = usage?.cost_usd;
         if (typeof observedCost === 'number' && Number.isFinite(observedCost) && observedCost >= 0) costUsd += observedCost;
         else unpricedAttempts += 1;
@@ -399,7 +415,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
           recordRun({
             meta: {
               runId, resolvedModel, routerName, orcaRequestId,
-              inputTokens, outputTokens, costUsd,
+              inputTokens, outputTokens, cachedInputTokens, costUsd,
               latencyMs: Math.round(performance.now() - t0),
               fallbackCount, schemaValid, degraded: false, rateLimited,
               attempts, unpricedAttempts, modelTier: TIER,

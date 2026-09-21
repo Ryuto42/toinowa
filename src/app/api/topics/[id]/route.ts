@@ -86,3 +86,45 @@ export async function PATCH(request: Request, route: Context) {
     return routeError(error);
   }
 }
+
+/**
+ * 課題を取り下げる。
+ *
+ * 行は消さず status を cancelled にする。一覧は draft/published/completed だけを
+ * 引くので画面からは消え、既に提出された説明や評価との繋がりは切れない。
+ */
+export async function DELETE(request: Request, route: Context) {
+  try {
+    const context = await requireRole('teacher', 'admin');
+    const assignmentId = uuidParam((await route.params).id, 'assignmentId');
+    const db = adminDb();
+
+    const assignment = await db.from('assignments').select('id,classroom_id,status')
+      .eq('tenant_id', context.tenantId).eq('id', assignmentId).maybeSingle();
+    if (assignment.error) throw new Error(assignment.error.message);
+    if (!assignment.data) return json({ error: 'not_found' }, { status: 404 });
+    if (assignment.data.status === 'completed') throw new ApiInputError('提出済みの課題は取り下げられません');
+
+    if (context.role !== 'admin') {
+      const enrollment = await db.from('enrollments').select('id')
+        .eq('tenant_id', context.tenantId).eq('user_id', context.userId)
+        .eq('classroom_id', assignment.data.classroom_id ?? '')
+        .eq('role', 'teacher').eq('active', true).maybeSingle();
+      if (enrollment.error) throw new Error(enrollment.error.message);
+      if (!enrollment.data) throw new ForbiddenError();
+    }
+
+    const updated = await db.from('assignments').update({ status: 'cancelled' })
+      .eq('tenant_id', context.tenantId).eq('id', assignmentId).select('id').single();
+    if (updated.error) throw new Error(updated.error.message);
+
+    recordAudit({
+      tenantId: context.tenantId, actorId: context.userId, actorRole: context.role,
+      action: 'topic.cancel', resourceType: 'assignment', resourceId: assignmentId,
+      result: 'allow', traceId: traceIdFrom(request), detail: { from: assignment.data.status },
+    });
+    return json({ assignmentId, status: 'cancelled' });
+  } catch (error) {
+    return routeError(error);
+  }
+}
