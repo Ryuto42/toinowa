@@ -24,7 +24,16 @@ export const messageCreateSchema = z.object({
   stream: z.boolean().default(true),
   assignmentId: z.uuid().optional(),
   questionId: z.uuid().optional(),
+  // クライアントが裏で計測した取り組みの様子。欠けていても処理は続ける。
+  telemetry: z.object({
+    elapsedSec: z.number().int().min(0).max(24 * 3600).default(0),
+    typingMs: z.number().int().min(0).max(24 * 3600 * 1000).default(0),
+    keystrokes: z.number().int().min(0).max(100_000).default(0),
+    pasteCount: z.number().int().min(0).max(1_000).default(0),
+  }).optional(),
 });
+
+export type AnswerTelemetry = NonNullable<z.infer<typeof messageCreateSchema>['telemetry']>;
 
 export async function listConversations(context: AuthContext, studentId?: string) {
   const target = studentId ?? context.userId;
@@ -122,6 +131,7 @@ export async function recordConversationAnswer(input: {
   assignmentId: string;
   questionId: string;
   answer: string;
+  telemetry?: AnswerTelemetry;
 }) {
   const db = adminDb();
   const assignment = await (await createClient()).from('assignments').select('id,question_ids')
@@ -143,6 +153,10 @@ export async function recordConversationAnswer(input: {
     raw_answer: input.answer,
     reasoning_text: '',
     hint_level: 0,
+    time_spent_sec: input.telemetry?.elapsedSec ?? null,
+    typing_ms: input.telemetry?.typingMs ?? null,
+    keystrokes: input.telemetry?.keystrokes ?? null,
+    paste_count: input.telemetry?.pasteCount ?? 0,
   }).select('*').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'conversation answer create failed');
   return inserted.data;

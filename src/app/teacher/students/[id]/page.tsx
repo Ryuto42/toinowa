@@ -55,8 +55,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
   const latest = new Map<string, NonNullable<typeof assessments.data>[number]>();
   for (const row of assessments.data ?? []) if (!latest.has(row.concept_id)) latest.set(row.concept_id, row);
   const scores = [...latest.values()].flatMap(row => row.reviewer_status === 'rejected' || row.reviewer_status === 'pending_review' || (row.override_score ?? row.score) === null ? [] : [Number(row.override_score ?? row.score)]);
-  const orderedAssessments = [...latest.values()].sort((a, b) => Number(b.reviewer_status === 'pending_review') - Number(a.reviewer_status === 'pending_review'));
-  const pendingCount = orderedAssessments.filter(item => item.reviewer_status === 'pending_review').length;
+  const orderedAssessments = [...latest.values()];
   const questionById = new Map((questions.data ?? []).map((question) => [question.id, question.body]));
   const currentPlan = plans.data?.[0];
   const evidenceMessageIds = [...new Set([...latest.values()].flatMap((item) => item.evidence_message_ids ?? []))];
@@ -72,7 +71,6 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
 <div className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm leading-7"><p><strong>目標：</strong>{profile.data?.learning_goal || '未設定'}</p><p><strong>苦手な範囲：</strong>{profile.data?.weak_areas || '未設定'}</p><details><summary className="cursor-pointer">登録時の模試結果</summary><p className="whitespace-pre-wrap">{profile.data?.exam_results || '未登録'}</p></details></div>
     <div className="grid gap-4 sm:grid-cols-3"><MetricCard label="確認済みの平均理解度" value={scores.length ? `${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 100)}%` : '—'} /><MetricCard label="学習継続" value={`${profile.data?.streak_days ?? 0}日`} /><MetricCard label="現在の難易度" value={`Lv.${profile.data?.current_difficulty ?? 2}`} /></div>
 
-    {pendingCount ? <div role="status" className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">先生の確認が必要な概念が{pendingCount}件あります</p><p className="mt-1">下の一覧では確認待ちを先頭にしています。根拠となった発言と要確認点を見て、評価を修正できます。</p></div> : null}
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
       <Panel title="概念説明とAI評価" description="会話全体から、先生が確認しやすい根拠と観点別の分析を表示します。">
         {latest.size ? <div className="space-y-6">{orderedAssessments.map((item) => {
@@ -103,7 +101,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
         })}</div> : <EmptyState>説明を送信するとAI評価が表示されます。</EmptyState>}
       </Panel>
       <Panel title="今後の学習" description="AIが提案した次の単元と、先生が確認すべき復習予定です。">
-        {currentPlan ? <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><p className="font-bold">学習計画 {formatDate(currentPlan.period_start)}〜{formatDate(currentPlan.period_end)}</p><StatusPill tone={currentPlan.status === 'active' || currentPlan.status === 'approved' ? 'emerald' : 'amber'}>{currentPlan.status === 'pending_review' ? '先生の確認待ち' : '学習計画'}</StatusPill></div><p className="mt-3 text-sm leading-6 text-slate-600">{currentPlan.rationale || '提案理由はまだありません。'}</p><ol className="mt-4 space-y-3">{jsonItems(currentPlan.tasks).map((task, index) => <li key={index} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-bold">{index + 1}. {String(task.concept ?? '学習テーマ')}</p><p className="mt-1 whitespace-pre-wrap leading-6">{String(task.prompt ?? task.goal ?? '')}</p><p className="mt-2 text-xs text-slate-500">難易度 Lv.{String(task.difficulty ?? '—')} ・ 目安 {String(task.est_min ?? '—')}分</p></li>)}</ol></div> : <EmptyState>学習計画はまだありません。</EmptyState>}
+        {currentPlan ? <div className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><p className="font-bold">学習計画 {formatDate(currentPlan.period_start)}〜{formatDate(currentPlan.period_end)}</p><StatusPill tone="emerald">学習計画</StatusPill></div><p className="mt-3 text-sm leading-6 text-slate-600">{currentPlan.rationale || '提案理由はまだありません。'}</p><ol className="mt-4 space-y-3">{jsonItems(currentPlan.tasks).map((task, index) => <li key={index} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-bold">{index + 1}. {String(task.concept ?? '学習テーマ')}</p><p className="mt-1 whitespace-pre-wrap leading-6">{String(task.prompt ?? task.goal ?? '')}</p><p className="mt-2 text-xs text-slate-500">難易度 Lv.{String(task.difficulty ?? '—')} ・ 目安 {String(task.est_min ?? '—')}分</p></li>)}</ol></div> : <EmptyState>学習計画はまだありません。</EmptyState>}
         <div className="mt-4">{reviews.data?.length ? <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">{reviews.data.map((review) => <li key={review.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="font-semibold">{review.concepts?.name ?? '復習単元'}</span><span className="text-slate-500">{formatDate(review.due_at)}</span></li>)}</ul> : <p className="text-sm text-slate-500">復習予定はありません。</p>}</div>
       </Panel>
     </div>

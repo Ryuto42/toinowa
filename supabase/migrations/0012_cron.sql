@@ -38,7 +38,7 @@ select cron.schedule(
     (tenant_id, student_id, kind, title, body, href, scheduled_for)
   select r.tenant_id, r.student_id, 'review_due',
          '復習のタイミングです',
-         c.name || ' の説明ワークが用意できました。',
+         c.name || ' の確認問題が用意できました。',
          '/student/home',
          -- 生徒が指定した通知時刻の直近の枠へ寄せる
          date_trunc('day', now() at time zone 'Asia/Tokyo')

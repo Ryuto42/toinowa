@@ -40,13 +40,12 @@ registerJobHandler('build_learning_plan', async job => {
       masterySummary: JSON.stringify({ grade: value.grade, goal: value.learning_goal?.slice(0, 1500), examResults: value.exam_results?.slice(0, 12000), weakAreas: value.weak_areas?.slice(0, 2000), recentAssessments: recentEvidence }) },
       { tenantId: job.tenant_id, traceId: job.trace_id, studentId: payload.studentId, userId: payload.requestedBy ?? null });
     if (result.meta.degraded || !result.data.tasks.length) throw new Error('学習計画を生成できませんでした。再試行します。');
-    const needsReview = result.data.needsTeacherReview || recent.some(item => item.reviewer_status === 'pending_review');
     const tasks = result.data.tasks.map(task => ({ ...task, difficulty: current ? Math.max(1, Math.min(5, Math.max(current - 1, Math.min(current + 1, task.difficulty)))) : task.difficulty }));
     const start = new Date().toISOString().slice(0, 10);
     const end = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
     const inserted = await db.from('learning_plans').upsert({ id: job.id, tenant_id: job.tenant_id, student_id: payload.studentId,
       period_start: start, period_end: end, tasks: schedulePlan(tasks, value.daily_time_limit_min, start) as Json,
-      rationale: `${needsReview ? '【要確認】' : ''}${result.data.rationale}\n根拠: ${result.data.evidence.join(' / ')}`, status: 'pending_review', agent_run_id: result.meta.runId }, { onConflict: 'id', ignoreDuplicates: true });
+      rationale: `${result.data.rationale}\n根拠: ${result.data.evidence.join(' / ')}`, status: 'active', agent_run_id: result.meta.runId }, { onConflict: 'id', ignoreDuplicates: true });
     if (inserted.error) throw new Error(inserted.error.message);
     const saved = await db.from('learning_plans').select('id,tasks,status,rationale').eq('tenant_id', job.tenant_id).eq('id', job.id).single();
     if (saved.error) throw new Error(saved.error.message);

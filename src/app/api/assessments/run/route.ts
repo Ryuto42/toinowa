@@ -58,13 +58,12 @@ export async function POST(request: Request) {
       selfCalib: body.selfRating ? { selfRating: body.selfRating, actualScore: result.data.score } : null,
       currentDifficulty: body.difficulty as DifficultyLevel,
     });
-    const reviewerStatus = mastery.needsReview ? 'pending_review' : 'auto_approved';
     const analysisNote = [
       result.data.feedback,
       result.data.strongPoints.length ? `良かった点: ${result.data.strongPoints.join(' / ')}` : '',
       result.data.attentionPoints.length ? `確認したい点: ${result.data.attentionPoints.join(' / ')}` : '',
       result.data.evidence.length ? `根拠: ${result.data.evidence.join(' / ')}` : '',
-      mastery.needsReview ? '確信度が低いため先生の確認が必要です。' : '直近の説明と過去結果から算出しました。',
+      mastery.needsReview ? '観測データがまだ少ないため参考値です。' : '直近の説明と過去結果から算出しました。',
     ].filter(Boolean).join(' ');
     const inserted = await adminDb().from('assessments').insert({
       tenant_id: context.tenantId,
@@ -83,19 +82,10 @@ export async function POST(request: Request) {
       evidence_answer_ids: body.evidenceAnswerIds,
       difficulty_at_time: body.difficulty,
       difficulty_reason: analysisNote,
-      reviewer_status: reviewerStatus,
+      reviewer_status: 'auto_approved',
       agent_run_id: result.meta.runId,
     }).select('*').single();
     if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
-    if (mastery.needsReview) {
-      await adminDb().from('approvals').insert({
-        tenant_id: context.tenantId,
-        resource_type: 'assessment',
-        resource_id: inserted.data.id,
-        requested_by: 'assessment-agent',
-        proposal: { score: mastery.score, confidence: mastery.confidence, evidence: result.data.evidence },
-      });
-    }
     return json({ assessment: inserted.data, feedback: result.data.feedback, mastery }, { status: 201 });
   } catch (error) {
     return routeError(error);

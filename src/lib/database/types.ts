@@ -58,7 +58,8 @@ export type EscalationKind =
   | 'repeated_failure'
   | 'budget'
   | 'stalled'
-  | 'distress';
+  | 'distress'
+  | 'ai_suspected';
 
 export type EscalationStatus =
   | 'open'
@@ -130,6 +131,11 @@ export type UserStatus =
   | 'active'
   | 'invited'
   | 'suspended';
+
+export type WorkProgress =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed';
 
 export type WorkflowState =
   | 'created'
@@ -413,6 +419,11 @@ export interface Database {
           self_rating: number | null;
           time_spent_sec: number | null;
           answered_at: string;
+          typing_ms: number | null;
+          paste_count: number;
+          keystrokes: number | null;
+          ai_likelihood: number | null;
+          ai_signals: Json;
         };
         Insert: {
           id?: string;
@@ -427,6 +438,11 @@ export interface Database {
           self_rating?: number | null;
           time_spent_sec?: number | null;
           answered_at?: string;
+          typing_ms?: number | null;
+          paste_count?: number;
+          keystrokes?: number | null;
+          ai_likelihood?: number | null;
+          ai_signals?: Json;
         };
         Update: {
           id?: string;
@@ -441,6 +457,11 @@ export interface Database {
           self_rating?: number | null;
           time_spent_sec?: number | null;
           answered_at?: string;
+          typing_ms?: number | null;
+          paste_count?: number;
+          keystrokes?: number | null;
+          ai_likelihood?: number | null;
+          ai_signals?: Json;
         };
         Relationships: [
           {
@@ -640,6 +661,67 @@ export interface Database {
           },
           {
             foreignKeyName: 'assessments_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      assignment_progress: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          assignment_id: string;
+          student_id: string;
+          status: WorkProgress;
+          opened_at: string | null;
+          completed_at: string | null;
+          active_seconds: number;
+          last_seen_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          assignment_id: string;
+          student_id: string;
+          status?: WorkProgress;
+          opened_at?: string | null;
+          completed_at?: string | null;
+          active_seconds?: number;
+          last_seen_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          assignment_id?: string;
+          student_id?: string;
+          status?: WorkProgress;
+          opened_at?: string | null;
+          completed_at?: string | null;
+          active_seconds?: number;
+          last_seen_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'assignment_progress_assignment_id_fkey';
+            columns: ['assignment_id'];
+            isOneToOne: false;
+            referencedRelation: 'assignments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignment_progress_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'assignment_progress_tenant_id_fkey';
             columns: ['tenant_id'];
             isOneToOne: false;
             referencedRelation: 'tenants';
@@ -2465,6 +2547,16 @@ export interface Database {
         };
         Returns: Json[];
       };
+      set_classroom_members: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_classroom: string;
+          p_teachers: string[];
+          p_students: string[];
+        };
+        Returns: void;
+      };
       today_ai_spend: {
         Args: {
           p_tenant: string;
@@ -2495,6 +2587,7 @@ export interface Database {
       review_status: ReviewStatus;
       user_role: UserRole;
       user_status: UserStatus;
+      work_progress: WorkProgress;
       workflow_state: WorkflowState;
     };
   };
