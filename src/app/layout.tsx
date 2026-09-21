@@ -36,7 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* eslint-disable-next-line @next/next/no-page-custom-font, @next/next/google-font-display */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&icon_names=archive,delete,edit,insights,swap_horiz,unarchive,visibility&display=block"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&icon_names=archive,delete,edit,insights,logout,swap_horiz,unarchive,visibility&display=block"
         />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
