@@ -2,13 +2,23 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 
-export function LoginForm({ loggedOut, next }: { loggedOut: boolean; next?: string }) {
+/** 自分のロールで開ける行き先だけを通す。管理者は先生の画面まで入れる。 */
+function allowedNext(next: string | undefined, role: unknown): string | undefined {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return undefined;
+  const area = /^\/(student|teacher|admin)(\/|$)/.exec(next)?.[1];
+  if (!area) return undefined;
+  if (area === role) return next;
+  if (role === 'admin' && area === 'teacher') return next;
+  return undefined;
+}
+
+export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOut: boolean; next?: string; notice?: string }) {
   const [schoolCode, setSchoolCode] = useState('');
   const [rememberCode, setRememberCode] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState(loggedOut ? 'ログアウトしました' : '');
+  const [notice, setNotice] = useState(initialNotice ?? (loggedOut ? 'ログアウトしました' : ''));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -51,8 +61,11 @@ export function LoginForm({ loggedOut, next }: { loggedOut: boolean; next?: stri
         if (rememberCode) localStorage.setItem('studypilot.organizationCode', schoolCode.trim());
         else localStorage.removeItem('studypilot.organizationCode');
       } catch { /* 保存の失敗でログインを止めない */ }
-      const safeNext = next && /^\/(student|teacher|admin)(\/|$)/.test(next) && !next.includes('\\') ? next : undefined;
-      window.location.assign(result.mustChangePassword ? '/change-password' : safeNext || result.redirectTo || '/student/home');
+      // next はログイン画面へ飛ばされる前のURL。別ロールの画面が入っていることがあるので、
+      // ログインしたアカウントのロールで行ける範囲だけを許可し、外れていたら自分のホームへ送る。
+      window.location.assign(result.mustChangePassword
+        ? '/change-password'
+        : allowedNext(next, result.role) || result.redirectTo || '/student/home');
     } catch {
       setError('通信に失敗しました。時間を置いてもう一度お試しください。');
     } finally {

@@ -31,9 +31,18 @@ export async function POST(request: Request) {
     } finally {
       await db.from('users').update({ password_operation_until: null }).eq('id', context.userId).eq('tenant_id', context.tenantId).eq('password_revision', lock.data);
     }
+    // パスワードを変えると元のセッションが無効になることがあり、リフレッシュだけでは
+    // must_change_password を含んだ古いクレームが残る。残ったままだと proxy に
+    // /change-password へ戻され、変更後もこの画面から抜けられない。
+    // 新しいパスワードで貼り直して、制限が解けたクレームを確実に配る。
     const supabase = await createClient();
-    const refreshed = await supabase.auth.refreshSession();
-    // 再ログインでも制限解除後のクレームを取得できる。
-    return json({ ok: true, redirectTo: refreshed.error ? '/login' : context.role === 'student' ? '/student/home' : context.role === 'teacher' ? '/teacher/dashboard' : '/admin/overview' });
+    const renewed = await supabase.auth.signInWithPassword({ email: user.data.user.email, password: body.password });
+    if (renewed.error) {
+      // 古いクレームを残さない。残すと /login も /change-password へ戻される。
+      await supabase.auth.signOut().catch(() => {});
+      return json({ ok: true, redirectTo: '/login?notice=password-changed' });
+    }
+    const home = context.role === 'student' ? '/student/home' : context.role === 'teacher' ? '/teacher/dashboard' : '/admin/overview';
+    return json({ ok: true, redirectTo: `${home}?notice=password-changed` });
   } catch (error) { return routeError(error); }
 }

@@ -1,4 +1,3 @@
-import { AnalysisMonitor } from '@/components/admin/analysis-monitor';
 import { AppShell } from '@/components/app-shell';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
@@ -15,5 +14,5 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
     { href: '/admin/handoffs', label: '引き継ぎ', icon: 'handoff' },
     { href: '/admin/usage', label: 'AI利用状況', icon: 'chart' },
     { href: '/admin/settings', label: '設定', icon: 'screen' },
-  ]}>{children}<AnalysisMonitor /></AppShell>;
+  ]}>{children}</AppShell>;
 }

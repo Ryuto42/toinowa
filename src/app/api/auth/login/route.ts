@@ -33,5 +33,5 @@ export async function POST(request: Request) {
   const mustChangePassword = registered.data.must_change_password;
   const role = registered.data.role;
   const redirectTo = mustChangePassword ? '/change-password' : role === 'student' ? '/student/home' : role === 'teacher' ? '/teacher/dashboard' : '/admin/overview';
-  return json({ ok: true, redirectTo, mustChangePassword });
+  return json({ ok: true, redirectTo, mustChangePassword, role });
 }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { BRAND } from '@/lib/shared/branding';
 import { MobileNav, SidebarNav, type SidebarNavItem } from '@/components/sidebar-nav';
 import { LogoutButton } from '@/components/logout-button';
+import { FlashNotice } from '@/components/flash-notice';
 
 export type NavItem = SidebarNavItem;
 
@@ -18,6 +19,7 @@ export function AppShell(props: {
   modelTier?: string;
 }) {
   return <div className="min-h-screen bg-[#fbfcfb] text-[#17233d]">
+    <FlashNotice />
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[286px] flex-col border-r border-[#cfe6e1] bg-[#def3ed] px-5 py-6 lg:flex">
       <Link href={props.homeHref} className="flex items-center gap-3 px-1">
         <BrandMark />
