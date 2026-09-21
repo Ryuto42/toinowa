@@ -2837,6 +2837,15 @@ export interface Database {
         };
         Returns: Json[];
       };
+      provision_tenant: {
+        Args: {
+          p_code: string;
+          p_name: string;
+          p_admin_id: string;
+          p_admin_email: string;
+        };
+        Returns: string;
+      };
       queue_exam_analysis: {
         Args: {
           p_tenant: string;
@@ -2886,6 +2895,12 @@ export interface Database {
       rls_auto_enable: {
         Args: Record<PropertyKey, never>;
         Returns: unknown;
+      };
+      school_code_available: {
+        Args: {
+          p_code: string;
+        };
+        Returns: boolean;
       };
       search_material_chunks_text: {
         Args: {

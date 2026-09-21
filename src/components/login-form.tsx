@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Toast } from '@/components/toast';
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand-mark';
+import { TenantSignup } from '@/components/tenant-signup';
 import { BRAND } from '@/lib/shared/branding';
 
 /** 自分のロールで開ける行き先だけを通す。管理者は先生の画面まで入れる。 */
@@ -96,6 +97,7 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
           {error ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</p> : null}
           <button disabled={busy} className="h-12 w-full rounded-xl bg-emerald-700 font-bold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-50">{busy ? '確認中…' : 'ログインする'}</button>
       </form>
+      <div className="mx-auto max-w-md"><TenantSignup /></div>
     </section>
   </main>;
 }
