@@ -11,6 +11,7 @@ const claimsSchema = z.object({
   tenant_id: z.uuid(),
   app_role: z.enum(['student', 'teacher', 'admin', 'none']),
   exp: z.number().optional(),
+  password_revision: z.number().int().default(0),
 });
 
 /**
@@ -28,9 +29,9 @@ const loadAuth = cache(async (allowPasswordChange: boolean): Promise<AuthContext
     throw new AuthRequiredError();
   }
 
-  const user = await adminDb().from('users').select('status,must_change_password').eq('id', parsed.data.sub).eq('tenant_id', parsed.data.tenant_id).single();
+  const user = await adminDb().from('users').select('status,must_change_password,password_revision').eq('id', parsed.data.sub).eq('tenant_id', parsed.data.tenant_id).single();
   if (user.error || user.data.status !== 'active') throw new AuthRequiredError();
-  if (user.data.must_change_password && !allowPasswordChange) throw new ForbiddenError('初期パスワードを変更してから利用してください');
+  if ((user.data.must_change_password || user.data.password_revision !== parsed.data.password_revision) && !allowPasswordChange) throw new ForbiddenError('初期パスワードを変更してから利用してください');
   return {
     userId: parsed.data.sub,
     tenantId: parsed.data.tenant_id,

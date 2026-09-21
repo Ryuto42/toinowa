@@ -10,7 +10,7 @@ import type { Channel, MsgActor } from '@/lib/database/types';
 
 export const conversationCreateSchema = z.object({
   studentId: z.uuid().optional(),
-  channel: z.enum(['web', 'line']).default('web'),
+  channel: z.literal('web').default('web'),
   externalThreadId: z.string().trim().max(200).optional(),
   lessonId: z.uuid().optional(),
   conceptId: z.uuid().optional(),
@@ -19,17 +19,21 @@ export const conversationCreateSchema = z.object({
 
 export const messageCreateSchema = z.object({
   content: z.string().trim().min(1).max(8_000),
-  channel: z.enum(['web', 'line']).default('web'),
+  channel: z.literal('web').default('web'),
   channelMessageId: z.string().trim().max(200).optional(),
   stream: z.boolean().default(true),
   assignmentId: z.uuid().optional(),
   questionId: z.uuid().optional(),
   // クライアントが裏で計測した取り組みの様子。欠けていても処理は続ける。
+  /** 音声で入力したか。聞き取りの揺れを理由に減点させないために、AIへ伝える。 */
+  spoken: z.boolean().optional(),
   telemetry: z.object({
     elapsedSec: z.number().int().min(0).max(24 * 3600).default(0),
     typingMs: z.number().int().min(0).max(24 * 3600 * 1000).default(0),
     keystrokes: z.number().int().min(0).max(100_000).default(0),
     pasteCount: z.number().int().min(0).max(1_000).default(0),
+    voiceChunks: z.number().int().min(0).max(1_000).default(0),
+    voiceHesitation: z.number().min(0).max(3).default(0),
   }).optional(),
 });
 
@@ -139,6 +143,7 @@ export async function recordConversationAnswer(input: {
   if (assignment.error || !assignment.data) throw new Error(assignment.error?.message ?? 'assignment not found');
   if (!assignment.data.question_ids.includes(input.questionId)) throw new Error('question is not part of assignment');
   const conversation = await getConversation(input.context, input.conversationId);
+  if (conversation.purpose === 'tutorial') throw new Error('練習は採点対象ではありません');
   const question = await db.from('questions').select('id,format,concept_id')
     .eq('tenant_id', input.context.tenantId).eq('id', input.questionId).maybeSingle();
   if (question.error || !question.data) throw new Error(question.error?.message ?? 'work prompt not found');
@@ -171,6 +176,8 @@ export async function completeConversation(context: AuthContext, conversationId:
   }).eq('tenant_id', context.tenantId).eq('id', conversationId).select('*').maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error('conversation not found');
+
+  if (data.purpose === 'tutorial') return data;
 
   // 完了時は、途中の回答ではなく会話全体を根拠にした最終分析を必ず作る。
   // 途中で評価モデルは呼ばず、完了後に一度だけ高品質な分析を行う。

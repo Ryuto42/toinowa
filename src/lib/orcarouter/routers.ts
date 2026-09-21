@@ -38,10 +38,12 @@ export const PRIMARY: Record<ModelTier, Record<RouterKey, string>> = {
  */
 export const FALLBACK_CHAIN: Record<ModelTier, Record<RouterKey, string[]>> = {
   dev: {
-    // Google -> OpenAI -> Z-AI
-    studentChat: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'z-ai/glm-5.3-flash'],
-    assessment: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'z-ai/glm-5.3-flash'],
-    curriculum: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'z-ai/glm-5.3-flash'],
+    // Google -> OpenAI -> DeepSeek
+    // z-ai/glm-5.3-flash は P50 40.4 秒かつ json_schema を無視するため外した。
+    // 退避先が本来の障害より遅く、スキーマ検証でも落ちるので縮退にならない。
+    studentChat: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'deepseek/deepseek-v4.1-flash'],
+    assessment: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'deepseek/deepseek-v4.1-flash'],
+    curriculum: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b', 'deepseek/deepseek-v4.1-flash'],
     safety: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b'],
   },
   production: {

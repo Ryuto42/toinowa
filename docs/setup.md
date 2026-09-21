@@ -30,7 +30,7 @@
 | 埋め込み | `openai/text-embedding-3-small` / 1536次元 |
 | 日次上限 | `AI_DAILY_BUDGET_USD=1.00` |
 
-選定根拠は `docs/m0-spike-results.md`。要点は「**額面単価ではなく実測で選ぶ**。
+選定根拠は `docs/orcarouter-findings.md`。要点は「**額面単価ではなく実測で選ぶ**。
 推論トークン量が支配的で、額面最安の qwen3.7-flash は実測2.4倍高く、しかも採点を誤った」。
 
 ## 残っているセットアップ
@@ -46,7 +46,8 @@
 しないと本番では動きプレビューで全滅する。
 
 ### 3. worker の起動設定（Vercel デプロイ後）
-デプロイURLが決まったら SQL Editor で実行する:
+デプロイURLが決まったら `npm run db:worker -- --url=https://<your-app>.vercel.app` を実行する。
+手で入れる場合は SQL Editor で以下と同じ:
 
 ```sql
 insert into private.app_config (key, value) values
@@ -63,9 +64,11 @@ on conflict (key) do update set value = excluded.value;
 - Guardrails: PII / シークレット / プロンプトインジェクション / 脱獄 / 毒性 / 自傷
 - Firewall: ツール許可リスト、egress制限、pending approval
 
-### 5. LINE 公式アカウント（M16）
-それまで `.env.local` の `LINE_*` は空でよい。
-`isLineConfigured` が false を返し、UIは「準備中」表示になる。
+### 5. 公開URL（Vercel）
+Deployment Protection が `all_except_custom_domains` の場合、
+`vercel alias set` でエイリアスを張っただけでは SSO で 302 になる。
+`vercel domains add <name>.vercel.app <project>` でプロジェクトのドメインとして
+登録して初めて公開状態になる。
 
 ## よく使うコマンド
 

@@ -1,4 +1,9 @@
+import { studentTutorialAudience } from '@/lib/tutorial/student';
+import { composeTutorialReply } from '@/lib/tutorial/flow';
+import { tutorialAgent } from '@/lib/tutorial/agent';
+import { TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { requireAuth } from '@/lib/auth/guard';
+import { ForbiddenError } from '@/lib/auth/errors';
 import { json, parseJson, routeError, traceIdFrom, uuidParam } from '@/lib/api/http';
 import { appendMessage, completeConversation, getConversation, listMessages, messageCreateSchema, maybeQueueConversationSummary, recordConversationAnswer } from '@/lib/conversation/service';
 import { buildConversationContext } from '@/lib/conversation/context';
@@ -7,7 +12,10 @@ import { after } from 'next/server';
 import { adminDb } from '@/lib/database/admin';
 import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
+import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
+import { WELLBEING_TITLES, detectWellbeing } from '@/lib/security/wellbeing';
+import { recordGuardEvent } from '@/lib/security/audit';
 import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
 
@@ -54,21 +62,18 @@ export async function GET(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);
@@ -104,6 +109,9 @@ export async function POST(request: Request, route: Context) {
     const conversationId = uuidParam((await route.params).id);
     const body = await parseJson(request, messageCreateSchema);
     const conversation = await getConversation(context, conversationId);
+    if (conversation.purpose === 'tutorial' && (context.role !== 'student' || conversation.student_id !== context.userId)) {
+      throw new ForbiddenError('この練習に回答できるのは生徒本人だけです');
+    }
     if (conversation.state === 'completed') {
       return json({ message: 'この対話はここで完了しました。' }, { status: 409 });
     }
@@ -116,6 +124,56 @@ export async function POST(request: Request, route: Context) {
       channelMessageId: body.channelMessageId,
     });
     const traceId = traceIdFrom(request);
+    // つらい相談は遮断しない。返信はそのまま続けたうえで、先生の要フォローに上げる。
+    if (context.role === 'student') {
+      const signal = detectWellbeing(body.content);
+      if (signal) {
+        const { tenantId, userId } = context;
+        after(async () => {
+          recordGuardEvent({
+            tenantId,
+            studentId: userId,
+            conversationId,
+            source: 'app_rule',
+            category: signal.category,
+            rule: 'wellbeing_keyword',
+            matchedExcerpt: signal.matched.join(' / '),
+          });
+          await raiseEscalation({
+            tenantId,
+            studentId: userId,
+            classroomId: await classroomOfStudent(tenantId, userId),
+            kind: 'distress',
+            priority: 'urgent',
+            title: WELLBEING_TITLES[signal.category],
+            payload: { category: signal.category, matched: signal.matched },
+            dedupeHours: 6,
+          });
+        });
+      }
+    }
+    if (conversation.purpose === 'tutorial') {
+      const finishRequested = body.content === TUTORIAL_STOP_MESSAGE;
+      let message = TUTORIAL_FINISH;
+      let conversationCompleted = finishRequested;
+      let runId: string | undefined;
+      if (!finishRequested) {
+        const [history, audience] = await Promise.all([listMessages(context, conversationId), studentTutorialAudience(context.tenantId, conversation.student_id)]);
+        const studentTurn = Math.max(1, history.filter(item => item.actor === 'student').length);
+        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000), audience, studentTurn }, {
+          traceId, tenantId: context.tenantId, studentId: conversation.student_id,
+          conversationId, userId: context.userId, modelClass: 'economy', routingReason: 'onboarding_tutorial',
+        });
+        const reply = composeTutorialReply(result.data, studentTurn, audience);
+        conversationCompleted = reply.conversationCompleted;
+        message = reply.message;
+        runId = result.meta.runId;
+      }
+      await appendMessage({context,conversationId,actor:'agent',content:message,channel:body.channel});
+      if(conversationCompleted) await completeConversation(context,conversationId);
+      const payload = {message,traceId,runId,conversationCompleted};
+      return body.stream ? eventStream(payload) : json(payload);
+    }
     if (context.role === 'student' && body.assignmentId && body.questionId) {
       const answer = await recordConversationAnswer({
         context,
@@ -139,6 +197,8 @@ export async function POST(request: Request, route: Context) {
           typingMs: body.telemetry?.typingMs ?? null,
           keystrokes: body.telemetry?.keystrokes ?? null,
           pasteCount: body.telemetry?.pasteCount ?? null,
+          voiceChunks: body.telemetry?.voiceChunks ?? null,
+          voiceHesitation: body.telemetry?.voiceHesitation ?? null,
         },
       }));
     }
@@ -157,7 +217,10 @@ export async function POST(request: Request, route: Context) {
       const difficulty = question?.data?.difficulty ?? 2;
       const result = await learningSupportAgent.run({
         studentMessage: body.content,
-        context: `お題: ${question?.data?.body ?? ''}\n${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
+        context: `お題: ${question?.data?.body ?? ''}\n${
+          // 音声は書き言葉にならない。言い回しの粗さを理由に減点させない。
+          body.spoken ? '※この発言は音声入力です。話し言葉であることや聞き取りの揺れを理由に減点しないでください。\n' : ''
+        }${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
         hintLevel: decision.intent === 'hint' ? 1 : 0,
         studentTurn,
         maxTurns: MAX_EXPLANATION_TURNS,
@@ -194,21 +257,18 @@ export async function POST(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);

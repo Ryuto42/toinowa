@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { requireRole } from '@/lib/auth/guard';
 import { adminDb } from '@/lib/database/admin';
 import { ForbiddenError } from '@/lib/auth/errors';
-import type { Json } from '@/lib/database/types';
 import { ApiInputError, json, parseJson, routeError, traceIdFrom, uuidParam } from '@/lib/api/http';
 import { preCheck } from '@/lib/security/guard';
 import { recordAudit } from '@/lib/security/audit';
@@ -10,6 +9,7 @@ import { recordAudit } from '@/lib/security/audit';
 type Context = { params: Promise<{ id: string }> };
 
 const schema = z.object({
+  revision: z.number().int().nonnegative().optional(),
   title: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(4000),
   difficulty: z.number().int().min(1).max(5),
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, route: Context) {
     const db = adminDb();
 
     const assignment = await db.from('assignments')
-      .select('id,lesson_id,classroom_id,question_ids,status')
+      .select('id,revision,lesson_id,classroom_id,question_ids,status')
       .eq('tenant_id', context.tenantId).eq('id', assignmentId).maybeSingle();
     if (assignment.error) throw new Error(assignment.error.message);
     if (!assignment.data) return json({ error: 'not_found' }, { status: 404 });
@@ -69,34 +69,11 @@ export async function PATCH(request: Request, route: Context) {
     const body = preCheck(input.body).masked.text;
     const content = input.content ? preCheck(input.content).masked.text : '';
 
-    const question = await db.from('questions')
-      .select('id,concept_id,grading_rubric')
-      .eq('tenant_id', context.tenantId).eq('id', questionId).maybeSingle();
-    if (question.error) throw new Error(question.error.message);
-    if (!question.data) return json({ error: 'not_found' }, { status: 404 });
-
-    const rubric = question.data.grading_rubric && typeof question.data.grading_rubric === 'object'
-      && !Array.isArray(question.data.grading_rubric)
-      ? { ...(question.data.grading_rubric as Record<string, unknown>) }
-      : {};
-    rubric.reference = content;
-
-    const updates = await Promise.all([
-      db.from('lessons').update({
-        title, objectives: [title] as unknown as Json,
-        ...(input.publish ? { status: 'published' as const } : {}),
-      })
-        .eq('tenant_id', context.tenantId).eq('id', assignment.data.lesson_id),
-      db.from('concepts').update({ name: title, description: content })
-        .eq('tenant_id', context.tenantId).eq('id', question.data.concept_id),
-      db.from('questions').update({ body, difficulty: input.difficulty, grading_rubric: rubric as Json })
-        .eq('tenant_id', context.tenantId).eq('id', questionId),
-      db.from('assignments').update({
-        due_at: input.dueAt ?? null,
-        ...(input.publish ? { status: 'published' as const, published_at: new Date().toISOString(), approved_by: context.userId } : {}),
-      }).eq('tenant_id', context.tenantId).eq('id', assignmentId),
-    ]);
-    for (const result of updates) if (result.error) throw new Error(result.error.message);
+    const saved = await db.rpc('review_explanation_works', {
+      p_tenant: context.tenantId, p_actor: context.userId, p_publish: input.publish ?? false,
+      p_items: [{ id: assignmentId, revision: input.revision ?? assignment.data.revision, title, body, content, difficulty: input.difficulty, dueAt: input.dueAt ?? null }],
+    });
+    if(saved.error) throw new ApiInputError(saved.error.code === 'P0001' ? saved.error.message : '課題を保存できませんでした');
 
     recordAudit({
       tenantId: context.tenantId, actorId: context.userId, actorRole: context.role,
@@ -105,6 +82,48 @@ export async function PATCH(request: Request, route: Context) {
       detail: { difficulty: input.difficulty, published: input.publish ?? false },
     });
     return json({ assignmentId, status: input.publish ? 'published' : assignment.data.status });
+  } catch (error) {
+    return routeError(error);
+  }
+}
+
+/**
+ * 課題を取り下げる。
+ *
+ * 行は消さず status を cancelled にする。一覧は draft/published/completed だけを
+ * 引くので画面からは消え、既に提出された説明や評価との繋がりは切れない。
+ */
+export async function DELETE(request: Request, route: Context) {
+  try {
+    const context = await requireRole('teacher', 'admin');
+    const assignmentId = uuidParam((await route.params).id, 'assignmentId');
+    const db = adminDb();
+
+    const assignment = await db.from('assignments').select('id,classroom_id,status')
+      .eq('tenant_id', context.tenantId).eq('id', assignmentId).maybeSingle();
+    if (assignment.error) throw new Error(assignment.error.message);
+    if (!assignment.data) return json({ error: 'not_found' }, { status: 404 });
+    if (assignment.data.status === 'completed') throw new ApiInputError('提出済みの課題は取り下げられません');
+
+    if (context.role !== 'admin') {
+      const enrollment = await db.from('enrollments').select('id')
+        .eq('tenant_id', context.tenantId).eq('user_id', context.userId)
+        .eq('classroom_id', assignment.data.classroom_id ?? '')
+        .eq('role', 'teacher').eq('active', true).maybeSingle();
+      if (enrollment.error) throw new Error(enrollment.error.message);
+      if (!enrollment.data) throw new ForbiddenError();
+    }
+
+    const updated = await db.from('assignments').update({ status: 'cancelled' })
+      .eq('tenant_id', context.tenantId).eq('id', assignmentId).select('id').single();
+    if (updated.error) throw new Error(updated.error.message);
+
+    recordAudit({
+      tenantId: context.tenantId, actorId: context.userId, actorRole: context.role,
+      action: 'topic.cancel', resourceType: 'assignment', resourceId: assignmentId,
+      result: 'allow', traceId: traceIdFrom(request), detail: { from: assignment.data.status },
+    });
+    return json({ assignmentId, status: 'cancelled' });
   } catch (error) {
     return routeError(error);
   }

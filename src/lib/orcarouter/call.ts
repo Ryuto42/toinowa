@@ -14,6 +14,8 @@ import {
 } from './errors';
 import { fallbackModels, primaryModel, TIER } from './routers';
 import { modelsForClass } from './selection';
+import { reportSafetyBlock } from '@/lib/security/escalate';
+import { estimateCostUsd } from './pricing';
 import { recordRun } from './record';
 import type { AttemptRecord, CallMeta, CallOptions, CallResult } from './types';
 
@@ -52,7 +54,7 @@ async function disabledModels(tenantId: string): Promise<Set<string>> {
  * 予算チェック。**呼び出しの前に**行う。
  * 超過を発見したリクエストで課金しないための順序。
  */
-async function assertBudget(tenantId: string, accruedCost = 0): Promise<void> {
+async function assertBudget(tenantId: string, accruedCost = 0, studentId?: string | null): Promise<void> {
   const tenant = await adminDb().from('tenants').select('ai_budget_limit_usd').eq('id', tenantId);
   const rawLimit = tenant.data?.[0]?.ai_budget_limit_usd;
   const tenantLimit = Number(rawLimit);
@@ -66,6 +68,16 @@ async function assertBudget(tenantId: string, accruedCost = 0): Promise<void> {
     throw new Error('AI利用額を確認できませんでした');
   }
   if (spent + accruedCost >= limit) throw new BudgetExceeded(tenantId, spent + accruedCost, limit);
+
+  // 生徒単位の上限。テナント枠だけだと、1人の連投で学校全体が止まる。
+  if (!studentId) return;
+  const perStudent = await adminDb().rpc('today_student_ai_spend', { p_tenant: tenantId, p_student: studentId });
+  const used = Number(perStudent.data);
+  if (perStudent.error || perStudent.data == null || !Number.isFinite(used) || used < 0) {
+    throw new Error('AI利用額を確認できませんでした');
+  }
+  const studentLimit = Math.min(serverEnv.AI_STUDENT_DAILY_BUDGET_USD, limit);
+  if (used + accruedCost >= studentLimit) throw new BudgetExceeded(tenantId, used + accruedCost, studentLimit);
 }
 
 /** 構造化出力の修復プロンプト。1回だけ使う。 */
@@ -114,7 +126,7 @@ function jsonParse(raw: string): unknown {
  *   rung3  構造化出力の検証失敗 → 修復プロンプト1回
  *   rung4  全滅 → degrade() でルールベース応答
  *
- * 実測で分かっている注意点（docs/m0-spike-results.md）:
+ * 実測で分かっている注意点（docs/orcarouter-findings.md）:
  *   ・x-orca-fallback-level は成功時「そもそも返らない」。0 ではなく不在
  *   ・usage.cost_usd は無料モデルでは返らない。取れなければ 0 とする
  *   ・推論モデルは出力の大半が reasoning トークンになる。max_tokens を絞りすぎない
@@ -133,11 +145,14 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
   let orcaRequestId: string | null = null;
   let inputTokens = 0;
   let outputTokens = 0;
+  let cachedInputTokens = 0;
+  let audioInputTokens = 0;
   let costUsd = 0;
   let fallbackCount = 0;
   let schemaValid = true;
   let rateLimited = false;
   let unpricedAttempts = 0;
+  let estimatedAttempts = 0;
 
   const finish = (
     data: Out,
@@ -150,6 +165,9 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
       orcaRequestId,
       inputTokens,
       outputTokens,
+      cachedInputTokens,
+      audioInputTokens,
+      estimatedAttempts,
       costUsd,
       latencyMs: Math.round(performance.now() - t0),
       fallbackCount,
@@ -193,6 +211,9 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         orcaRequestId,
         inputTokens,
         outputTokens,
+        cachedInputTokens,
+        audioInputTokens,
+        estimatedAttempts,
         costUsd,
         latencyMs: Math.round(performance.now() - t0),
         fallbackCount,
@@ -213,7 +234,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
   // ── 予算チェックは呼び出しの前 ──
   try {
-    await assertBudget(opts.trace.tenantId);
+    await assertBudget(opts.trace.tenantId, 0, opts.trace.studentId);
   } catch (err) {
     if (err instanceof BudgetExceeded && opts.degrade) {
       return finish(opts.degrade() as Out, { degraded: true, status: 'degraded' });
@@ -265,15 +286,15 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
     let messages = opts.messages;
 
     // 構造化出力の修復は「そのモデルの中で」1回だけ
-    for (let repair = 0; repair <= (opts.schema ? 1 : 0); repair++) {
+    for (let repair = 0; repair <= (opts.schema && opts.modelClass !== 'exam' ? 1 : 0); repair++) {
       if (attempts.length) {
-        try { await assertBudget(opts.trace.tenantId, costUsd); } catch (error) {
+        try { await assertBudget(opts.trace.tenantId, costUsd, opts.trace.studentId); } catch (error) {
           if (error instanceof BudgetExceeded && opts.degrade) return finish(opts.degrade() as Out, { degraded: true });
           recordTerminal(error instanceof BudgetExceeded ? 'rate_limited' : 'error', errorCodeOf(error));
           throw error;
         }
       }
-      const remainingMs = 45_000 - (performance.now() - t0);
+      const remainingMs = (opts.modelClass === 'exam' ? 65_000 : 45_000) - (performance.now() - t0);
       if (remainingMs <= 0) { lastError = new Error('AI request deadline exceeded'); break ladderLoop; }
       const attemptStart = performance.now();
       let attemptRecorded = false;
@@ -304,7 +325,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
                   extra_body: { route: 'fallback', models: chain.slice(0, 5) },
                 }
               : {}),
-          } as never, { timeout: Math.min(15_000, Math.ceil(remainingMs)) })
+          } as never, { timeout: Math.min(opts.modelClass === 'exam' ? 60_000 : 15_000, Math.ceil(remainingMs)) })
           .withResponse();
 
         // ── ヘッダは .withResponse() でしか読めない ──
@@ -328,14 +349,31 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         }
 
         const usage = res.usage as
-          | { prompt_tokens?: number; completion_tokens?: number; cost_usd?: number }
+          | { prompt_tokens?: number; completion_tokens?: number; cost_usd?: number;
+              prompt_tokens_details?: { cached_tokens?: number; audio_tokens?: number } }
           | undefined;
         // スキーマ修復や別モデルでの再生成にも課金されるため、取得できた全応答を合算する。
         inputTokens += usage?.prompt_tokens ?? 0;
         outputTokens += usage?.completion_tokens ?? 0;
+        // 入力のうちキャッシュから返った分。並べ方の効果を後から測るために残す。
+        cachedInputTokens += usage?.prompt_tokens_details?.cached_tokens ?? 0;
+        const attemptAudioTokens = usage?.prompt_tokens_details?.audio_tokens ?? 0;
+        audioInputTokens += attemptAudioTokens;
         const observedCost = usage?.cost_usd;
-        if (typeof observedCost === 'number' && Number.isFinite(observedCost) && observedCost >= 0) costUsd += observedCost;
-        else unpricedAttempts += 1;
+        if (typeof observedCost === 'number' && Number.isFinite(observedCost) && observedCost >= 0) {
+          costUsd += observedCost;
+        } else {
+          // 音声を含む応答には cost_usd が付かない（実測）。
+          // 0 のままにすると、表示に出ないだけでなく予算のガードが素通りする。
+          const guess = await estimateCostUsd({
+            model: resolvedModel ?? model,
+            inputTokens: usage?.prompt_tokens ?? 0,
+            outputTokens: usage?.completion_tokens ?? 0,
+            audioInputTokens: attemptAudioTokens,
+          });
+          if (guess === null) unpricedAttempts += 1;
+          else { costUsd += guess; estimatedAttempts += 1; }
+        }
 
         const content = res.choices[0]?.message?.content ?? '';
         attempts.push({
@@ -361,7 +399,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         // ── 構造化出力が壊れている ──
         schemaValid = false;
         attempts[attempts.length - 1].outcome = 'schema_invalid';
-        if (repair === 1) throw new SchemaRepairFailed(z.prettifyError(parsed.error));
+        if (repair === 1 || opts.modelClass === 'exam') throw new SchemaRepairFailed(z.prettifyError(parsed.error));
 
         messages = [
           ...messages,
@@ -399,10 +437,10 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
           recordRun({
             meta: {
               runId, resolvedModel, routerName, orcaRequestId,
-              inputTokens, outputTokens, costUsd,
+              inputTokens, outputTokens, cachedInputTokens, audioInputTokens, costUsd,
               latencyMs: Math.round(performance.now() - t0),
               fallbackCount, schemaValid, degraded: false, rateLimited,
-              attempts, unpricedAttempts, modelTier: TIER,
+              attempts, unpricedAttempts, estimatedAttempts, modelTier: TIER,
             },
             agentName: opts.agentName,
             requestType: opts.requestType,
@@ -411,8 +449,17 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
             errorCode: errorCodeOf(err),
             safetyResult: { source: guard, ...(err instanceof SafetyBlocked ? { rule: err.rule } : {}) },
           });
-          if (err instanceof SafetyBlocked) throw err;
-          throw new SafetyBlocked(guard, errorCodeOf(err));
+          const blocked = err instanceof SafetyBlocked ? err : new SafetyBlocked(guard, errorCodeOf(err));
+          // ここを通るのはゲートウェイのガードレールと自前判定の両方。
+          // 記録と要フォローの起票を1か所に寄せ、経路ごとの取りこぼしを無くす。
+          reportSafetyBlock({
+            error: blocked,
+            tenantId: opts.trace.tenantId,
+            studentId: opts.trace.studentId,
+            conversationId: opts.trace.conversationId,
+            agentRunId: runId,
+          });
+          throw blocked;
         }
 
         // このモデルでは無理。次の段へ

@@ -12,6 +12,15 @@ export class ApiInputError extends Error {
   }
 }
 
+/** 回数制限。実際に数えるのは lib/api/rate-limit（server-only）側。 */
+export class TooManyRequests extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TooManyRequests';
+  }
+}
+
+
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   // Content-Lengthだけに依存せずストリームの実サイズも制限する。
   // 画像8枚の既存上限を含めて12MiB。無制限のJSONパースを避ける。
@@ -65,6 +74,9 @@ export function routeError(error: unknown): Response {
       { error: 'safety_blocked', message: '安全性チェックで処理を止めました', rule: error.rule },
       { status: 422 },
     );
+  }
+  if (error instanceof TooManyRequests) {
+    return json({ error: 'rate_limited', message: error.message }, { status: 429 });
   }
   if (error instanceof BudgetExceeded) {
     return json({ error: 'budget_exceeded', message: error.message }, { status: 429 });

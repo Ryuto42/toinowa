@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { SimpleFeedback } from '@/lib/mastery/feedback';
 export function FeedbackCard({ feedback }: { feedback: SimpleFeedback }) {
-  return <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><p className="text-xs font-bold text-emerald-700">{feedback.concept} · 振り返り</p><h2 className="mt-2 text-lg font-bold text-emerald-950">{feedback.encouragement}</h2><p className="mt-3 text-sm leading-7 text-slate-700">{feedback.goodPoint}</p><p className="mt-3 rounded-xl bg-white p-3 text-sm leading-7 text-emerald-900">{feedback.nextStep}</p></article>;
+  return <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><h2 className="text-lg font-bold text-emerald-950">{feedback.encouragement}</h2><p className="mt-3 text-sm leading-7 text-slate-700">{feedback.goodPoint}</p><p className="mt-3 rounded-xl bg-white p-3 text-sm leading-7 text-emerald-900">{feedback.nextStep}</p></article>;
 }
 export function ConversationFeedback({ conversationId }: { conversationId: string }) {
   const [feedback, setFeedback] = useState<SimpleFeedback | null>(null);

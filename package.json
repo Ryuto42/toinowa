@@ -1,6 +1,7 @@
 {
-  "name": "ai_hackathon",
+  "name": "toinowa",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -17,7 +18,11 @@
     "test:smoke": "tsx scripts/smoke-features.ts",
     "benchmark:feedback": "tsx scripts/benchmark-feedback.ts",
     "db:worker": "tsx scripts/configure-worker.ts",
-    "db:reset-chats": "tsx scripts/reset-chats.ts"
+    "db:reset-chats": "tsx scripts/reset-chats.ts",
+    "guide:capture": "tsx scripts/capture-guide.ts",
+    "check:guardrail": "tsx scripts/check-guardrail.ts",
+    "check:injection": "tsx scripts/check-injection.ts",
+    "check:injection:image": "tsx scripts/check-injection-image.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.53",
@@ -34,6 +39,7 @@
     "openai": "^7.19.0",
     "pdfjs-dist": "^6.3.289",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.1",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.88.0",
     "server-only": "^0.0.1",
@@ -51,6 +57,7 @@
     "eslint-config-next": "16.3.5",
     "eslint-plugin-import": "^2.32.0",
     "pg": "^8.23.0",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",

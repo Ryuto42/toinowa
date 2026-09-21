@@ -9,10 +9,19 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/database/admin', () => ({ adminDb: () => ({ rpc: mocks.rpc, from: () => mocks.query }) }));
 vi.mock('@/lib/jobs/default-handlers', () => ({}));
 vi.mock('@/lib/jobs/plan-handler', () => ({}));
+vi.mock('@/lib/jobs/exam-handler', () => ({}));
+vi.mock('@/lib/jobs/queue', () => ({ triggerWorkerTick: vi.fn() }));
 import { runWorkerTick, clearJobHandlersForTests, registerJobHandler } from '@/lib/jobs/worker';
 const job = { id: 'job1', tenant_id: 'school1', kind: 'test', lease_token: 'lease1', attempt: 0, max_attempts: 5, state: {} } as JobRow;
 beforeEach(() => { vi.restoreAllMocks(); mocks.rpc.mockReset(); mocks.query.update.mockClear(); clearJobHandlersForTests(); });
 describe('worker recovery', () => {
+  it('does not invoke a handler after its student or classroom is archived', async () => {
+    mocks.rpc.mockResolvedValueOnce({data:[job],error:null}).mockResolvedValueOnce({data:false,error:null});
+    const handler=vi.fn(); registerJobHandler('test',handler);
+    expect(await runWorkerTick()).toMatchObject({succeeded:1,deadLettered:0});
+    expect(handler).not.toHaveBeenCalled();
+    expect(mocks.query.update).toHaveBeenCalledWith(expect.objectContaining({status:'succeeded',state:{cancelledByArchive:true}}));
+  });
   it('claims only the work it can start within the deadline', async () => {
     let now = 0;
     vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -20,7 +29,7 @@ describe('worker recovery', () => {
     registerJobHandler('test', async () => { now = 110; return { nextStep: null }; });
     const result = await runWorkerTick({ limit: 10, maxDurationMs: 100 });
     expect(result).toMatchObject({ claimed: 1, succeeded: 1 });
-    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.rpc).toHaveBeenCalledTimes(2);
     expect(mocks.rpc).toHaveBeenCalledWith('claim_jobs', expect.objectContaining({ p_limit: 1 }));
   });
   it('never retries a prompt safety block and checks lease ownership before removal', async () => {
@@ -32,7 +41,7 @@ describe('worker recovery', () => {
     expect(mocks.query.update).not.toHaveBeenCalled();
   });
   it('does not count a stale lease as a removed job', async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: [job], error: null }).mockResolvedValue({ data: false, error: null });
+    mocks.rpc.mockResolvedValueOnce({ data: [job], error: null }).mockResolvedValueOnce({ data: true, error: null }).mockResolvedValue({ data: false, error: null });
     registerJobHandler('test', async () => { throw new SafetyBlocked('app_rule', 'injection'); });
     expect(await runWorkerTick()).toMatchObject({ deadLettered: 0, leaseLost: 1 });
   });

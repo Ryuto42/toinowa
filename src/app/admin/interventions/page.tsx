@@ -2,6 +2,8 @@ import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
 import { EmptyState, MetricCard, PageTitle, Panel } from '@/components/dashboard';
 import { InterventionList } from '@/components/teacher/intervention-list';
+import { GuardEventFeed } from '@/components/guard-event-feed';
+import { recentGuardEvents } from '@/lib/security/guard-feed';
 
 export default async function AdminInterventionsPage() {
   const context = await requireRole('admin');
@@ -15,9 +17,10 @@ export default async function AdminInterventionsPage() {
   if (error) throw new Error(error.message);
   const rows = data ?? [];
   const byKind = (kind: string) => rows.filter((row) => row.kind === kind).length;
+  const guardEvents = await recentGuardEvents(context.tenantId, null);
 
   return <div>
-    <PageTitle title="介入" />
+    <PageTitle title="要フォロー" />
     <p className="-mt-6 mb-8 text-sm text-[#60708d]">
       安全上の懸念、生成AIの疑い、繰り返すつまずき、学習停滞をまとめて確認します。
     </p>
@@ -31,8 +34,13 @@ export default async function AdminInterventionsPage() {
       <MetricCard label="学習停滞" value={byKind('stalled')}
         tone="slate" note="未着手・途中で停止" />
     </div>
-    <Panel title="未対応">
-      {rows.length ? <InterventionList initial={rows} /> : <EmptyState>未対応の介入はありません</EmptyState>}
+    <Panel>
+      {rows.length ? <InterventionList initial={rows} studentBase="/admin/students" /> : <EmptyState>いま要フォローの生徒はいません</EmptyState>}
     </Panel>
+    <div className="mt-6">
+      <Panel title="遮断した入力" description="AIに渡す前に止めた入力です。対応は不要ですが、何が起きているかを確認できます。">
+        <GuardEventFeed rows={guardEvents} />
+      </Panel>
+    </div>
   </div>;
 }

@@ -35,7 +35,7 @@ export const MASTERY_LABELS: Record<string, string> = {
 function band(value: number): { stroke: string; text: string; bg: string; label: string } {
   if (value >= 0.8) return { stroke: '#238878', text: 'text-[#1c6e60]', bg: 'bg-[#e8f8f3]', label: '説明できている' };
   if (value >= 0.5) return { stroke: '#c08422', text: 'text-[#8a5e12]', bg: 'bg-[#fff3df]', label: 'あと少し' };
-  return { stroke: '#b34e5b', text: 'text-[#8f3b46]', bg: 'bg-[#fff0f1]', label: '要フォロー' };
+  return { stroke: '#b34e5b', text: 'text-[#8f3b46]', bg: 'bg-[#fff0f1]', label: 'まだ説明できていない' };
 }
 
 /** 理解度のドーナツ。数値・色・ラベルの3つで表し、色だけに頼らない。 */

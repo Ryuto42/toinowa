@@ -17,7 +17,7 @@ export async function GET() {
     const context = await requireRole('admin');
     const { data, error } = await (await createClient())
       .from('classrooms').select('id,name,subject,grade')
-      .eq('tenant_id', context.tenantId).order('name');
+      .eq('tenant_id', context.tenantId).is('individual_student_id',null).order('name');
     if (error) throw new Error(error.message);
     return json({ classrooms: data ?? [] });
   } catch (error) {

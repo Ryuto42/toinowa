@@ -27,11 +27,11 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": [
         "error",
         {
-          selector: "Literal[value=/StudyPilot/]",
+          selector: "Literal[value=/トイノワ/]",
           message: "アプリ名を直接書かないでください。@/lib/shared/branding の BRAND を使ってください。",
         },
         {
-          selector: "TemplateElement[value.raw=/StudyPilot/]",
+          selector: "TemplateElement[value.raw=/トイノワ/]",
           message: "アプリ名を直接書かないでください。@/lib/shared/branding の BRAND を使ってください。",
         },
       ],

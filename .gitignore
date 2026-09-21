@@ -22,9 +22,18 @@
 
 # misc
 .DS_Store
+Thumbs.db
+.idea/
+
+# 鍵・証明書。拡張子だけで弾く（中身の確認より先に止める）
 *.pem
+*.key
+*.p12
+*.pfx
+*.jks
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -44,3 +53,19 @@ next-env.d.ts
 !.env.example
 
 /public/pdf.worker.min.mjs
+
+# Local evaluation inputs, credentials and raw traces
+/benchmark-data/
+/.orca/
+
+# Playwright（ガイド撮影）
+/playwright-report/
+/test-results/
+/blob-report/
+
+# 一時出力
+/tmp/
+*.local.json
+
+# 生成物の作業ディレクトリ
+/output/

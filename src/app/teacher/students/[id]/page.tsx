@@ -9,6 +9,8 @@ import {
   DimensionBars, MisconceptionChips, PlanTimeline, ScoreRing, ScoreTrend,
   jsonItems, jsonRecord,
 } from '@/components/teacher/analysis';
+import { HandoffForm } from '@/components/teacher/handoff-form';
+import { HandoffList } from '@/components/teacher/handoff-list';
 
 const REVIEW_LABELS: Record<string, string> = {
   pending_review: '確認が必要', auto_approved: '自動分析済み', approved: '先生が確認済み',
@@ -20,15 +22,17 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
   const { id } = await params;
   await assertStudentScope(context, id);
   const db = await createClient();
-  const [user, profile, assessments, plans, reviews, escalations, progress] = await Promise.all([
+  const [user, profile, assessments, plans, reviews, escalations, progress, colleagues, handoffs] = await Promise.all([
     db.from('users').select('*').eq('id', id).maybeSingle(),
     db.from('student_profiles').select('*').eq('user_id', id).maybeSingle(),
     db.from('assessments').select('id,concept_id,score,override_score,confidence,reviewer_status,component_scores,misconceptions,created_at,concepts(name)')
       .eq('student_id', id).eq('is_final', true).order('created_at', { ascending: false }),
-    db.from('learning_plans').select('*').eq('student_id', id).order('created_at', { ascending: false }).limit(1),
+    db.from('learning_plans').select('*,classrooms(name)').eq('student_id', id).order('created_at', { ascending: false }).limit(8),
     db.from('review_schedules').select('*,concepts(name)').eq('student_id', id).is('fulfilled_at', null).order('due_at').limit(6),
     db.from('escalations').select('id,kind,title,priority,created_at').eq('student_id', id).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }),
     db.from('assignment_progress').select('assignment_id,status,active_seconds,completed_at').eq('student_id', id),
+    db.from('users').select('id,display_name').eq('tenant_id', context.tenantId).in('role', ['teacher', 'admin']).eq('status', 'active').order('display_name'),
+    db.from('handoffs').select('*').eq('tenant_id', context.tenantId).eq('student_id', id).order('created_at', { ascending: false }).limit(10),
   ]);
   if (!user.data) notFound();
 
@@ -67,22 +71,26 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
       description={`学年 ${profile.data?.grade ?? '未設定'}。概念ごとの理解度と、次に取り組むことをまとめています。`}
     />
 
+    <div className="mb-6">
+      <HandoffForm studentId={id} teachers={colleagues.data?.filter((row) => row.id !== context.userId) ?? []} />
+    </div>
+
     {pending.length ? <div role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-bold">先生の確認が必要な分析が{pending.length}件あります</p>
       <p className="mt-1">観測が少なく、AIの確信度が低い評価です。根拠を見て必要なら点数を修正してください。</p>
     </div> : null}
 
     {escalations.data?.length ? <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4">
-      <p className="text-sm font-bold text-rose-800">対応待ちの介入が{escalations.data.length}件</p>
+      <p className="text-sm font-bold text-rose-800">要フォローの項目が{escalations.data.length}件</p>
       <ul className="mt-2 space-y-1 text-sm text-rose-900">
         {escalations.data.slice(0, 3).map((item) => <li key={item.id}>・{item.title}</li>)}
       </ul>
-      <Link href="/teacher/interventions" className="mt-2 inline-block text-sm font-bold text-rose-800 underline">介入管理で見る</Link>
+      <Link href="/teacher/interventions" className="mt-2 inline-block text-sm font-bold text-rose-800 underline">要フォロー一覧で見る</Link>
     </div> : null}
 
     <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <Panel title="いまの理解度" description={`${current.length}概念の最新評価から算出`}>
-        <ScoreRing value={average} caption={average === null ? '説明ワークの提出を待っています。' : `完了 ${progressCounts.completed}件 / 取り組み中 ${progressCounts.inProgress}件`} />
+        <ScoreRing value={average} caption={average === null ? '課題の提出を待っています。' : `完了 ${progressCounts.completed}件 / 取り組み中 ${progressCounts.inProgress}件`} />
         <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-[#f3f7f7] p-3">
             <p className="text-xs text-[#8a9ab2]">学習継続</p>
@@ -113,7 +121,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     </div> : null}
 
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
-      <Panel title="提出ごとの分析" description="行を選ぶと、その説明ワークの詳しい分析を開きます">
+      <Panel title="提出ごとの分析" description="行を選ぶと、その課題の詳しい分析を開きます">
         {rows.length ? <div className="divide-y divide-slate-100">{rows.map((row) => {
           const score = row.override_score ?? row.score;
           return <Link key={row.id} href={`/teacher/students/${id}/assessments/${row.id}`}
@@ -136,9 +144,17 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
       </Panel>
 
       <div className="space-y-6">
-        <Panel title="今後の学習" description="AIが提案した次の順番です">
-          {planTasks.length ? <PlanTimeline tasks={planTasks} /> : <EmptyState>学習計画はまだありません</EmptyState>}
-        </Panel>
+        <div id="learning-plan"><Panel title="学習計画と変更理由" description="先生向けの提案です。計画が更新されても、新しい課題は承認するまで配信されません。">
+          {plans.data?.[0] ? <div className="mb-5 space-y-3">
+            <p className="text-xs text-slate-500">{plans.data[0].classrooms?.name ?? 'クラス未設定'} · 最新の提案 · {formatDateTime(plans.data[0].created_at)} · {plans.data[0].preparation_id ? '授業記録を受けて作成' : plans.data[0].source_assessment_id ? '説明の評価を受けて更新' : '登録情報・模試などをもとに作成'}</p>
+            <p className="whitespace-pre-wrap rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">{plans.data[0].rationale}</p>
+            {Array.isArray(plans.data[0].review_notes) ? plans.data[0].review_notes.map((note,index) => <p key={index} className="text-sm text-amber-800">{String(note)}</p>) : null}
+            {plans.data[0].source_assessment_id ? <Link className="block text-sm font-bold text-emerald-800 underline" href={`/teacher/students/${id}/assessments/${plans.data[0].source_assessment_id}`}>今回の変更の根拠となった説明・評価を見る</Link> : null}
+            <Link href="/teacher/assignments#review" className="block text-sm font-bold text-emerald-800 underline">課題案を確認して配信する</Link>
+          </div> : null}
+          {planTasks.length ? <PlanTimeline tasks={planTasks} /> : <EmptyState>授業記録や模試の分析後に、学習計画が届きます。</EmptyState>}
+          {(plans.data?.length ?? 0)>1 ? <details className="mt-5 border-t border-slate-200 pt-4"><summary className="cursor-pointer text-sm font-bold">過去の提案・他クラスの計画を見る</summary><div className="mt-4 space-y-5">{plans.data?.slice(1).map(plan => <div key={plan.id}><p className="text-xs text-slate-500">{plan.classrooms?.name ?? 'クラス未設定'} · {formatDateTime(plan.created_at)}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7">{plan.rationale}</p><PlanTimeline tasks={jsonItems(plan.tasks)} /></div>)}</div></details> : null}
+        </Panel></div>
         <Panel title="復習の予定">
           {reviews.data?.length ? <ul className="space-y-2 text-sm">
             {reviews.data.map((review) => <li key={review.id} className="flex items-center justify-between gap-3 rounded-lg bg-[#f7faf9] px-3 py-2">
@@ -149,5 +165,16 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
         </Panel>
       </div>
     </div>
+
+    {handoffs.data?.length ? <div className="mt-6">
+      <Panel title="引き継ぎの履歴" description="この生徒を誰から誰へ、どんな申し送りで渡したかの記録です">
+        <HandoffList
+          initial={handoffs.data}
+          mode={handoffs.data.some((row) => row.to_user === context.userId && row.status === 'pending') ? 'inbox' : 'admin'}
+          names={Object.fromEntries((colleagues.data ?? []).map((row) => [row.id, row.display_name]).concat([[id, user.data.display_name]]))}
+          linkStudents={false}
+        />
+      </Panel>
+    </div> : null}
   </div>;
 }

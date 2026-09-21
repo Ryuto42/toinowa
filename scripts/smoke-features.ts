@@ -15,17 +15,17 @@ async function main() {
   const password = crypto.randomUUID() + 'Aa1!';
   const authIds: string[] = [];
   let tenantId: string | undefined;
-  async function session(email: string) {
+  async function session(email: string, loginPassword = password) {
     const cookies = new Map<string,string>();
     const client = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,{ cookies: { getAll: () => [...cookies].map(([name,value]) => ({name,value})), setAll: values => { for(const item of values) cookies.set(item.name,item.value); } } });
-    const result = await client.auth.signInWithPassword({ email, password });
+    const result = await client.auth.signInWithPassword({ email, password: loginPassword });
     if(result.error) throw result.error;
     return [...cookies].map(([name,value]) => `${name}=${value}`).join('; ');
   }
   async function api(cookie: string, path: string, body?: unknown, expected = 200, method?: 'PATCH') {
     const response = await fetch(`${base}${path}`,{ method: method ?? (body === undefined ? 'GET' : 'POST'), headers: { Cookie: cookie, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const data = await response.json();
-    assert.equal(response.status,expected,`${path}: ${data.error ?? response.status}`);
+    assert.equal(response.status,expected,`${path}: ${data.message ?? data.error ?? response.status}`);
     return data;
   }
   try {
@@ -47,6 +47,8 @@ async function main() {
     authIds.push(teacher.user.id);
     const enrollment = await db.from('enrollments').insert({tenant_id:tenantId,classroom_id:classroom.data.id,user_id:teacher.user.id,role:'teacher'});
     if(enrollment.error) throw enrollment.error;
+    const teacherInitialCookie = await session(teacherEmail, teacher.credentials.initialPassword);
+    await api(teacherInitialCookie, '/api/auth/change-password', { currentPassword: teacher.credentials.initialPassword, password });
     const teacherCookie=await session(teacherEmail);
     const loginIdentifier=`student-${suffix}`;
     const student=await api(cookie,'/api/admin/users',{displayName:'検証生徒',loginIdentifier,role:'student',intake:{grade:'中学2年',learningGoal:'定期テストで一次関数の基礎を理解したい',examResults:'数学62/100、一次関数12/30',weakAreas:'傾きと切片の違い',dailyTimeLimitMin:15,classroomId:classroom.data.id}},201);
@@ -98,7 +100,32 @@ async function main() {
     const unchangedProfile = await db.from('student_profiles').select('exam_results').eq('user_id', student.user.id).single();
     assert.equal(unchangedProfile.data?.exam_results, profilePatch.examResults);
     console.log('PASS: 既存生徒の編集・保存内容・管理者限定・不正入力・重複IDでの更新取り消し');
-    if (process.env.SMOKE_AUTH_ONLY === '1') return;
+    if (process.env.SMOKE_AUTH_ONLY === '1') {
+      const secondAdmin = await api(cookie, '/api/admin/users', { displayName: '検証管理者2', email: `second-admin-${suffix}@example.com`, role: 'admin' }, 201);
+      authIds.push(secondAdmin.user.id);
+      assert(secondAdmin.credentials.initialPassword.length >= 16);
+      await api(teacherCookie, `/api/admin/users/${student.user.id}/reset-password`, {}, 403);
+      await api(cookie, `/api/admin/users/${crypto.randomUUID()}/reset-password`, {}, 404);
+      for (const target of [student, teacher, secondAdmin]) {
+        const reset = await api(cookie, `/api/admin/users/${target.user.id}/reset-password`, {});
+        assert(reset.credentials.initialPassword.length >= 16);
+        const loginResponse = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ organizationCode, identifier: reset.credentials.loginIdentifier, password: reset.credentials.initialPassword }) });
+        assert.equal(loginResponse.status, 200);
+        const loginResult = await loginResponse.json();
+        assert.equal(loginResult.mustChangePassword, true);
+        const tempCookie = loginResponse.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+        await api(tempCookie, '/api/admin/users', undefined, 403);
+        await api(tempCookie, '/api/auth/change-password', { currentPassword: reset.credentials.initialPassword, password });
+      }
+      const stale = await fetch(`${base}/api/students/me/tasks`, { headers: { Cookie: studentCookie } });
+      assert([401, 403].includes(stale.status), '再発行前のセッションは変更完了後も失効');
+      const optional = await api(cookie, '/api/admin/users', { displayName: '任意項目空欄', role: 'student', loginIdentifier: `optional-${suffix}`, intake: { grade: '中2', classroomId: classroom.data.id } }, 201);
+      authIds.push(optional.user.id);
+      const optionalProfile = await db.from('student_profiles').select('learning_goal,weak_areas,daily_time_limit_min').eq('user_id', optional.user.id).single();
+      assert.equal(optionalProfile.data?.learning_goal, ''); assert.equal(optionalProfile.data?.daily_time_limit_min, null);
+      console.log('PASS: 全ロールの初期パスワード発行・再発行・変更強制・管理者限定・旧セッション失効・任意項目空欄登録');
+      return;
+    }
     console.log('PASS: 管理者登録・プロフィール・クラス所属・ロール認証');
     await api(studentCookie,'/api/assessments/run',{},403);
     const image='data:image/png;base64,'+(await readFile('tests/fixtures/mock-exam.png')).toString('base64');

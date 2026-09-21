@@ -54,7 +54,7 @@ export function fastPathMessage(intent: ConversationIntent): string | null {
     case 'greeting': return 'こんにちは。今日の学習を一緒に進めましょう。分からないところを一つ送ってください。';
     case 'next_task': return '今日の課題を確認します。まず、いちばん近い締切の課題から始めましょう。';
     case 'mastery': return '理解度は概念説明とAI分析の記録から更新されます。説明の根拠と一緒に確認できます。';
-    case 'deadline': return '締切を確認するため、説明ワークの一覧を開きます。近いテーマから、自分の言葉で説明してみましょう。';
+    case 'deadline': return '締切を確認するため、課題の一覧を開きます。近いテーマから、自分の言葉で説明してみましょう。';
     case 'escalation': return '先生への相談に切り替えています。これまでの会話と根拠を先生に渡します。';
     default: return null;
   }

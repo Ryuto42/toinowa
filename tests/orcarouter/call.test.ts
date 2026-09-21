@@ -66,12 +66,32 @@ describe('callModel', () => {
     trace.tenantId = crypto.randomUUID();
   });
 
-  it('用途別モデルが遅い場合はautoを再試行せず別モデルに切り替える', async () => {
+  it('自己紹介のeconomy指定はFlash Liteを優先する', async () => {
+    mocks.create.mockReturnValueOnce(queuedResponse(okResponse('hello')));
+    await callModel({ router: 'studentChat', modelClass: 'economy', agentName: 'learning-support', requestType: 'student_tutorial', messages: [{ role: 'user', content: 'test' }], trace });
+    expect(mocks.create.mock.calls[0][0].model).toBe('google/gemini-2.5-flash-lite');
+  });
+
+  it('模試だけ60秒待ち、失敗時はジョブに返して別モデルに切り替えない', async () => {
+    mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status:504 }) });
+    await expect(callModel({ router:'curriculum', modelClass:'exam', agentName:'lesson-analysis', requestType:'extract_exam', messages:[{ role:'user', content:'test' }], trace })).rejects.toMatchObject({ status:504 });
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create.mock.calls[0][0].model).toBe('google/gemini-2.5-flash');
+    expect(mocks.create.mock.calls[0][1].timeout).toBe(60000);
+  });
+
+  it('模試のJSON失敗を内部で再課金して修復せずジョブへ返す', async () => {
+    mocks.create.mockReturnValueOnce(queuedResponse(okResponse('invalid json')));
+    await expect(callModel({ router:'curriculum', modelClass:'exam', agentName:'lesson-analysis', requestType:'extract_exam', schema:z.object({ answer:z.string() }), messages:[{ role:'user', content:'test' }], trace })).rejects.toThrow('構造化出力');
+    expect(mocks.create).toHaveBeenCalledOnce();
+  });
+
+  it('用途別モデルが遅い場合は同じルーターを再試行せず別モデルに切り替える', async () => {
     mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status: 504 }) })
       .mockReturnValueOnce(queuedResponse(okResponse('recovered')));
     const result = await callModel({ router: 'assessment', modelClass: 'advanced', agentName: 'assessment', requestType: 'final', messages: [{ role: 'user', content: 'test' }], trace });
     expect(result.data).toBe('recovered');
-    expect(mocks.create.mock.calls.map(call => call[0].model)).toEqual(['orcarouter/auto', 'google/gemini-2.5-flash']);
+    expect(mocks.create.mock.calls.map(call => call[0].model)).toEqual(['orcarouter/toinowa-advanced', 'google/gemini-2.5-flash']);
     expect(result.meta.fallbackCount).toBe(1);
     expect(result.meta.resolvedModel).toBe('google/gemini-2.5-flash');
     expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed_over' }));

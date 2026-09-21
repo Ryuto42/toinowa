@@ -18,9 +18,16 @@ const schema = z.object({
   // 1日あたりのAI費用上限(USD)。暴走ループでクレジットが溶けるのを防ぐ安全弁。
   AI_ECONOMY_MODEL: z.string().min(1).default('google/gemini-2.5-flash-lite'),
   AI_STANDARD_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
-  AI_ADVANCED_MODEL: z.string().min(1).default('orcarouter/auto'),
+  AI_ADVANCED_MODEL: z.string().min(1).default('orcarouter/toinowa-advanced'),
+  // 音声入力の段。1段目から順に試し、落ちたら次へ降りる。
+  AI_AUDIO_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
+  AI_AUDIO_STANDARD_MODEL: z.string().min(1).default('google/gemini-flash-latest'),
+  AI_AUDIO_ADVANCED_MODEL: z.string().min(1).default('google/gemini-2.5-flash-lite'),
   AI_VISION_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
+  AI_EXAM_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
   AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(1.0),
+  // 生徒1人あたりの1日上限。1人の連投で学校全体の枠を使い切らせない。
+  AI_STUDENT_DAILY_BUDGET_USD: z.coerce.number().positive().default(0.2),
   ORCAROUTER_API_KEY: z.string().startsWith('sk-orca-'),
   ORCAROUTER_BASE_URL: z.url().default('https://api.orcarouter.ai/v1'),
 
@@ -30,24 +37,15 @@ const schema = z.object({
 
   // --- アプリ -------------------------------------------------------------
   APP_BASE_URL: z.url(),
-  AUTH_SECRET: secret32,
-  /** LINE user id の AES-256-GCM 暗号化 / HMAC 検索キー生成に使う */
-  ENCRYPTION_KEY: secret32,
   /** pg_net -> /api/internal/worker/tick の共有シークレット */
   WORKER_SECRET: secret32,
   /** 生徒の内部メール合成に使うドメイン。変更にはユーザー移行が必要 */
-  AUTH_EMAIL_DOMAIN: z.string().min(1).default('studypilot.local'),
+  AUTH_EMAIL_DOMAIN: z.string().min(1).default('toinowa.local'),
 
   // --- Web Push -----------------------------------------------------------
   VAPID_PUBLIC_KEY: optional,
   VAPID_PRIVATE_KEY: optional,
   VAPID_SUBJECT: optional,
-
-  // --- LINE（フェーズ2） ---------------------------------------------------
-  LINE_CHANNEL_SECRET: optional,
-  LINE_CHANNEL_ACCESS_TOKEN: optional,
-  LINE_LOGIN_CHANNEL_ID: optional,
-  LINE_LOGIN_CHANNEL_SECRET: optional,
 });
 
 const parsed = schema.safeParse(process.env);
@@ -63,11 +61,6 @@ export const serverEnv = parsed.data;
 
 /** 現在のモデル階層。devで動いているのか本番モデルなのかは運用画面に常時表示する */
 export const MODEL_TIER = serverEnv.AI_MODEL_TIER;
-
-/** LINE連携が有効かどうか。M16まで false */
-export const isLineConfigured =
-  serverEnv.LINE_CHANNEL_SECRET !== '' &&
-  serverEnv.LINE_CHANNEL_ACCESS_TOKEN !== '';
 
 /** Web Push が有効かどうか */
 export const isWebPushConfigured =

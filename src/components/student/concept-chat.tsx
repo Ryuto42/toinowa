@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChatClient, ChatMessage } from './chat-client';
 
 interface ConversationResponse {
-  conversation?: { id: string; state?: string };
+  conversation?: { id: string; state?: string; undo_blocked_message_id?: string | null };
   message?: string;
 }
 
@@ -12,6 +12,7 @@ interface ConversationLoadResult {
   conversationId: string;
   messages: ChatMessage[];
   completed: boolean;
+  undoBlockedMessageId: string | null;
 }
 
 export function ConceptChatLauncher({
@@ -28,6 +29,7 @@ export function ConceptChatLauncher({
   const [conversationId, setConversationId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [completed, setCompleted] = useState(false);
+  const [undoBlockedMessageId, setUndoBlockedMessageId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
   const requestRef = useRef<{ key: string; promise: Promise<ConversationLoadResult> } | null>(null);
@@ -46,17 +48,18 @@ export function ConceptChatLauncher({
           });
           const result = await response.json().catch(() => ({})) as ConversationResponse;
           if (!response.ok || !result.conversation?.id) {
-            throw new Error(result.message ?? 'AIワークを開始できませんでした。');
+            throw new Error(result.message ?? '課題を開始できませんでした。');
           }
           const messageResponse = await fetch('/api/conversations/' + result.conversation.id + '/messages');
           const messageResult = await messageResponse.json().catch(() => ({})) as { messages?: ChatMessage[]; message?: string };
           if (!messageResponse.ok) {
-            throw new Error(messageResult.message ?? 'AIワークの問いを読み込めませんでした。');
+            throw new Error(messageResult.message ?? '課題の問いを読み込めませんでした。');
           }
           return {
             conversationId: result.conversation.id,
             messages: messageResult.messages ?? [],
             completed: result.conversation.state === 'completed',
+            undoBlockedMessageId: result.conversation.undo_blocked_message_id ?? null,
           };
         })(),
       };
@@ -67,20 +70,15 @@ export function ConceptChatLauncher({
         setConversationId(result.conversationId);
         setMessages(result.messages);
         setCompleted(result.completed);
+        setUndoBlockedMessageId(result.undoBlockedMessageId);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'AIワークを読み込めませんでした。');
+        if (!cancelled) setError(reason instanceof Error ? reason.message : '課題を読み込めませんでした。');
       });
     return () => { cancelled = true; };
   }, [assignmentId, conceptId, lessonId, retryCount]);
 
   if (error) return <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm leading-7 text-rose-800"><p>{error}</p><button type="button" onClick={() => { requestRef.current = null; setError(''); setConversationId(''); setMessages([]); setCompleted(false); setRetryCount((count) => count + 1); }} className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-2 font-bold text-rose-800">もう一度読み込む</button></div>;
   if (!conversationId) return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">AIがワークを準備しています…</div>;
-  return <div>
-    <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-      <p className="text-sm font-bold text-emerald-900">AIに教えてあげよう</p>
-      <p className="mt-1 text-xs leading-6 text-emerald-800">AIはまだ知らない聞き手です。わかるように教えてあげてね。</p>
-    </div>
-    <ChatClient conversationId={conversationId} initialMessages={messages} initialCompleted={completed} assignmentId={assignmentId} questionId={questionId} />
-  </div>;
+  return <ChatClient key={conversationId} conversationId={conversationId} initialMessages={messages} initialCompleted={completed} initialUndoBlockedMessageId={undoBlockedMessageId} assignmentId={assignmentId} questionId={questionId} />;
 }

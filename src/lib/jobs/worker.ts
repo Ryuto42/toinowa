@@ -5,8 +5,10 @@ import { adminDb } from '@/lib/database/admin';
 import type { Json } from '@/lib/database/types';
 import type { JobRow, JobStepResult } from './types';
 import { jobHandler } from './registry';
+import { triggerWorkerTick } from './queue';
 import './default-handlers';
 import './plan-handler';
+import './exam-handler';
 
 export const DEFAULT_LEASE_SECONDS = 180;
 export const MAX_TICK_MS = 100_000;
@@ -121,8 +123,16 @@ export async function runWorkerTick(options: {
     }
 
     try {
+      const active = await adminDb().rpc('learning_work_active', { p_tenant: job.tenant_id, p_payload: job.payload });
+      if(active.error) throw new Error(active.error.message);
+      if(!active.data) {
+        await completeStep(job, { nextStep: null, state: { cancelledByArchive: true } });
+        result.succeeded += 1;
+        continue;
+      }
       const next = await handler(job);
       await completeStep(job, next);
+      if (job.kind === 'analyze_exam' && next.nextStep && !next.runAfter) triggerWorkerTick();
       result.succeeded += next.nextStep === null ? 1 : 0;
     } catch (error) {
       result[await retryOrDeadLetter(job, error)] += 1;

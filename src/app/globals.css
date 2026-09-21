@@ -5,6 +5,12 @@
   --foreground: #17233d;
 }
 
+/* 画面全体をわずかに縮める。Tailwind の余白・文字はすべて rem なので、
+   ここを変えるだけで比率を保ったまま一段小さくなる。 */
+html {
+  font-size: 15px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -31,4 +37,158 @@ textarea {
 ::selection {
   background: #c8eee5;
   color: #0d5f59;
+}
+
+/* 共通の font: inherit より優先して、入力する文章の行間を整える。 */
+.chat-composer textarea { line-height: 1.5; }
+
+/* 共通の font: inherit で大きくならない、補助操作用の小さなタブ。 */
+.chat-composer .chat-undo-button {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+  /* 入力欄のフォーカス時も、つながった枠として同じ色を保つ。 */
+  border-color: inherit;
+}
+
+/* キーボード表示時や横向きの小さい画面では、会話と入力に高さを使う。 */
+.chat-workspace[data-compact="true"] .chat-instructions { display: none; }
+.chat-workspace[data-compact="true"] .chat-heading h1 { font-size: 1rem; max-height: 1.5rem; }
+.chat-workspace[data-compact="true"] .chat-composer textarea { height: 3rem; min-height: 3rem; }
+
+body:has(.chat-workspace) [data-shell-mobile-header],
+body:has(.chat-workspace) [data-shell-mobile-nav],
+body:has(.chat-workspace) [data-shell-guide] { display: none; }
+
+/* ════════════════════════════════════════════════════════════
+   動きの共通ルール
+   画面ごとに違う動きをすると、操作が効いたのかどうかの判断が
+   毎回やり直しになる。押した感・出てくる感・読み込み中をここで統一する。
+   ════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 押したときに少しへこむ。クリックが届いたことを手応えとして返す。 */
+  button:not(:disabled),
+  a[href],
+  summary {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+      box-shadow 150ms ease, transform 120ms ease, opacity 150ms ease;
+  }
+  button:not(:disabled):active,
+  a[href]:active,
+  summary:active { transform: scale(0.97); }
+}
+
+/* メニューの現在地。共通の a[href] ルール（150ms）より特異度を上げて、
+   白い帯がゆっくり現れる／消えるようにする。
+   .transition-all などのクラスは a[href] に負けるため、ここで上書きする。 */
+@media (prefers-reduced-motion: no-preference) {
+  a[href].nav-item {
+    transition:
+      background-color 280ms ease,
+      box-shadow 280ms ease,
+      color 280ms ease;
+  }
+  /* メニューは押しても縮めない。位置が動くと、現在地の帯の動きと混ざって見える。 */
+  a[href].nav-item:active { transform: none; }
+}
+
+/* キーボード操作でも押せる位置が分かるようにする。 */
+:where(button, a[href], summary, [role="tab"]):focus-visible {
+  outline: 2px solid #237d75;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@keyframes ui-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ポップアップ。開くときも閉じるときも同じ動きにする。
+   キーフレームだと閉じる側が効かない（display:none が即座に当たる）ので、
+   @starting-style と allow-discrete を使って display の切り替えを待たせる。 */
+@media (prefers-reduced-motion: no-preference) {
+  dialog {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  dialog[open] { opacity: 1; transform: none; }
+  @starting-style {
+    dialog[open] { opacity: 0; transform: translateY(10px) scale(0.98); }
+  }
+
+  dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  dialog[open]::backdrop { opacity: 1; }
+  @starting-style {
+    dialog[open]::backdrop { opacity: 0; }
+  }
+}
+
+/* 画面写真の拡大。手前に迫り出す感じを出すため、他のポップアップより大きく縮めてから開く。 */
+@media (prefers-reduced-motion: no-preference) {
+  dialog.lightbox { transform: scale(0.92); }
+  dialog.lightbox[open] { transform: none; }
+  @starting-style {
+    dialog.lightbox[open] { opacity: 0; transform: scale(0.92); }
+  }
+}
+
+/* 画面の中身。骨組みから本文へ差し替わったことを、上から順に現れる動きで示す。
+   まとめて1回フェードさせるより、どこが埋まったのかが追いやすい。 */
+@keyframes ui-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  /* 直下はページ全体の器。ここは淡く出すだけにして、位置は動かさない。 */
+  .page-enter > * { animation: ui-fade 200ms ease-out both; }
+  /* その中の見出し・指標・パネルを、上から順に少し遅らせて出す。
+     位置は動かさない。骨組みと同じ場所のまま濃くなるので、読む位置がずれない。 */
+  .page-enter > * > * { animation: ui-fade 320ms ease-out both; }
+  .page-enter > * > *:nth-child(2) { animation-delay: 60ms; }
+  .page-enter > * > *:nth-child(3) { animation-delay: 120ms; }
+  .page-enter > * > *:nth-child(4) { animation-delay: 180ms; }
+  .page-enter > * > *:nth-child(n + 5) { animation-delay: 240ms; }
+}
+
+/* 読み込み中の骨組み。灰色の帯を左から右へ流す。 */
+.skeleton {
+  background-color: #e9eef0;
+  background-image: linear-gradient(90deg, #e9eef0 0%, #f4f7f8 50%, #e9eef0 100%);
+  background-size: 200% 100%;
+  border-radius: 0.75rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: ui-shimmer 1.4s linear infinite; }
+}
+
+/* チャット。AIの返事は段落が届いた順に現れ、生徒の送信は静かに出す。
+   吹き出しの位置は動かさない。書いた直後に文字が動くと、読み返しづらい。 */
+@media (prefers-reduced-motion: no-preference) {
+  .chat-bubble-in { animation: ui-fade 220ms ease-out both; }
+  .chat-line-in { animation: ui-fade 380ms ease-out both; }
+}
+
+/* ── トップページの登場 ───────────────────────────────────────
+   読み込み直後に下から浮かび上がる。順番に出して視線を追わせる。
+   動きを減らす設定の人には出さない（最初から表示された状態にする）。 */
+.lp-in { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-in {
+    opacity: 0;
+    animation: lp-rise 720ms cubic-bezier(0.22, 0.8, 0.3, 1) both;
+    animation-delay: var(--lp-delay, 0ms);
+  }
+}
+
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
 }
