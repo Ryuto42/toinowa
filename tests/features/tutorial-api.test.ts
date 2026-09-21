@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TUTORIAL_OPENING, TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
-const mocks=vi.hoisted(()=>({rpc:vi.fn(),auth:vi.fn(),get:vi.fn(),list:vi.fn(),append:vi.fn(),complete:vi.fn(),answer:vi.fn(),summary:vi.fn(),tutorial:vi.fn(),learning:vi.fn(),integrity:vi.fn()}));
+import { TUTORIAL_OPENING, TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE, tutorialOpening } from '@/lib/tutorial/content';
+const mocks=vi.hoisted(()=>({rpc:vi.fn(),profile:vi.fn(),scope:vi.fn(),auth:vi.fn(),get:vi.fn(),list:vi.fn(),append:vi.fn(),complete:vi.fn(),answer:vi.fn(),summary:vi.fn(),tutorial:vi.fn(),learning:vi.fn(),integrity:vi.fn()}));
 vi.mock('server-only',()=>({}));
 vi.mock('next/server',()=>({after:vi.fn()}));
 vi.mock('@/lib/auth/guard',()=>({requireRole:mocks.auth,requireAuth:mocks.auth}));
-vi.mock('@/lib/database/admin',()=>({adminDb:()=>({rpc:mocks.rpc})}));
+vi.mock('@/lib/database/admin',()=>({adminDb:()=>({rpc:mocks.rpc,from:()=>{
+  const query={select:()=>query,eq:(...args:unknown[])=>{mocks.scope(...args);return query;},maybeSingle:mocks.profile};return query;
+}})}));
 vi.mock('@/lib/database/server',()=>({createClient:vi.fn()}));
 vi.mock('@/lib/jobs/queue',()=>({enqueueJob:vi.fn(),triggerWorkerTick:vi.fn()}));
 vi.mock('@/lib/conversation/service',async original=>({...(await original<object>()),getConversation:mocks.get,listMessages:mocks.list,appendMessage:mocks.append,completeConversation:mocks.complete,recordConversationAnswer:mocks.answer,maybeQueueConversationSummary:mocks.summary}));
@@ -18,6 +20,7 @@ beforeEach(()=>{
   vi.clearAllMocks();
   mocks.auth.mockResolvedValue({tenantId:'tenant',userId:'student',role:'student'});
   mocks.rpc.mockResolvedValue({data:id,error:null});
+  mocks.profile.mockResolvedValue({data:{grade:null},error:null});
   mocks.get.mockResolvedValue({id,purpose:'tutorial',state:'awaiting_student',student_id:'student',message_count:1});
   mocks.list.mockResolvedValue([{actor:'agent',content_redacted:TUTORIAL_OPENING,seq:1},{actor:'student',content_redacted:'サッカーが好き',seq:2}]);
   mocks.append.mockResolvedValue({content_redacted:'サッカーが好き'});
@@ -33,6 +36,19 @@ describe('初回の練習API',()=>{
     expect((await start()).status).toBe(200);
     expect(mocks.rpc).toHaveBeenCalledWith('start_student_tutorial',{p_tenant:'tenant',p_student:'student',p_opening:TUTORIAL_OPENING});
     expect(mocks.tutorial).not.toHaveBeenCalled();expect(mocks.learning).not.toHaveBeenCalled();
+  });
+  it.each([['小学2年生','elementary'],['中学2年生','junior'],['高校2年生','senior']] as const)('%sには学年別の固定文を保存する',async(grade,audience)=>{
+    mocks.profile.mockResolvedValue({data:{grade},error:null});
+    expect((await start()).status).toBe(200);
+    expect(mocks.rpc).toHaveBeenCalledWith('start_student_tutorial',{p_tenant:'tenant',p_student:'student',p_opening:tutorialOpening(audience)});
+    expect(mocks.scope).toHaveBeenCalledWith('tenant_id','tenant');expect(mocks.scope).toHaveBeenCalledWith('user_id','student');
+    expect(mocks.tutorial).not.toHaveBeenCalled();
+  });
+  it('送信後のAIにも登録学年に合った文体を渡す',async()=>{
+    mocks.profile.mockResolvedValue({data:{grade:'高校2年生'},error:null});
+    const response=await reply(new Request('http://local/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:'サッカーが好き',stream:false})}),{params:Promise.resolve({id})});
+    expect(response.status).toBe(200);
+    expect(mocks.tutorial).toHaveBeenCalledWith(expect.objectContaining({audience:'senior'}),expect.anything());
   });
   it('最初の送信から専用AIに会話を渡し、回答・採点や計画更新を行わない',async()=>{
     const response=await reply(new Request('http://local/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:'サッカーが好き',stream:false,assignmentId:id,questionId:id})}),{params:Promise.resolve({id})});

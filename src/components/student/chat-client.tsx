@@ -153,7 +153,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
         return <div key={message.id} className={isStudent ? 'flex justify-end' : 'flex justify-start'}>
           <div className="min-w-0 max-w-[88%] break-words">
             <p className={isStudent ? 'mb-1 text-right text-xs font-bold text-emerald-700' : 'mb-1 text-xs font-bold text-slate-500'}>{isStudent ? 'あなた' : 'AI'}</p>
-            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'whitespace-pre-wrap rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-7 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : message.content_redacted}</div>
+            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'space-y-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : isStudent ? message.content_redacted : message.content_redacted.split(/\r?\n(?:[ \t]*\r?\n)+/u).map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{paragraph}</p>)}</div>
           </div>
         </div>;
       })}
@@ -162,7 +162,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     </div>
     {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">AIワークへ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
       {canUndo ? <div className="flex justify-end"><button type="button" onClick={undo} disabled={undoing || busy} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-600 underline disabled:opacity-50">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button></div> : null}
-      <form onSubmit={event => void send(event)} className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
+      <form onSubmit={event => void send(event)} className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
@@ -171,7 +171,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
             event.preventDefault();
             void send(event);
           }
-        }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1 text-base outline-none" />
+        }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 text-base outline-none" />
         <button type="submit" disabled={busy || undoing || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
           {busy ? <><Spinner /><span>考え中</span></> : <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></>}
         </button>

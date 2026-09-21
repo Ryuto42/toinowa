@@ -1,3 +1,4 @@
+import { studentTutorialAudience } from '@/lib/tutorial/student';
 import { tutorialAgent } from '@/lib/tutorial/agent';
 import { TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { requireAuth } from '@/lib/auth/guard';
@@ -128,8 +129,8 @@ export async function POST(request: Request, route: Context) {
       let conversationCompleted = finishRequested;
       let runId: string | undefined;
       if (!finishRequested) {
-        const history = await listMessages(context, conversationId);
-        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000) }, {
+        const [history, audience] = await Promise.all([listMessages(context, conversationId), studentTutorialAudience(context.tenantId, conversation.student_id)]);
+        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000), audience }, {
           traceId, tenantId: context.tenantId, studentId: conversation.student_id,
           conversationId, userId: context.userId, modelClass: 'standard', routingReason: 'onboarding_tutorial',
         });
