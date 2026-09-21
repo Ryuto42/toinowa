@@ -1,6 +1,6 @@
 import { applyExamAnalysis } from '@/lib/materials/apply-exam-analysis';
 import { generateStudentCredentials } from '@/lib/auth/student-credentials';
-import { studentIntakeSchema } from '@/lib/plans/schema';
+import { hasPlanningEvidence, studentIntakeSchema } from '@/lib/plans/schema';
 import { enqueueJob, triggerWorkerTick } from '@/lib/jobs/queue';
 import { preCheck } from '@/lib/security/guard';
 import { z } from 'zod';
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         const attached = await db.rpc('attach_exam_analysis', { p_tenant: context.tenantId, p_actor: context.userId, p_student: authUserId, p_analysis: body.examAnalysisId });
         if (attached.error) throw new Error(attached.error.message);
         await applyExamAnalysis(context.tenantId, body.examAnalysisId);
-      } else {
+      } else if (hasPlanningEvidence(body.intake!)) {
       const job = await enqueueJob({ tenantId: context.tenantId, kind: 'build_learning_plan', idempotencyKey: `onboarding:${authUserId}`, payload: { studentId: authUserId, requestedBy: context.userId, classroomId: body.intake!.classroomId ?? personal.data }, traceId: crypto.randomUUID() });
       if (!job) throw new Error('学習計画を予約できませんでした');
       triggerWorkerTick();

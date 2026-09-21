@@ -55,6 +55,7 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
 export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHref: string }) {
   const pathname = usePathname();
   return <nav
+    data-shell-mobile-nav
     aria-label="メインナビゲーション"
     className="fixed inset-x-0 bottom-0 z-30 border-t border-[#cfe6e1] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
   >

@@ -76,11 +76,5 @@ export function ConceptChatLauncher({
 
   if (error) return <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm leading-7 text-rose-800"><p>{error}</p><button type="button" onClick={() => { requestRef.current = null; setError(''); setConversationId(''); setMessages([]); setCompleted(false); setRetryCount((count) => count + 1); }} className="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-2 font-bold text-rose-800">もう一度読み込む</button></div>;
   if (!conversationId) return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">AIがワークを準備しています…</div>;
-  return <div>
-    <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-      <p className="text-sm font-bold text-emerald-900">AIに教えてあげよう</p>
-      <p className="mt-1 text-xs leading-6 text-emerald-800">AIはまだ知らない聞き手です。わかるように教えてあげてね。</p>
-    </div>
-    <ChatClient conversationId={conversationId} initialMessages={messages} initialCompleted={completed} assignmentId={assignmentId} questionId={questionId} />
-  </div>;
+  return <ChatClient key={conversationId} conversationId={conversationId} initialMessages={messages} initialCompleted={completed} assignmentId={assignmentId} questionId={questionId} />;
 }

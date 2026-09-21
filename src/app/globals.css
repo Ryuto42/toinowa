@@ -32,3 +32,12 @@ textarea {
   background: #c8eee5;
   color: #0d5f59;
 }
+
+/* キーボード表示時や横向きの小さい画面では、会話と入力に高さを使う。 */
+.chat-workspace[data-compact="true"] .chat-instructions { display: none; }
+.chat-workspace[data-compact="true"] .chat-heading h1 { font-size: 1rem; max-height: 1.5rem; }
+.chat-workspace[data-compact="true"] .chat-composer textarea { height: 3rem; min-height: 3rem; }
+
+body:has(.chat-workspace) [data-shell-mobile-header],
+body:has(.chat-workspace) [data-shell-mobile-nav],
+body:has(.chat-workspace) [data-shell-guide] { display: none; }

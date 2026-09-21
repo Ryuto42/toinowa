@@ -1058,6 +1058,7 @@ export interface Database {
           message_count: number;
           started_at: string;
           completed_at: string | null;
+          purpose: string;
         };
         Insert: {
           id?: string;
@@ -1073,6 +1074,7 @@ export interface Database {
           message_count?: number;
           started_at?: string;
           completed_at?: string | null;
+          purpose?: string;
         };
         Update: {
           id?: string;
@@ -1088,6 +1090,7 @@ export interface Database {
           message_count?: number;
           started_at?: string;
           completed_at?: string | null;
+          purpose?: string;
         };
         Relationships: [
           {
@@ -2951,6 +2954,14 @@ export interface Database {
           p_actor: string;
           p_student: string;
           p_teachers: string[];
+        };
+        Returns: string;
+      };
+      start_student_tutorial: {
+        Args: {
+          p_tenant: string;
+          p_student: string;
+          p_opening: string;
         };
         Returns: string;
       };

@@ -16,3 +16,15 @@ export function schedulePlan(tasks: Array<{ concept: string; goal: string; promp
     return { concept: task.concept, goal: task.goal, prompt: task.prompt ?? task.goal, difficulty: task.difficulty, est_min: Math.min(dailyMinutes, Math.max(1, task.minutes)), scheduled_for: date.toISOString().slice(0, 10), completion_criteria: '自分の言葉で説明し、例を一つ挙げる' };
   });
 }
+
+/** 名前・学年・学習時間だけでは、学習内容の根拠にならない。 */
+export function hasPlanningEvidence(input: {
+  learningGoal?: string | null;
+  examResults?: string | null;
+  weakAreas?: string | null;
+  lessonContext?: string | null;
+  feedbackCount?: number;
+}) {
+  return [input.learningGoal, input.examResults, input.weakAreas, input.lessonContext]
+    .some(value => Boolean(value?.trim())) || (input.feedbackCount ?? 0) > 0;
+}

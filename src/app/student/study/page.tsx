@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TutorialEntry } from '@/components/student/tutorial-entry';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
 import { EmptyState, PageTitle, Panel, StatusPill } from '@/components/dashboard';
@@ -32,6 +33,7 @@ export default async function StudentStudyPage() {
 
   return <div>
     <PageTitle title="AIワーク" description="AIに説明することで、理解があいまいなところを見つけます。" />
+    <TutorialEntry studentId={context.userId} tenantId={context.tenantId} />
     <Panel title="説明するテーマ">
       {items.length ? <div className="divide-y divide-slate-100">{items.map(({ task, state }) => {
         const view = PROGRESS[state];

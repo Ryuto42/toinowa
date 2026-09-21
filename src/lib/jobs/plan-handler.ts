@@ -4,7 +4,7 @@ import { registerJobHandler } from './registry';
 import type { JobHandler } from './types';
 import { adminDb } from '@/lib/database/admin';
 import { curriculumAgent } from '@/lib/agents/catalog';
-import { schedulePlan } from '@/lib/plans/schema';
+import { hasPlanningEvidence, schedulePlan } from '@/lib/plans/schema';
 import { topicStudentContext } from '@/lib/materials/student-context';
 import type { Json } from '@/lib/database/types';
 
@@ -36,18 +36,28 @@ const buildPlan: JobHandler = async job => {
   if (assessmentSource?.error) throw new Error(assessmentSource.error.message);
   const lessonContext = preparation?.data ? `${preparation.data.title}\n${preparation.data.content}` : assessmentSource?.data?.concepts ? `${assessmentSource.data.concepts.lessons?.title ?? ''}\n${assessmentSource.data.concepts.description ?? ''}` : '';
 
+  const [profile, prior, history] = await Promise.all([
+    db.from('student_profiles').select('*').eq('tenant_id', job.tenant_id).eq('user_id', payload.studentId).single(),
+    db.from('learning_plans').select('id,tasks,rationale').eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('classroom_id', classroomId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    topicStudentContext({ tenantId: job.tenant_id, userId: actor, role: 'teacher' }, payload.studentId, classroomId, db),
+  ]);
+  if (profile.error) throw new Error(profile.error.message);
+  if (prior.error) throw new Error(prior.error.message);
+  const value = profile.data;
+
+  // 登録後の再実行や、修正前に予約されたジョブもここで止める。
+  // 既存の計画があっても、空の初期情報から自己紹介課題を再作成しない。
+  if (!hasPlanningEvidence({
+    learningGoal: value.learning_goal, examResults: value.exam_results,
+    weakAreas: value.weak_areas, lessonContext, feedbackCount: history.feedbackUsed,
+  })) {
+    return { nextStep: null, state: { skipped: 'awaiting_learning_context' } };
+  }
+
   const saved = await db.from('learning_plans').select('*').eq('tenant_id', job.tenant_id).eq('id', job.id).maybeSingle();
   if (saved.error) throw new Error(saved.error.message);
   let plan = saved.data;
   if (!plan) {
-    const [profile, prior, history] = await Promise.all([
-      db.from('student_profiles').select('*').eq('tenant_id', job.tenant_id).eq('user_id', payload.studentId).single(),
-      db.from('learning_plans').select('id,tasks,rationale').eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('classroom_id', classroomId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      topicStudentContext({ tenantId: job.tenant_id, userId: actor, role: 'teacher' }, payload.studentId, classroomId, db),
-    ]);
-    if (profile.error) throw new Error(profile.error.message);
-    if (prior.error) throw new Error(prior.error.message);
-    const value = profile.data;
     const result = await curriculumAgent.run({ studentId: payload.studentId, availableMinutes: value.daily_time_limit_min ?? 30,
       masterySummary: history.text, lessonContext: `${classroom ? `対象クラス: ${classroom.name} / 科目: ${classroom.subject} / 学年: ${classroom.grade ?? value.grade}\n` : ''}${lessonContext}`.slice(0,21000),
       previousPlan: prior.data ? JSON.stringify(prior.data).slice(0, 10000) : '',

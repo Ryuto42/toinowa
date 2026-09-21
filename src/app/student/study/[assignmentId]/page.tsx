@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
-import { PageTitle } from '@/components/dashboard';
+import { ChatWorkspace } from '@/components/student/chat-workspace';
 import { ConceptChatLauncher } from '@/components/student/concept-chat';
 
 export default async function StudyAssignmentPage({ params }: PageProps<'/student/study/[assignmentId]'>) {
@@ -24,13 +24,12 @@ export default async function StudyAssignmentPage({ params }: PageProps<'/studen
     .maybeSingle();
   if (!question.data || question.data.format !== 'explain') notFound();
 
-  return <div>
-    <PageTitle title={assignment.data.lessons?.title ?? '概念説明ワーク'} />
+  return <ChatWorkspace title={assignment.data.lessons?.title ?? '概念説明ワーク'}>
     <ConceptChatLauncher
       assignmentId={assignmentId}
       lessonId={assignment.data.lesson_id}
       conceptId={question.data.concept_id}
       questionId={question.data.id}
     />
-  </div>;
+  </ChatWorkspace>;
 }

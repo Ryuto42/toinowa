@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { ConversationFeedback } from './feedback-card';
 import { useEffect, useRef, useState } from 'react';
 import { useWorkTelemetry } from './use-work-telemetry';
@@ -15,11 +17,12 @@ interface ChatClientProps {
   conversationId: string;
   initialMessages: ChatMessage[];
   initialCompleted?: boolean;
+  tutorial?: boolean;
   assignmentId?: string;
   questionId?: string;
 }
 
-export function ChatClient({ conversationId, initialMessages, initialCompleted = false, assignmentId, questionId }: ChatClientProps) {
+export function ChatClient({ conversationId, initialMessages, initialCompleted = false, assignmentId, questionId, tutorial = false }: ChatClientProps) {
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,16 +35,19 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const sequence = useRef(Math.max(0, ...initialMessages.map((message) => message.seq)));
   // 取り組みの様子を裏で記録する（生徒には見せない）
   const telemetry = useWorkTelemetry(assignmentId);
-  const endOfMessages = useRef<HTMLDivElement>(null);
+  const messageLog = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
 
   useEffect(() => {
-    endOfMessages.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, busy]);
+    const log = messageLog.current;
+    if (log && followLatest.current) log.scrollTop = log.scrollHeight;
+  }, [messages, busy, completed]);
 
-  async function send(event: { preventDefault: () => void }) {
+  async function send(event: { preventDefault: () => void }, preset?: string) {
     event.preventDefault();
-    const content = input.trim();
-    if (!content || busy || completed) return;
+    const content = (preset ?? input).trim();
+    if (!content || busy || undoing || completed) return;
+    followLatest.current = true;
     const measured = telemetry.consume();
     setInput('');
     setBusy(true);
@@ -140,37 +146,25 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     }
   }
 
-  return <div className="grid gap-4">
-    <div role="log" aria-live="polite" className="h-[min(58vh,560px)] space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+  return <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div ref={messageLog} role="log" aria-label="対話の履歴" aria-live="polite" onScroll={event => { const log = event.currentTarget; followLatest.current = log.scrollHeight - log.scrollTop - log.clientHeight < 80; }} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
       {messages.length === 0 ? <div className="mx-auto max-w-md py-20 text-center"><p className="text-lg font-bold">AIへの説明を始めましょう</p><p className="mt-2 text-sm leading-6 text-slate-500">授業で学んだ概念を、何も知らないAIに教えてください。</p></div> : null}
       {messages.map((message) => {
         const isStudent = message.actor === 'student';
         return <div key={message.id} className={isStudent ? 'flex justify-end' : 'flex justify-start'}>
-          <div className="max-w-[88%]">
+          <div className="min-w-0 max-w-[88%] break-words">
             <p className={isStudent ? 'mb-1 text-right text-xs font-bold text-emerald-700' : 'mb-1 text-xs font-bold text-slate-500'}>{isStudent ? 'あなた' : 'AI'}</p>
-            <div className={isStudent ? 'rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-7 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : message.content_redacted}</div>
+            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'whitespace-pre-wrap rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-7 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : message.content_redacted}</div>
           </div>
         </div>;
       })}
-      {busy && !streamingId ? <div role="status" aria-live="polite" className="flex justify-start"><div className="max-w-[88%]"><p className="mb-1 text-xs font-bold text-slate-500">AI</p><div className="flex items-center gap-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm text-slate-600"><Spinner />考えています…</div></div></div> : null}
-      <div ref={endOfMessages} aria-hidden="true" />
+      {busy && !streamingId ? <div role="status" aria-live="polite" className="flex justify-start"><div className="min-w-0 max-w-[88%] break-words"><p className="mb-1 text-xs font-bold text-slate-500">AI</p><div className="flex items-center gap-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm text-slate-600"><Spinner />考えています…</div></div></div> : null}
+      {completed ? tutorial ? <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-950"><p className="font-bold">はじめての練習、できました！</p><p className="mt-2 leading-7">自分の言葉で伝えて、AIの質問に答える。宿題でも同じようにやり取りしてみよう。先生から届いたお題は「AIワーク」で確認できます。</p></div> : <ConversationFeedback conversationId={conversationId} /> : null}
     </div>
-    {completed ? <ConversationFeedback conversationId={conversationId} /> : <>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setInput('この概念は何を表すのかを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">意味を説明する</button>
-        <button type="button" onClick={() => setInput('理由や他の概念とのつながりを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">つながりを説明する</button>
-        <button type="button" onClick={() => setInput('具体例やたとえを追加します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">具体例を出す</button>
-        {canUndo ? <button
-          type="button"
-          onClick={undo}
-          disabled={undoing || busy}
-          className="ml-auto rounded-full border border-slate-400 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 disabled:opacity-50"
-        >
-          {undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}
-        </button> : null}
-      </div>
-      <form onSubmit={send} className="flex gap-2">
-        <label className="sr-only" htmlFor="chat-input">AIへの説明</label>
+    {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">AIワークへ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
+      {canUndo ? <div className="flex justify-end"><button type="button" onClick={undo} disabled={undoing || busy} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-600 underline disabled:opacity-50">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button></div> : null}
+      <form onSubmit={event => void send(event)} className="flex items-end gap-2">
+        <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
           // 日本語入力の変換確定でEnterが来るので、変換中は送信しない
@@ -178,11 +172,12 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
             event.preventDefault();
             void send(event);
           }
-        }} onPaste={telemetry.onPaste} rows={3} maxLength={8000} placeholder="AIに教える内容を、自分の言葉で書いてください（Enterで送信／Shift+Enterで改行）" className="min-h-16 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-emerald-600" />
-        <button disabled={busy || !input.trim()} className="self-end rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? <span className="inline-flex items-center gap-2"><Spinner light />考え中…</span> : '送信'}</button>
+        }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} className="h-20 min-h-16 min-w-0 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 outline-none focus:border-emerald-600 sm:text-sm" />
+        <button disabled={busy || undoing || !input.trim()} className="shrink-0 self-end rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? <span className="inline-flex items-center gap-2"><Spinner light />考え中…</span> : '送信'}</button>
       </form>
-    </>}
-    {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-1"><p className="text-[11px] leading-4 text-slate-500">送信ボタン・Enterで送信 ／ Shift+Enterで改行</p>{tutorial ? <button type="button" disabled={busy || undoing} onClick={event => void send(event, TUTORIAL_STOP_MESSAGE)} className="shrink-0 text-xs text-slate-600 underline disabled:opacity-50">{TUTORIAL_STOP_MESSAGE}</button> : null}</div>
+    </div>}
+    {error ? <p role="alert" className="max-h-16 shrink-0 overflow-y-auto text-sm text-rose-700">{error}</p> : null}
   </div>;
 }
 

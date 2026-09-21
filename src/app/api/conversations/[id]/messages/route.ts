@@ -1,4 +1,7 @@
+import { tutorialAgent } from '@/lib/tutorial/agent';
+import { TUTORIAL_FINISH, TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { requireAuth } from '@/lib/auth/guard';
+import { ForbiddenError } from '@/lib/auth/errors';
 import { json, parseJson, routeError, traceIdFrom, uuidParam } from '@/lib/api/http';
 import { appendMessage, completeConversation, getConversation, listMessages, messageCreateSchema, maybeQueueConversationSummary, recordConversationAnswer } from '@/lib/conversation/service';
 import { buildConversationContext } from '@/lib/conversation/context';
@@ -104,6 +107,9 @@ export async function POST(request: Request, route: Context) {
     const conversationId = uuidParam((await route.params).id);
     const body = await parseJson(request, messageCreateSchema);
     const conversation = await getConversation(context, conversationId);
+    if (conversation.purpose === 'tutorial' && (context.role !== 'student' || conversation.student_id !== context.userId)) {
+      throw new ForbiddenError('この練習に回答できるのは生徒本人だけです');
+    }
     if (conversation.state === 'completed') {
       return json({ message: 'この対話はここで完了しました。' }, { status: 409 });
     }
@@ -116,6 +122,26 @@ export async function POST(request: Request, route: Context) {
       channelMessageId: body.channelMessageId,
     });
     const traceId = traceIdFrom(request);
+    if (conversation.purpose === 'tutorial') {
+      const finishRequested = body.content === TUTORIAL_STOP_MESSAGE;
+      let message = TUTORIAL_FINISH;
+      let conversationCompleted = finishRequested;
+      let runId: string | undefined;
+      if (!finishRequested) {
+        const history = await listMessages(context, conversationId);
+        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000) }, {
+          traceId, tenantId: context.tenantId, studentId: conversation.student_id,
+          conversationId, userId: context.userId, modelClass: 'standard', routingReason: 'onboarding_tutorial',
+        });
+        conversationCompleted = result.data.shouldFinish;
+        message = conversationCompleted && /[?？]/u.test(result.data.message) ? TUTORIAL_FINISH : result.data.message;
+        runId = result.meta.runId;
+      }
+      await appendMessage({context,conversationId,actor:'agent',content:message,channel:body.channel});
+      if(conversationCompleted) await completeConversation(context,conversationId);
+      const payload = {message,traceId,runId,conversationCompleted};
+      return body.stream ? eventStream(payload) : json(payload);
+    }
     if (context.role === 'student' && body.assignmentId && body.questionId) {
       const answer = await recordConversationAnswer({
         context,

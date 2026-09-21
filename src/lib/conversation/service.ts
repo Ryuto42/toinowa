@@ -139,6 +139,7 @@ export async function recordConversationAnswer(input: {
   if (assignment.error || !assignment.data) throw new Error(assignment.error?.message ?? 'assignment not found');
   if (!assignment.data.question_ids.includes(input.questionId)) throw new Error('question is not part of assignment');
   const conversation = await getConversation(input.context, input.conversationId);
+  if (conversation.purpose === 'tutorial') throw new Error('練習は採点対象ではありません');
   const question = await db.from('questions').select('id,format,concept_id')
     .eq('tenant_id', input.context.tenantId).eq('id', input.questionId).maybeSingle();
   if (question.error || !question.data) throw new Error(question.error?.message ?? 'work prompt not found');
@@ -171,6 +172,8 @@ export async function completeConversation(context: AuthContext, conversationId:
   }).eq('tenant_id', context.tenantId).eq('id', conversationId).select('*').maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error('conversation not found');
+
+  if (data.purpose === 'tutorial') return data;
 
   // 完了時は、途中の回答ではなく会話全体を根拠にした最終分析を必ず作る。
   // 途中で評価モデルは呼ばず、完了後に一度だけ高品質な分析を行う。

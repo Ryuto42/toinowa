@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { schedulePlan, studentIntakeSchema } from '@/lib/plans/schema';
+import { hasPlanningEvidence, schedulePlan, studentIntakeSchema } from '@/lib/plans/schema';
 import { classForDifficulty, modelsForClass } from '@/lib/orcarouter/selection';
 import { documentImagesSchema, hasImageSignature } from '@/lib/materials/images';
 import { summarizeUsage } from '@/lib/admin/usage-summary';
 describe('learning plan constraints', () => {
+  it('学習内容が未入力なら計画を作らず、授業や模試があれば作る', () => {
+    expect(hasPlanningEvidence({})).toBe(false);
+    expect(hasPlanningEvidence({learningGoal:'  ', examResults:null, weakAreas:'\n'})).toBe(false);
+    for (const evidence of [{learningGoal:'数学の文章題を解きたい'}, {examResults:'英語の長文読解40点'}, {weakAreas:'分数'}, {lessonContext:'一次関数の授業記録'}, {feedbackCount:1}]) {
+      expect(hasPlanningEvidence(evidence)).toBe(true);
+    }
+  });
   it('caps daily workload and rolls dates over month boundaries', () => {
     const task = { concept: '割合', goal: '説明する', minutes: 90, difficulty: 2 };
     const plan = schedulePlan(Array.from({ length: 9 }, () => task), 15, '2026-09-30');
@@ -11,7 +18,7 @@ describe('learning plan constraints', () => {
     expect(plan.every(item => item.est_min === 15)).toBe(true);
     expect(plan[1].scheduled_for).toBe('2026-10-01');
   });
-  it('requires grade, goal and classroom at registration', () => {
+  it('requires grade at registration', () => {
     expect(studentIntakeSchema.safeParse({}).success).toBe(false);
   });
 });

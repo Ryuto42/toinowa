@@ -32,6 +32,7 @@ export function usageFeature(requestType: string): { feature: string; location: 
     extract_lesson: ['授業資料の読み取り', '先生：説明ワーク作成'],
     propose_explanation_work: ['お題の自動作成', '先生：説明ワーク作成'],
     analyze_lesson: ['授業の分析', '先生：授業資料'],
+    student_tutorial: ['初回チャットの練習', '生徒：自己紹介チュートリアル'],
     learning_support: ['生徒との対話', '生徒：説明ワーク'],
     assess_answer: ['最終フィードバック', '対話完了後の自動処理'],
     build_learning_plan: ['学習計画・次回の提案', '授業記録・模試・対話完了後の個別計画'],

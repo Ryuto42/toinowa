@@ -22,12 +22,24 @@ beforeEach(()=>{
   mocks.responses.set('lesson_preparations',[{id:'prep',student_ids:['student'],title:'一次関数',content:'傾きと切片。文章題は未習。',due_at:'2026-09-22T10:00:00Z'}]);
   mocks.responses.set('users',[{status:'active'}]);
   mocks.responses.set('student_profiles',[{daily_time_limit_min:null,current_difficulty:2}]);
-  mocks.responses.set('learning_plans',[null,{id:'prior',tasks:[],rationale:'前の計画'},null,plan]);
+  mocks.responses.set('learning_plans',[{id:'prior',tasks:[],rationale:'前の計画'},null,null,plan]);
   mocks.history.mockResolvedValue({text:'模試・過去の説明と先生の修正',feedbackUsed:0});
   mocks.run.mockResolvedValue({data:{tasks:[{concept:'傾き',goal:'意味を説明',prompt:'傾きとは何か教えて',difficulty:2,minutes:10}],rationale:'授業の意味の説明を優先',evidence:['授業記録'],needsTeacherReview:true},meta:{runId:'run'}});
   mocks.rpc.mockResolvedValue({data:'work',error:null});
 });
 describe('授業記録からの個別計画生成',()=>{
+  it('古い初回ジョブでも、学年・学習時間だけならAIや課題を作らず完了する',async()=>{
+    mocks.responses.set('student_profiles',[{grade:'中学2年',daily_time_limit_min:30,learning_goal:'',exam_results:'  ',weak_areas:null}]);
+    mocks.responses.set('learning_plans',[{id:'old-plan',tasks:[{concept:'自己紹介と学習目標設定'}]}]);
+    const result=await jobHandler('build_learning_plan')!({...job,kind:'build_learning_plan',payload:{studentId:'student',classroomId:'class'}});
+    expect(result).toEqual({nextStep:null,state:{skipped:'awaiting_learning_context'}});
+    expect(mocks.run).not.toHaveBeenCalled();expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.inserts).toHaveLength(0);
+  });
+  it('あとから模試結果が入ったら、授業記録がなくても計画を作れる',async()=>{
+    mocks.responses.set('student_profiles',[{grade:'中学2年',daily_time_limit_min:30,exam_results:'一次関数の設問で2問不正解'}]);
+    await jobHandler('build_learning_plan')!({...job,kind:'build_learning_plan',payload:{studentId:'student',classroomId:'class'}});
+    expect(mocks.run).toHaveBeenCalledOnce();expect(mocks.rpc).toHaveBeenCalledOnce();
+  });
   it('授業範囲・個別履歴・前の計画を渡し、注意点付きの未公開課題を保存する',async()=>{
     await jobHandler('prepare_lesson_student')!(job);
     expect(mocks.run).toHaveBeenCalledWith(expect.objectContaining({lessonContext:expect.stringContaining('文章題は未習'),masterySummary:'模試・過去の説明と先生の修正',previousPlan:expect.stringContaining('前の計画')}),expect.objectContaining({studentId:'student'}));
@@ -40,7 +52,7 @@ describe('授業記録からの個別計画生成',()=>{
     expect(mocks.inserts[0]).toMatchObject({tasks:expect.arrayContaining([expect.objectContaining({difficulty:3})])});
   });
   it('計画保存後の再実行ではAIへ再課金せず課題保存から再開する',async()=>{
-    mocks.responses.set('learning_plans',[plan]);
+    mocks.responses.set('learning_plans',[null,plan]);
     await jobHandler('prepare_lesson_student')!(job);
     expect(mocks.run).not.toHaveBeenCalled();expect(mocks.inserts).toHaveLength(0);
     expect(mocks.rpc).toHaveBeenCalledOnce();

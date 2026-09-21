@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TutorialEntry } from '@/components/student/tutorial-entry';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
 import { EmptyState, MetricCard, PageTitle, Panel, StatusPill } from '@/components/dashboard';
@@ -24,6 +25,7 @@ export default async function StudentHomePage() {
   const subjectByClassroom = new Map((classrooms.data ?? []).map((classroom) => [classroom.id, classroom.subject]));
   return <div>
     <PageTitle title="今日の学習" />
+    <TutorialEntry studentId={context.userId} tenantId={context.tenantId} />
     <div className="grid gap-4 sm:grid-cols-3"><MetricCard label="今日の目標" value={`${profile.data?.daily_time_limit_min ?? 30}分`} note="設定から変更できます"/><MetricCard label="説明するテーマ" value={activeTasks.length} tone={activeTasks.length ? 'amber' : 'emerald'}/><MetricCard label="学習継続" value={`${profile.data?.streak_days ?? 0}日`} note="小さな積み重ねを記録します"/></div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
       <Panel title="次に説明すること" description="期限と復習予定をまとめています">
