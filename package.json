@@ -34,6 +34,7 @@
     "openai": "^7.19.0",
     "pdfjs-dist": "^6.3.289",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.1",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.88.0",
     "server-only": "^0.0.1",

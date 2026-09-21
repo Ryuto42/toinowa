@@ -58,9 +58,7 @@ export default async function TeacherAssignmentsPage() {
       action={<CreateWorkDialog
         classrooms={(classrooms.data ?? []).filter(c=>!c.individual_student_id)}
         students={personalStudents}
-        topicClassrooms={availableClasses.map(c=>({...c,name:c.individual_student_id ? `個別指導：${students.find(s=>s.id===c.individual_student_id)?.name ?? '生徒'}` : c.name}))}
       />} />
-    <ol className="grid gap-3 text-sm sm:grid-cols-3">{['1　授業記録を渡す','2　AIが生徒別に準備する','3　先生が確認して配信'].map(text => <li key={text} className="rounded-xl bg-emerald-50 p-4 font-bold text-emerald-900">{text}</li>)}</ol>
     {availablePreparations.length ? <Panel title="AIの準備状況" description="画面を閉じても、受け付けた授業記録から準備を続けます。">
       <div className="space-y-3">{availablePreparations.map(row => {
         const own = (jobs.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id);

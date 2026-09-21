@@ -1,7 +1,8 @@
 import Link from 'next/link';
 
 export type IconName =
-  | 'edit' | 'insights' | 'visibility' | 'archive' | 'unarchive' | 'delete' | 'swap_horiz' | 'logout';
+  | 'edit' | 'insights' | 'visibility' | 'archive' | 'unarchive' | 'delete' | 'swap_horiz' | 'logout'
+  | 'event' | 'schedule' | 'group' | 'person' | 'lightbulb' | 'check_circle' | 'error' | 'search_off';
 
 /** Material Symbols（Google Fonts）。読み込むアイコン名は app/layout.tsx で指定している。 */
 export function Icon({ name, className = '' }: { name: IconName; className?: string }) {
