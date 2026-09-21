@@ -202,7 +202,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           }
         }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 text-base outline-none" />
         <button type="submit" disabled={busy || undoing || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
-          {busy ? <><Spinner /><span>考え中</span></> : <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></>}
+          {busy ? <><Spinner /><span>考え中</span></> : <span className="inline-flex -translate-x-px items-center gap-1"><svg aria-hidden="true" viewBox="4 2 16 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-4 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></span>}
         </button>
       </form>
       {/* 話した端から対話の中に出していく。
