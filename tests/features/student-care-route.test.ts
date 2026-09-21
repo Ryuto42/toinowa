@@ -54,12 +54,13 @@ describe('相談・暴言の実際のメッセージAPI分岐', () => {
     m.purpose = 'tutorial'; await send('助けて');
     expect(m.tutorial).not.toHaveBeenCalled(); expect(m.complete).not.toHaveBeenCalled();
   });
-  it('短い相づちでも相談状態を維持し、明示的な再開を保存する', async () => {
+  it.each(['また勉強しよっか！', '再開しようかな'])('短い相づちでは休止し、再開意思を保存する: %s', async text => {
     await send('助けて');
     m.classify.mockResolvedValue({ category: 'normal', reason: '', source: 'model' });
     expect((await (await send('ありがとう')).json()).message).toContain('無理に詳しく');
     expect(m.learn).not.toHaveBeenCalled();
-    expect((await (await send('勉強に戻る')).json()).message).toContain('元のお題');
+    m.classify.mockResolvedValue({ category: 'normal', reason: '本人の再開意思', source: 'model', evidence: '', resumeLearning: true });
+    expect((await (await send(text)).json()).message).toContain('元のお題');
     expect(m.messages.at(-1)?.safety_flags).toEqual({ student_care: ['resume'] });
     expect(m.answer).not.toHaveBeenCalled();
   });
@@ -72,10 +73,21 @@ describe('相談・暴言の実際のメッセージAPI分岐', () => {
     expect(m.complete).not.toHaveBeenCalled();
   });
   it('記録が失敗しても支援の返答を返し、先生に届いたと偽らない', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     m.escalation.mockResolvedValue(null);
     const payload = await (await send('助けて')).json();
-    expect(payload.message).toContain('記録を完了できません');
+    expect(payload.message).toContain('勉強を休んで大丈夫');
+    expect(payload.message).not.toMatch(/記録|一覧|先生に伝/);
+    expect(log).toHaveBeenCalledWith('[student-care] 要フォローを記録できませんでした');
     expect(payload.conversationCompleted).toBe(false);
+    log.mockRestore();
+  });
+  it('相談中に誰が見られるか聞かれた時だけ共有の仕組みを説明する', async () => {
+    await send('助けて');
+    m.classify.mockResolvedValue({ category: 'normal', reason: '', source: 'model' });
+    const payload = await (await send('先生にも見られるの？')).json();
+    expect(payload.message).toContain('担当の先生や管理者が確認できる');
+    expect(m.learn).not.toHaveBeenCalled();
   });
   it('SSEでも相談応答を返し、命の危険はurgentにする', async () => {
     m.classify.mockResolvedValue({ category: 'self_harm', reason: '本人の相談', source: 'rule' });

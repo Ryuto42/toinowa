@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicUnavailable, startRecorder } from '@/lib/voice/record';
 
 /** 1ターンで話せる長さ。これを超えたら自動で止める。 */
 const MAX_SECONDS = 120;
 
-type Status = 'idle' | 'starting' | 'recording' | 'error';
+type Status = 'idle' | 'starting' | 'recording' | 'stopping' | 'error';
 
 async function toBase64(blob: Blob): Promise<string> {
   const buffer = new Uint8Array(await blob.arrayBuffer());
@@ -57,26 +57,53 @@ export function VoiceInput({ conversationId, disabled, topic, previousText, onSt
   const dispatchedRef = useRef(0);
   const nextEmitRef = useRef(0);
   const pendingTextRef = useRef(new Map<number, string>());
+  const activeRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const generationRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    generationRef.current += 1;
+    activeRef.current = false;
+    abortRef.current?.abort();
+    if (timerRef.current) clearInterval(timerRef.current);
+    const stopFn = stopRef.current;
+    stopRef.current = null;
+    void stopFn?.().catch(() => {});
+  }, [conversationId]);
 
   const stop = useCallback(async () => {
+    if (!stopRef.current || stoppingRef.current) return;
+    stoppingRef.current = true;
+    const generation = generationRef.current;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     const stopFn = stopRef.current;
     stopRef.current = null;
-    setStatus('idle');
+    setStatus('stopping');
     setLevel(0);
     // 止めた瞬間に残りが最後のチャンクとして積まれる。
     // それを書き起こし終わる前に送ると、話の最後が丸ごと落ちる。
-    if (stopFn) await stopFn();
+    try {
+      await stopFn();
+    } catch {
+      if (generation === generationRef.current) setMessage('録音を終了しました。入力された文字を確認してください。');
+    }
     while (inflightRef.current.size) await Promise.all([...inflightRef.current]);
+    if (generation !== generationRef.current) return;
     onStop?.();
+    activeRef.current = false;
+    stoppingRef.current = false;
+    setStatus('idle');
   }, [onStop]);
 
-  const send = useCallback(async (wav: Blob, index: number) => {
+  const send = useCallback(async (wav: Blob, index: number, generation: number) => {
     setPending((n) => n + 1);
+    let text = '';
     try {
       const response = await fetch('/api/voice/transcribe', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        signal: abortRef.current?.signal,
         body: JSON.stringify({
           conversationId,
           format: 'wav',
@@ -88,53 +115,66 @@ export function VoiceInput({ conversationId, disabled, topic, previousText, onSt
         }),
       });
       const result = await response.json() as { text?: string; hesitation?: number; message?: string };
+      if (generation !== generationRef.current) return;
       if (!response.ok) { setMessage(result.message ?? '聞き取れませんでした。'); return; }
-      if (result.text) setMessage('');
       if (typeof result.hesitation === 'number') onHesitation?.(result.hesitation);
-      pendingTextRef.current.set(index, result.text ?? '');
+      text = result.text ?? '';
     } catch {
-      setMessage('通信に失敗しました。文字で入力してください。');
-      pendingTextRef.current.set(index, '');
+      if (generation === generationRef.current) setMessage('一部を聞き取れませんでした。入力された文字を確認し、足りない部分を入力してください。');
     } finally {
-      // 先に返ってきても、前の区切りが揃うまで出さない。
-      while (pendingTextRef.current.has(nextEmitRef.current)) {
-        const text = pendingTextRef.current.get(nextEmitRef.current) ?? '';
-        pendingTextRef.current.delete(nextEmitRef.current);
-        nextEmitRef.current += 1;
-        if (text) onText(text);
+      if (generation === generationRef.current) {
+        // HTTPエラーも空の区切りとして確定させ、後続の認識結果を止めない。
+        pendingTextRef.current.set(index, text);
+        // 先に返ってきても、前の区切りが揃うまで出さない。
+        while (pendingTextRef.current.has(nextEmitRef.current)) {
+          const text = pendingTextRef.current.get(nextEmitRef.current) ?? '';
+          pendingTextRef.current.delete(nextEmitRef.current);
+          nextEmitRef.current += 1;
+          if (text) onText(text);
+        }
+        setPending((n) => n - 1);
       }
-      setPending((n) => n - 1);
     }
   }, [conversationId, topic, previousText, onText, onHesitation]);
 
   async function start() {
-    if (disabled || status === 'recording' || status === 'starting') return;
+    if (disabled || activeRef.current) return;
+    activeRef.current = true;
+    stoppingRef.current = false;
+    const generation = ++generationRef.current;
+    abortRef.current = new AbortController();
     setStatus('starting');
     setMessage('');
     setSeconds(0);
     dispatchedRef.current = 0;
     nextEmitRef.current = 0;
     pendingTextRef.current.clear();
+    inflightRef.current.clear();
+    setPending(0);
     try {
       const stopFn = await startRecorder({
-        onLevel: setLevel,
+        onLevel: value => { if (generation === generationRef.current) setLevel(value); },
         onChunk: ({ wav }) => {
+          if (generation !== generationRef.current) return;
           const index = dispatchedRef.current;
           dispatchedRef.current += 1;
-          const task = send(wav, index).finally(() => inflightRef.current.delete(task));
+          const task = send(wav, index, generation).finally(() => inflightRef.current.delete(task));
           inflightRef.current.add(task);
         },
       });
+      if (generation !== generationRef.current) { await stopFn(); return; }
       stopRef.current = stopFn;
       setStatus('recording');
       onStart?.();
+      let elapsed = 0;
       timerRef.current = setInterval(() => {
-        setSeconds((value) => {
-          if (value + 1 >= MAX_SECONDS) { void stop(); return MAX_SECONDS; }
-          return value + 1;
-        });
+        elapsed += 1;
+        setSeconds(elapsed);
+        if (elapsed >= MAX_SECONDS) void stop();
       }, 1000);
     } catch (error) {
+      if (generation !== generationRef.current) return;
+      activeRef.current = false;
       setStatus('error');
       // 原因によって直し方が違う。ひとまとめの文言だと、何をすればよいか分からない。
       setMessage(error instanceof MicUnavailable
@@ -144,7 +184,8 @@ export function VoiceInput({ conversationId, disabled, topic, previousText, onSt
   }
 
   const recording = status === 'recording';
-  const label = status === 'starting' ? 'マイクを準備しています'
+  const label = status === 'stopping' ? '最後の音声を文字にしています'
+    : status === 'starting' ? 'マイクを準備しています'
     : recording ? `話し終わったら押す（あと${MAX_SECONDS - seconds}秒）`
       : '声で説明する';
 
@@ -152,7 +193,7 @@ export function VoiceInput({ conversationId, disabled, topic, previousText, onSt
     <button
       type="button"
       onClick={() => void (recording ? stop() : start())}
-      disabled={disabled || status === 'starting'}
+      disabled={disabled || status === 'starting' || status === 'stopping'}
       aria-pressed={recording}
       aria-label={label}
       title={label}

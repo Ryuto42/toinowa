@@ -14,7 +14,7 @@ import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
 import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
-import { activeCare, asksToResume, carePriority, careReply, careTag, CARE_TITLES, isLearningMessage, type CareDecision } from '@/lib/security/student-care';
+import { activeCare, canResumeLearning, carePriority, careReply, careTag, CARE_TITLES, isLearningMessage, type CareDecision } from '@/lib/security/student-care';
 import { classifyStudentCare } from '@/lib/security/student-care-agent';
 import { preCheck } from '@/lib/security/guard';
 import { recordGuardEvent } from '@/lib/security/audit';
@@ -125,7 +125,7 @@ export async function POST(request: Request, route: Context) {
       ? await classifyStudentCare(preCheck(body.content).masked.text, previousMessages, {
         traceId, tenantId: context.tenantId, studentId: context.userId, userId: context.userId, conversationId,
       }) : null;
-    const resume = Boolean(paused && asksToResume(body.content) && care?.category === 'normal');
+    const resume = Boolean(paused && care && canResumeLearning(care));
     const category: CareDecision['category'] = paused && !resume && (!care || care.category === 'normal' || care.category === 'hostility' || care.category === 'unavailable')
       ? paused : care?.category ?? 'normal';
     const careLabel = resume ? 'resume' : category !== 'normal' ? category : undefined;
@@ -135,7 +135,6 @@ export async function POST(request: Request, route: Context) {
       careLabel,
     });
     if (careLabel) {
-      let recorded = false;
       if (category !== 'normal' && category !== 'unavailable') {
         const repeatHostility = previousMessages.some(row => row.actor === 'student' && careTag(row) === 'hostility');
         if (category !== 'hostility' || repeatHostility) {
@@ -149,7 +148,7 @@ export async function POST(request: Request, route: Context) {
               reasons: [care?.reason ?? '相談の途中のため、学習を休止しています。'], source: care?.source ?? 'rule' },
             dedupeHours: 6,
           });
-          recorded = Boolean(escalationId);
+          if (!escalationId) console.error('[student-care] 要フォローを記録できませんでした');
         }
         await recordGuardEvent({
           tenantId: context.tenantId, studentId: conversation.student_id, conversationId,
@@ -160,7 +159,7 @@ export async function POST(request: Request, route: Context) {
       }
       const message = resume
         ? 'わかりました。無理のない範囲で、元のお題について説明してみてください。つらくなったら、いつでも休んで大丈夫です。'
-        : careReply(category, recorded, Boolean(paused));
+        : careReply(category, Boolean(paused), body.content);
       await appendMessage({ context, conversationId, actor: 'agent', content: message, channel: body.channel, careLabel });
       const payload = { message, traceId, runId: care?.runId, conversationCompleted: false };
       return body.stream ? eventStream(payload) : json(payload);

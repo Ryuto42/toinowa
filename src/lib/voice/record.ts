@@ -16,6 +16,9 @@ const MAX_CHUNK_SEC = 10;
 /** これより静かなら「間」とみなす。 */
 const SILENCE_RMS = 0.012;
 const SILENCE_HOLD_SEC = 0.6;
+// 区切り用より低い閾値にし、小声まで一律に捨てない。
+const AUDIBLE_RMS = 0.003;
+const MIN_AUDIBLE_SEC = 0.06;
 
 export interface Chunk { wav: Blob; seconds: number }
 
@@ -138,12 +141,17 @@ export async function startRecorder(handlers: {
   let parts: Float32Array[] = [];
   let total = 0;
   let quietFor = 0;
+  let audibleFor = 0;
   let stopped = false;
 
   const flush = () => {
     if (!total) return;
     const raw = concat(parts, total);
+    const audible = audibleFor >= MIN_AUDIBLE_SEC;
     parts = []; total = 0; quietFor = 0;
+    audibleFor = 0;
+    // 話し終わりの無音から、モデルが参考文や定型句を生成するのを防ぐ。
+    if (!audible) return;
     const samples = downsample(raw, context.sampleRate, TARGET_RATE);
     handlers.onChunk({ wav: encodeWav(samples, TARGET_RATE), seconds: raw.length / context.sampleRate });
   };
@@ -154,6 +162,7 @@ export async function startRecorder(handlers: {
     parts.push(frame);
     total += frame.length;
     const level = rmsOf(frame);
+    if (level >= AUDIBLE_RMS) audibleFor += frame.length / context.sampleRate;
     handlers.onLevel(level);
     const seconds = total / context.sampleRate;
     quietFor = level < SILENCE_RMS ? quietFor + frame.length / context.sampleRate : 0;

@@ -36,6 +36,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const [voiceDraft, setVoiceDraft] = useState('');
   // 送るときの本文は ref から読む。更新関数の中で送ると二重送信になりうる。
   const voiceDraftRef = useRef('');
+  const spokenInputRef = useRef(false);
   // 直前の1往復だけ取り消せる。取り消した直後は、さらに前へは戻せない。
   const [canUndo, setCanUndo] = useState(() => canUndoSavedExchange(initialMessages, initialCompleted, initialUndoBlockedMessageId));
   const [undoing, setUndoing] = useState(false);
@@ -53,9 +54,11 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   async function send(event: { preventDefault: () => void }) {
     event.preventDefault();
     const content = input.trim();
-    if (!content) return;
+    if (!content || speaking || busy || undoing || completed) return;
     setInput('');
-    await sendText(content);
+    const spoken = spokenInputRef.current;
+    spokenInputRef.current = false;
+    await sendText(content, spoken);
   }
 
   async function sendText(raw: string, spoken = false) {
@@ -191,9 +194,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">課題へ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
       <div className="flex items-center gap-2">
       <form onSubmit={event => void send(event)} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
-        {canUndo ? <button type="button" onClick={undo} disabled={undoing || busy} className="chat-undo-button absolute bottom-full right-3 z-10 min-h-6 rounded-t-md border border-b-0 border-slate-200 bg-white px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:text-slate-400">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button> : null}
+        {canUndo ? <button type="button" onClick={undo} disabled={undoing || busy || speaking} className="chat-undo-button absolute bottom-full right-3 z-10 min-h-6 rounded-t-md border border-b-0 border-slate-200 bg-white px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:text-slate-400">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button> : null}
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
-        <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
+        <textarea id="chat-input" readOnly={speaking} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
           // 日本語入力の変換確定でEnterが来るので、変換中は送信しない
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -201,17 +204,17 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
             void send(event);
           }
         }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 text-base outline-none" />
-        <button type="submit" disabled={busy || undoing || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
+        <button type="submit" disabled={busy || undoing || speaking || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
           {busy ? <><Spinner /><span>考え中</span></> : <span className="inline-flex -translate-x-px items-center gap-1"><svg aria-hidden="true" viewBox="4 2 16 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-4 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></span>}
         </button>
       </form>
       {/* 話した端から対話の中に出していく。
-          送るのは話し終わったときで、経路は手で打った場合とまったく同じ。 */}
+          認識が終わったら入力欄で確認し、手入力と同じ送信操作をする。 */}
       <VoiceInput
         conversationId={conversationId}
         disabled={busy || undoing}
-        // 直前のAIの発言を渡す。お題の用語が入っているので、同音異義語の直しがここで効く。
-        topic={[...messages].reverse().find((item) => item.actor === 'agent')?.content_redacted.slice(0, 500)}
+        // 質問全文は渡さない。無音をその文章で埋める誤認識を防ぐ。
+        topic={initialMessages.find(item => item.actor === 'agent')?.content_redacted.match(/^「([^」]{1,100})」について/)?.[1]}
         previousText={() => voiceDraftRef.current}
         onStart={() => {
           followLatest.current = true;
@@ -229,11 +232,15 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           voiceDraftRef.current = '';
           setVoiceDraft('');
           setSpeaking(false);
-          void sendText(spoken, true);
+          if (spoken) {
+            setInput(current => (current ? `${current} ${spoken}` : spoken).slice(0, 8000));
+            spokenInputRef.current = true;
+          }
+          document.getElementById('chat-input')?.focus();
         }}
       />
       </div>
-      <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。マイクを押すと声で説明できます（話し終わってもう一度押すと送信）。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
+      <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。マイクを押すと声で入力できます。もう一度押して止めたら、文字を確認して送信してね。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
     </div>}
     {error ? <p role="alert" className="max-h-16 shrink-0 overflow-y-auto text-sm text-rose-700">{error}</p> : null}
   </div>;
