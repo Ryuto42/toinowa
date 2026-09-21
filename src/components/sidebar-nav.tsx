@@ -1,6 +1,6 @@
 'use client';
 
-import Link, { useLinkStatus } from 'next/link';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/logout-button';
 
@@ -30,14 +30,6 @@ function NavIcon({ name }: { name: NavIconName }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="m4 11 8-7 8 7" /><path {...common} d="M6 10v9h12v-9M10 19v-5h4v5" /></svg>;
 }
 
-/** クリック直後から、遷移が始まったことを示す小さな印。 */
-function LinkPending() {
-  const { pending } = useLinkStatus();
-  if (!pending) return null;
-  return <span aria-hidden="true"
-    className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[#9fc4bf] border-t-transparent" />;
-}
-
 export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavItem[]; homeHref: string; userName: string }) {
   const pathname = usePathname();
   const initial = userName.trim().charAt(0) || 'U';
@@ -45,11 +37,12 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
     <nav aria-label="メインナビゲーション" className="space-y-1.5">
       {items.map((item) => {
         const active = pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`));
-        return <Link key={item.href} href={item.href} className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold transition ${active ? 'bg-white text-slate-900 shadow-[0_8px_22px_-18px_rgba(15,23,42,0.45)]' : 'text-[#527b78] hover:bg-white/70 hover:text-[#006f68]'}`}>
-          <span className={active ? 'text-[#008477]' : 'text-[#6f9792]'}><NavIcon name={item.icon ?? 'dashboard'} /></span>
+        // 現在地の切り替えも動きでつなぐ。瞬時に入れ替わると、どこからどこへ移ったのかが残らない。
+        return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined}
+          className={`nav-item group flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold ${active ? 'bg-white text-slate-900 shadow-[0_8px_22px_-18px_rgba(15,23,42,0.45)]' : 'text-[#527b78] shadow-none hover:bg-white/70 hover:text-[#006f68]'}`}>
+          <span className={`transition-colors duration-300 ${active ? 'text-[#008477]' : 'text-[#6f9792]'}`}><NavIcon name={item.icon ?? 'dashboard'} /></span>
           <span className="flex-1">{item.label}</span>
           {item.badge ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">{item.badge}</span> : null}
-          <LinkPending />
         </Link>;
       })}
     </nav>
@@ -76,12 +69,11 @@ export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHr
           <Link
             href={item.href}
             aria-current={active ? 'page' : undefined}
-            className={`relative flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-bold leading-tight ${active ? 'text-[#008477]' : 'text-[#6f8a87]'}`}
+            className={`nav-item relative flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-bold leading-tight ${active ? 'text-[#008477]' : 'text-[#6f8a87]'}`}
           >
             <NavIcon name={item.icon ?? 'dashboard'} />
             <span className="text-center">{item.label}</span>
             {item.badge ? <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold text-white">{item.badge}</span> : null}
-            <span className="absolute left-2 top-2"><LinkPending /></span>
           </Link>
         </li>;
       })}

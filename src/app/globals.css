@@ -64,6 +64,19 @@ body:has(.chat-workspace) [data-shell-guide] { display: none; }
   summary:active { transform: scale(0.97); }
 }
 
+/* メニューの現在地。共通の a[href] ルール（150ms）より特異度を上げて、
+   白い帯がゆっくり現れる／消えるようにする。
+   .transition-all などのクラスは a[href] に負けるため、ここで上書きする。 */
+@media (prefers-reduced-motion: no-preference) {
+  a[href].nav-item {
+    transition:
+      background-color 280ms ease,
+      box-shadow 280ms ease,
+      color 280ms ease;
+  }
+  a[href].nav-item:active { transform: scale(0.97); }
+}
+
 /* キーボード操作でも押せる位置が分かるようにする。 */
 :where(button, a[href], summary, [role="tab"]):focus-visible {
   outline: 2px solid #237d75;
@@ -101,6 +114,15 @@ body:has(.chat-workspace) [data-shell-guide] { display: none; }
   dialog[open]::backdrop { opacity: 1; }
   @starting-style {
     dialog[open]::backdrop { opacity: 0; }
+  }
+}
+
+/* 画面写真の拡大。手前に迫り出す感じを出すため、他のポップアップより大きく縮めてから開く。 */
+@media (prefers-reduced-motion: no-preference) {
+  dialog.lightbox { transform: scale(0.92); }
+  dialog.lightbox[open] { transform: none; }
+  @starting-style {
+    dialog.lightbox[open] { opacity: 0; transform: scale(0.92); }
   }
 }
 
