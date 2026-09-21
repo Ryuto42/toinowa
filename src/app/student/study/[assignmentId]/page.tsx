@@ -24,7 +24,7 @@ export default async function StudyAssignmentPage({ params }: PageProps<'/studen
     .maybeSingle();
   if (!question.data || question.data.format !== 'explain') notFound();
 
-  return <ChatWorkspace title={assignment.data.lessons?.title ?? '概念説明ワーク'}>
+  return <ChatWorkspace title={assignment.data.lessons?.title ?? '課題'}>
     <ConceptChatLauncher
       assignmentId={assignmentId}
       lessonId={assignment.data.lesson_id}

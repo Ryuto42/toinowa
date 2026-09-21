@@ -22,6 +22,10 @@ export interface AnswerTelemetry {
   typingMs: number;
   keystrokes: number;
   pasteCount: number;
+  /** 音声で書き起こした回数。打鍵0でも「打たずに書いた」とは限らない材料になる。 */
+  voiceChunks: number;
+  /** 言いよどみの平均（0〜3）。 */
+  voiceHesitation: number;
 }
 
 export function useWorkTelemetry(assignmentId: string | undefined) {
@@ -100,6 +104,14 @@ export function useWorkTelemetry(assignmentId: string | undefined) {
 
   const onPaste = useCallback(() => { pasteCount.current += 1; }, []);
 
+  // ── 音声入力 ──
+  const voiceChunks = useRef(0);
+  const voiceHesitation = useRef(0);
+  const onHesitation = useCallback((level: number) => {
+    voiceChunks.current += 1;
+    voiceHesitation.current += level;
+  }, []);
+
   /** 送信時に呼ぶ。計測値を返してリセットする。 */
   const consume = useCallback((): AnswerTelemetry => {
     const value: AnswerTelemetry = {
@@ -107,14 +119,18 @@ export function useWorkTelemetry(assignmentId: string | undefined) {
       typingMs: Math.round(typingMs.current),
       keystrokes: keystrokes.current,
       pasteCount: pasteCount.current,
+      voiceChunks: voiceChunks.current,
+      voiceHesitation: voiceChunks.current ? Number((voiceHesitation.current / voiceChunks.current).toFixed(2)) : 0,
     };
     answerStart.current = Date.now();
     keystrokes.current = 0;
     pasteCount.current = 0;
     typingMs.current = 0;
     lastKey.current = null;
+    voiceChunks.current = 0;
+    voiceHesitation.current = 0;
     return value;
   }, []);
 
-  return { onKeyDown, onPaste, consume };
+  return { onKeyDown, onPaste, onHesitation, consume };
 }

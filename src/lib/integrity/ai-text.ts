@@ -18,6 +18,10 @@ export interface TypingSignals {
   keystrokes?: number | null;
   /** 問いが表示されてから送信するまで(秒) */
   elapsedSec?: number | null;
+  /** 音声で書き起こした回数。0より大きければ、その場で話したことの裏づけになる。 */
+  voiceChunks?: number | null;
+  /** 言いよどみの平均（0〜3）。生成物の読み上げでは、ここが低いまま長文になる。 */
+  voiceHesitation?: number | null;
 }
 
 export interface HeuristicSignal {

@@ -26,9 +26,27 @@ export function reportSafetyBlock(input: {
   /** 生徒以外の操作（授業準備など）では要フォローを立てず、記録だけ残す */
   escalate?: boolean;
 }): void {
-  const { error, tenantId } = input;
+  const { error } = input;
   if (error.reported) return;
   error.reported = true;
+  // 記録に失敗しても、遮断そのものは成立している。
+  // ここで例外を投げると、本来返すべき SafetyBlocked が記録側の失敗に置き換わる。
+  try {
+    record(input);
+  } catch (err) {
+    console.error('[safety] 遮断の記録に失敗:', err);
+  }
+}
+
+function record(input: {
+  error: SafetyBlocked;
+  tenantId: string;
+  studentId?: string | null;
+  conversationId?: string | null;
+  agentRunId?: string | null;
+  escalate?: boolean;
+}): void {
+  const { error, tenantId } = input;
   recordGuardEvent({
     tenantId,
     studentId: input.studentId ?? null,

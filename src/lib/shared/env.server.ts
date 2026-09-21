@@ -19,6 +19,10 @@ const schema = z.object({
   AI_ECONOMY_MODEL: z.string().min(1).default('google/gemini-2.5-flash-lite'),
   AI_STANDARD_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
   AI_ADVANCED_MODEL: z.string().min(1).default('orcarouter/studypilot-advanced'),
+  // 音声入力の段。1段目から順に試し、落ちたら次へ降りる。
+  AI_AUDIO_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
+  AI_AUDIO_STANDARD_MODEL: z.string().min(1).default('google/gemini-flash-latest'),
+  AI_AUDIO_ADVANCED_MODEL: z.string().min(1).default('google/gemini-2.5-flash-lite'),
   AI_VISION_MODEL: z.string().min(1).default('google/gemini-2.5-flash'),
   AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(1.0),
   // 生徒1人あたりの1日上限。1人の連投で学校全体の枠を使い切らせない。

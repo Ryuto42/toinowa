@@ -11,6 +11,7 @@ export type AgentName =
   | 'assessment'
   | 'curriculum'
   | 'teacher-insight'
+  | 'voice-input'
   | 'safety';
 
 /** 1つのユーザー操作に紐づく実行をまとめる文脈 */
@@ -27,7 +28,12 @@ export interface TraceCtx {
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+  content: string | Array<
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } }
+    // 音声は Google 系のみ対応。webm/opus は拒否されるので wav / mp3 に限る。
+    | { type: 'input_audio'; input_audio: { data: string; format: 'wav' | 'mp3' } }
+  >;
   tool_call_id?: string;
   name?: string;
 }
@@ -58,6 +64,10 @@ export interface CallMeta {
   inputTokens: number;
   /** 入力のうちプロンプトキャッシュから返った分。 */
   cachedInputTokens?: number;
+  /** 入力のうち音声だったぶん。費用の見積もりと発話時間の算出に使う。 */
+  audioInputTokens?: number;
+  /** 費用が返らず、カタログの単価から見積もった試行の数。 */
+  estimatedAttempts?: number;
   outputTokens: number;
   /** usage.cost_usd の実測値。取れなければ 0（null にはしない） */
   costUsd: number;

@@ -66,6 +66,18 @@ export async function analyzeIntegrity(input: IntegrityInput): Promise<Integrity
   // 速すぎる回答はAIの疑いを少しだけ押し上げる（単独では決め手にしない）
   if (pace.verdict === 'too_fast') likelihood = Math.min(1, likelihood + 0.1);
 
+  // その場で声に出して説明したことは、本人が書いた側の材料になる。
+  // ただし「読み上げれば疑いが消える」抜け道にしないため、疑いの値そのものは動かさない。
+  const chunks = input.signals.voiceChunks ?? 0;
+  if (chunks > 0) {
+    const hesitation = input.signals.voiceHesitation ?? 0;
+    humanSignals = [
+      `その場で声に出して説明しています（${chunks}回の発話）。`,
+      ...(hesitation >= 1 ? ['話しながら言いよどみがあり、読み上げではない可能性が高いです。'] : []),
+      ...humanSignals,
+    ].slice(0, 5);
+  }
+
   return {
     aiLikelihood: Number(likelihood.toFixed(3)),
     verdict: verdictOf(likelihood),

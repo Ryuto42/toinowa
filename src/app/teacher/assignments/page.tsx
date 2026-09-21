@@ -54,7 +54,7 @@ export default async function TeacherAssignmentsPage() {
   const live = works.filter(work => work.status !== 'draft');
   const pending = (jobs.data ?? []).some(row => row.status === 'queued' || row.status === 'leased');
   return <div className="space-y-6">
-    <PageTitle title="授業と宿題" description="授業記録を渡すと、AIが生徒別の課題と学習計画を準備します。"
+    <PageTitle title="課題" description="授業記録を渡すと、AIが生徒別の課題と学習計画を準備します。"
       action={<CreateWorkDialog
         classrooms={(classrooms.data ?? []).filter(c=>!c.individual_student_id)}
         students={personalStudents}

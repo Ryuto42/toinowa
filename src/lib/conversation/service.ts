@@ -25,11 +25,15 @@ export const messageCreateSchema = z.object({
   assignmentId: z.uuid().optional(),
   questionId: z.uuid().optional(),
   // クライアントが裏で計測した取り組みの様子。欠けていても処理は続ける。
+  /** 音声で入力したか。聞き取りの揺れを理由に減点させないために、AIへ伝える。 */
+  spoken: z.boolean().optional(),
   telemetry: z.object({
     elapsedSec: z.number().int().min(0).max(24 * 3600).default(0),
     typingMs: z.number().int().min(0).max(24 * 3600 * 1000).default(0),
     keystrokes: z.number().int().min(0).max(100_000).default(0),
     pasteCount: z.number().int().min(0).max(1_000).default(0),
+    voiceChunks: z.number().int().min(0).max(1_000).default(0),
+    voiceHesitation: z.number().min(0).max(3).default(0),
   }).optional(),
 });
 

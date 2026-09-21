@@ -197,6 +197,8 @@ export async function POST(request: Request, route: Context) {
           typingMs: body.telemetry?.typingMs ?? null,
           keystrokes: body.telemetry?.keystrokes ?? null,
           pasteCount: body.telemetry?.pasteCount ?? null,
+          voiceChunks: body.telemetry?.voiceChunks ?? null,
+          voiceHesitation: body.telemetry?.voiceHesitation ?? null,
         },
       }));
     }
@@ -215,7 +217,10 @@ export async function POST(request: Request, route: Context) {
       const difficulty = question?.data?.difficulty ?? 2;
       const result = await learningSupportAgent.run({
         studentMessage: body.content,
-        context: `お題: ${question?.data?.body ?? ''}\n${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
+        context: `お題: ${question?.data?.body ?? ''}\n${
+          // 音声は書き言葉にならない。言い回しの粗さを理由に減点させない。
+          body.spoken ? '※この発言は音声入力です。話し言葉であることや聞き取りの揺れを理由に減点しないでください。\n' : ''
+        }${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
         hintLevel: decision.intent === 'hint' ? 1 : 0,
         studentTurn,
         maxTurns: MAX_EXPLANATION_TURNS,

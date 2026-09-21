@@ -26,10 +26,10 @@ export default async function AdminOverviewPage() {
       <MetricCard label="要フォロー" value={escalations.count ?? 0} tone={escalations.count ? 'rose' : 'emerald'} note={escalations.count ? '先生の対応を待っています' : '未対応の案件はありません'} />
       <MetricCard label="本日のAI費用" value={`$${todaySpend.toFixed(4)}`} tone="slate" note="上限に達すると自動で止まります" />
       <MetricCard label="今週の説明" value={weekAnswers.count ?? 0} tone="slate" note="直近7日に生徒が提出した数" />
-      <MetricCard label="在籍生徒" value={students.count ?? 0} note={`公開中の説明ワーク ${assignments.count ?? 0}件`} />
+      <MetricCard label="在籍生徒" value={students.count ?? 0} note={`公開中の課題 ${assignments.count ?? 0}件`} />
     </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
-      <Panel title="学習状況" description="生徒のAIワークと評価の蓄積です。">
+      <Panel title="学習状況" description="生徒の課題と評価の蓄積です。">
         <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-500">説明数</p><p className="mt-1 text-2xl font-bold">{answers.count ?? 0}</p></div><div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-500">AI分析数</p><p className="mt-1 text-2xl font-bold">{assessments.count ?? 0}</p></div></div>
         <div className="mt-5 flex flex-wrap gap-3"><Link href="/admin/students" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white">生徒の学習状況を見る</Link><Link href="/admin/interventions" className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700">要フォローを見る</Link></div>
       </Panel>

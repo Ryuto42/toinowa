@@ -236,6 +236,7 @@ export interface Database {
           created_at: string;
           actor_id: string | null;
           cached_input_tokens: number;
+          audio_input_tokens: number;
         };
         Insert: {
           id?: string;
@@ -264,6 +265,7 @@ export interface Database {
           created_at?: string;
           actor_id?: string | null;
           cached_input_tokens?: number;
+          audio_input_tokens?: number;
         };
         Update: {
           id?: string;
@@ -292,6 +294,7 @@ export interface Database {
           created_at?: string;
           actor_id?: string | null;
           cached_input_tokens?: number;
+          audio_input_tokens?: number;
         };
         Relationships: [
           {

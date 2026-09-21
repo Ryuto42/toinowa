@@ -20,7 +20,7 @@ export async function studentFeedback(context: AuthContext, conversationId?: str
     .in('conversation_id', ids).order('created_at', { ascending: false });
   if (result.error) throw new Error(result.error.message);
   return (result.data ?? []).flatMap(row => {
-    const feedback = simplifyFeedback(row, row.concepts?.name ?? '説明ワーク', true);
+    const feedback = simplifyFeedback(row, row.concepts?.name ?? '課題', true);
     return feedback ? [feedback] : [];
   });
 }
