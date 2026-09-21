@@ -12,6 +12,7 @@ import { after } from 'next/server';
 import { adminDb } from '@/lib/database/admin';
 import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
+import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
 import { WELLBEING_TITLES, detectWellbeing } from '@/lib/security/wellbeing';
 import { recordGuardEvent } from '@/lib/security/audit';
@@ -61,21 +62,18 @@ export async function GET(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);
@@ -254,21 +252,18 @@ export async function POST(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);

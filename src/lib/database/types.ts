@@ -2133,6 +2133,42 @@ export interface Database {
           },
         ];
       };
+      nav_seen: {
+        Row: {
+          tenant_id: string;
+          user_id: string;
+          nav_key: string;
+          seen_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          user_id: string;
+          nav_key: string;
+          seen_at?: string;
+        };
+        Update: {
+          tenant_id?: string;
+          user_id?: string;
+          nav_key?: string;
+          seen_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'nav_seen_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'nav_seen_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notifications: {
         Row: {
           id: string;

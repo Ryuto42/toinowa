@@ -10,7 +10,7 @@ export function modelsForClass(kind: ModelClass, config: {
 }): string[] {
   const economy = config.AI_ECONOMY_MODEL ?? 'google/gemini-2.5-flash-lite';
   const standard = config.AI_STANDARD_MODEL ?? 'google/gemini-2.5-flash';
-  const advanced = config.AI_ADVANCED_MODEL ?? 'orcarouter/auto';
+  const advanced = config.AI_ADVANCED_MODEL ?? 'orcarouter/studypilot-advanced';
   const vision = config.AI_VISION_MODEL ?? 'google/gemini-2.5-flash';
   const chains = { economy: [economy, 'openai/gpt-4o-mini'], standard: [standard, 'openai/gpt-4o-mini'], advanced: [advanced, 'google/gemini-2.5-flash', 'openai/gpt-5-nano'], vision: [vision, 'openai/gpt-4o-mini'] };
   return [...new Set(chains[kind])];

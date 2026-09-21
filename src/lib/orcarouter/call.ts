@@ -14,6 +14,7 @@ import {
 } from './errors';
 import { fallbackModels, primaryModel, TIER } from './routers';
 import { modelsForClass } from './selection';
+import { reportSafetyBlock } from '@/lib/security/escalate';
 import { recordRun } from './record';
 import type { AttemptRecord, CallMeta, CallOptions, CallResult } from './types';
 
@@ -427,8 +428,17 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
             errorCode: errorCodeOf(err),
             safetyResult: { source: guard, ...(err instanceof SafetyBlocked ? { rule: err.rule } : {}) },
           });
-          if (err instanceof SafetyBlocked) throw err;
-          throw new SafetyBlocked(guard, errorCodeOf(err));
+          const blocked = err instanceof SafetyBlocked ? err : new SafetyBlocked(guard, errorCodeOf(err));
+          // ここを通るのはゲートウェイのガードレールと自前判定の両方。
+          // 記録と要フォローの起票を1か所に寄せ、経路ごとの取りこぼしを無くす。
+          reportSafetyBlock({
+            error: blocked,
+            tenantId: opts.trace.tenantId,
+            studentId: opts.trace.studentId,
+            conversationId: opts.trace.conversationId,
+            agentRunId: runId,
+          });
+          throw blocked;
         }
 
         // このモデルでは無理。次の段へ

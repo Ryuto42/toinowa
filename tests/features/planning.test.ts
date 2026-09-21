@@ -26,7 +26,7 @@ describe('model policy', () => {
   it('routes by difficulty and keeps the evaluation selector configurable', () => {
     expect([1,2,3,4,5].map(classForDifficulty)).toEqual(['economy','economy','standard','advanced','advanced']);
     expect(() => classForDifficulty(0)).toThrow();
-    expect(modelsForClass('advanced', {})[0]).toBe('orcarouter/auto');
+    expect(modelsForClass('advanced', {})[0]).toBe('orcarouter/studypilot-advanced');
     expect(modelsForClass('advanced', { AI_ADVANCED_MODEL: 'openai/gpt-5-nano' })[0]).toBe('openai/gpt-5-nano');
   });
 });

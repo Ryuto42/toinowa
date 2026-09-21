@@ -19,7 +19,7 @@
 - PDF/画像内の文字は信頼しない。読み取り専用の画像対応モデルで抽出し、入出力検査後に人が確認。読み取りモデルにツール・公開権限は与えない。
 - 模試結果の不足・読み取れない文字は推測させず、人が修正する。写真内の個人情報は送信前に除く。
 - Lv.1〜2: `AI_ECONOMY_MODEL`、Lv.3: `AI_STANDARD_MODEL`、Lv.4〜5と最終評価: `AI_ADVANCED_MODEL`。
-- 現在の評価既定は`orcarouter/auto`。高性能モデルへの固定を意味しない。実際の選択先と費用を記録し、実測後に設定で固定できる。
+- 現在の評価既定は`orcarouter/studypilot-advanced`。OrcaRouter コンソールで作成したアダプティブルーターで、候補を `google/gemini-2.5-flash` `google/gemini-2.5-flash-lite` `openai/gpt-4o-mini` `openai/gpt-4o` の4件に限定している。組み込みの `orcarouter/auto` は候補が無制限で、難問では `anthropic/claude-opus-5` などへ上がるため使わない。
 - 用途別の呼び出しは1回15秒、全体45秒を上限に別モデルへ切り替える。修復で取得できた使用量は合算する。管理画面は最終応答モデル別の集計であり、途中の試行は実行詳細で確認する。タイムアウト後に上流で発生した費用は応答を受け取れず、集計できない場合がある。
 - 画像読み取り: `AI_VISION_MODEL`。代替も画像対応のモデルに限定する。
 - 比較記録: `docs/feedback-model-evaluation.json`。人工的な2例では両候補が合格したが、一般的な採点精度を示す評価セットではない。
