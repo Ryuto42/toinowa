@@ -150,10 +150,10 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       {messages.length === 0 ? <div className="mx-auto max-w-md py-20 text-center"><p className="text-lg font-bold">AIへの説明を始めましょう</p><p className="mt-2 text-sm leading-6 text-slate-500">授業で学んだ概念を、何も知らないAIに教えてください。</p></div> : null}
       {messages.map((message) => {
         const isStudent = message.actor === 'student';
-        return <div key={message.id} className={isStudent ? 'flex justify-end' : 'flex justify-start'}>
+        return <div key={message.id} className={`chat-bubble-in ${isStudent ? 'flex justify-end' : 'flex justify-start'}`}>
           <div className="min-w-0 max-w-[88%] break-words">
             <p className={isStudent ? 'mb-1 text-right text-xs font-bold text-emerald-700' : 'mb-1 text-xs font-bold text-slate-500'}>{isStudent ? 'あなた' : 'AI'}</p>
-            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'space-y-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : isStudent ? message.content_redacted : message.content_redacted.split(/\r?\n(?:[ \t]*\r?\n)+/u).map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{paragraph}</p>)}</div>
+            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'space-y-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : isStudent ? message.content_redacted : message.content_redacted.split(/\r?\n(?:[ \t]*\r?\n)+/u).map((paragraph, index) => <p key={index} className="chat-line-in whitespace-pre-wrap">{paragraph}</p>)}</div>
           </div>
         </div>;
       })}

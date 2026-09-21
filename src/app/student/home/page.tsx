@@ -23,10 +23,18 @@ export default async function StudentHomePage() {
     .filter((task) => task.status === 'published')
     .filter((task) => progressByAssignment.get(task.id) !== 'completed');
   const subjectByClassroom = new Map((classrooms.data ?? []).map((classroom) => [classroom.id, classroom.subject]));
+  // 生徒がいちばん知りたいのは「あと何件か」「いつまでか」。設定値より締切を前に出す。
+  const nextDue = activeTasks.map((task) => task.due_at).filter((due): due is string => Boolean(due)).sort()[0] ?? null;
+  const dueDays = nextDue ? Math.ceil((new Date(nextDue).getTime() - new Date().getTime()) / 86_400_000) : null;
+  const dueLabel = dueDays === null ? '—' : dueDays < 0 ? '期限ぎれ' : dueDays === 0 ? '今日' : `あと${dueDays}日`;
   return <div>
     <PageTitle title="今日の学習" />
     <TutorialEntry studentId={context.userId} tenantId={context.tenantId} />
-    <div className="grid gap-4 sm:grid-cols-3"><MetricCard label="今日の目標" value={`${profile.data?.daily_time_limit_min ?? 30}分`} note="設定から変更できます"/><MetricCard label="説明するテーマ" value={activeTasks.length} tone={activeTasks.length ? 'amber' : 'emerald'}/><MetricCard label="学習継続" value={`${profile.data?.streak_days ?? 0}日`} note="小さな積み重ねを記録します"/></div>
+    <div className="grid gap-4 sm:grid-cols-3">
+      <MetricCard label="今日やること" value={activeTasks.length} tone={activeTasks.length ? 'amber' : 'emerald'} note={activeTasks.length ? 'AIに説明して終わらせよう' : 'いまは全部おわっています'} />
+      <MetricCard label="いちばん近い期限" value={dueLabel} tone={dueDays !== null && dueDays <= 1 ? 'rose' : 'slate'} note={nextDue ? formatDate(nextDue) : '期限のある課題はありません'} />
+      <MetricCard label="連続学習" value={`${profile.data?.streak_days ?? 0}日`} note="1日1回の説明でのびます" />
+    </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
       <Panel title="次に説明すること" description="期限と復習予定をまとめています">
         {activeTasks.length ? <div className="space-y-3">{activeTasks.map((task) => <Link key={task.id} href={`/student/study/${task.id}`} className="block rounded-xl border border-slate-200 p-4 hover:border-emerald-400"><div className="flex items-center justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{task.lessons?.title ?? '概念説明ワーク'}</p>{task.lessons?.classroom_id && subjectByClassroom.get(task.lessons.classroom_id) ? <StatusPill tone="blue">{subjectByClassroom.get(task.lessons.classroom_id)}</StatusPill> : null}</div><p className="mt-1 text-xs text-slate-500">期限: {formatDate(task.due_at)} · {task.question_ids.length}テーマ</p></div>{(() => {

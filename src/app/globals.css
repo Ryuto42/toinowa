@@ -152,3 +152,10 @@ body:has(.chat-workspace) [data-shell-guide] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .skeleton { animation: ui-shimmer 1.4s linear infinite; }
 }
+
+/* チャット。AIの返事は段落が届いた順に現れ、生徒の送信は静かに出す。
+   吹き出しの位置は動かさない。書いた直後に文字が動くと、読み返しづらい。 */
+@media (prefers-reduced-motion: no-preference) {
+  .chat-bubble-in { animation: ui-fade 220ms ease-out both; }
+  .chat-line-in { animation: ui-fade 380ms ease-out both; }
+}

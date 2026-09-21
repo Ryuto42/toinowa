@@ -7,8 +7,9 @@ import { MetricCard, PageTitle, Panel, StatusPill } from '@/components/dashboard
 export default async function AdminOverviewPage() {
   const context = await requireRole('admin');
   const db = await createClient();
-  const [users, students, assignments, answers, assessments, escalations, runs] = await Promise.all([
-    db.from('users').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
+  const weekAgo = new Date(new Date().getTime() - 7 * 86_400_000).toISOString();
+  const [weekAnswers, students, assignments, answers, assessments, escalations, runs, spend] = await Promise.all([
+    db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).gte('created_at', weekAgo),
     db.from('users').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('role', 'student').eq('status', 'active'),
     db.from('assignments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('status', 'published'),
     db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
@@ -16,14 +17,16 @@ export default async function AdminOverviewPage() {
     db.from('escalations').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']),
     // agent_runs は authenticated 向けポリシーを持たない内部表。RLSクライアントでは常に0件になる。
     adminDb().from('agent_runs').select('id,status,agent_name,created_at').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(5),
+    adminDb().rpc('today_ai_spend', { p_tenant: context.tenantId }),
   ]);
+  const todaySpend = Number(spend.data ?? 0);
   return <div>
-    <PageTitle title="ダッシュボード" description="説明ワーク、AI分析、要フォロー、AI利用状況を一つの画面で確認します。" />
+    <PageTitle title="ダッシュボード" description="対応が必要なこと、AIの費用、学習の動きをまとめて確認します。" />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="有効ユーザー" value={users.count ?? 0} />
-      <MetricCard label="在籍生徒" value={students.count ?? 0} />
-      <MetricCard label="公開中の説明ワーク" value={assignments.count ?? 0} />
-      <MetricCard label="要フォロー" value={escalations.count ?? 0} tone={escalations.count ? 'rose' : 'slate'} />
+      <MetricCard label="要フォロー" value={escalations.count ?? 0} tone={escalations.count ? 'rose' : 'emerald'} note={escalations.count ? '先生の対応を待っています' : '未対応の案件はありません'} />
+      <MetricCard label="本日のAI費用" value={`$${todaySpend.toFixed(4)}`} tone="slate" note="上限に達すると自動で止まります" />
+      <MetricCard label="今週の説明" value={weekAnswers.count ?? 0} tone="slate" note="直近7日に生徒が提出した数" />
+      <MetricCard label="在籍生徒" value={students.count ?? 0} note={`公開中の説明ワーク ${assignments.count ?? 0}件`} />
     </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
       <Panel title="学習状況" description="生徒のAIワークと評価の蓄積です。">

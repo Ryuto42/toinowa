@@ -13,6 +13,8 @@ import { adminDb } from '@/lib/database/admin';
 import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
+import { WELLBEING_TITLES, detectWellbeing } from '@/lib/security/wellbeing';
+import { recordGuardEvent } from '@/lib/security/audit';
 import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
 
@@ -124,6 +126,34 @@ export async function POST(request: Request, route: Context) {
       channelMessageId: body.channelMessageId,
     });
     const traceId = traceIdFrom(request);
+    // つらい相談は遮断しない。返信はそのまま続けたうえで、先生の要フォローに上げる。
+    if (context.role === 'student') {
+      const signal = detectWellbeing(body.content);
+      if (signal) {
+        const { tenantId, userId } = context;
+        after(async () => {
+          recordGuardEvent({
+            tenantId,
+            studentId: userId,
+            conversationId,
+            source: 'app_rule',
+            category: signal.category,
+            rule: 'wellbeing_keyword',
+            matchedExcerpt: signal.matched.join(' / '),
+          });
+          await raiseEscalation({
+            tenantId,
+            studentId: userId,
+            classroomId: await classroomOfStudent(tenantId, userId),
+            kind: 'distress',
+            priority: 'urgent',
+            title: WELLBEING_TITLES[signal.category],
+            payload: { category: signal.category, matched: signal.matched },
+            dedupeHours: 6,
+          });
+        });
+      }
+    }
     if (conversation.purpose === 'tutorial') {
       const finishRequested = body.content === TUTORIAL_STOP_MESSAGE;
       let message = TUTORIAL_FINISH;
