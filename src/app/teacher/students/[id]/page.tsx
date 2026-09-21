@@ -10,6 +10,7 @@ import {
   jsonItems, jsonRecord,
 } from '@/components/teacher/analysis';
 import { HandoffForm } from '@/components/teacher/handoff-form';
+import { listColleagues } from '@/lib/handoffs/colleagues';
 import { HandoffList } from '@/components/teacher/handoff-list';
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -31,7 +32,8 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     db.from('review_schedules').select('*,concepts(name)').eq('student_id', id).is('fulfilled_at', null).order('due_at').limit(6),
     db.from('escalations').select('id,kind,title,priority,created_at').eq('student_id', id).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }),
     db.from('assignment_progress').select('assignment_id,status,active_seconds,completed_at').eq('student_id', id),
-    db.from('users').select('id,display_name').eq('tenant_id', context.tenantId).in('role', ['teacher', 'admin']).eq('status', 'active').order('display_name'),
+    // 先生は他の先生をRLSで読めない。引き継ぎ先の一覧だけサーバー側で取る。
+    listColleagues(context.tenantId),
     db.from('handoffs').select('*').eq('tenant_id', context.tenantId).eq('student_id', id).order('created_at', { ascending: false }).limit(10),
   ]);
   if (!user.data) notFound();
@@ -69,11 +71,9 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     <PageTitle
       title={user.data.display_name}
       description={`学年 ${profile.data?.grade ?? '未設定'}。概念ごとの理解度と、次に取り組むことをまとめています。`}
+      // 主役は生徒の記録。引き継ぎは見出しの右に置き、独立した行を作らない。
+      action={<HandoffForm studentId={id} teachers={colleagues.filter((row) => row.id !== context.userId)} />}
     />
-
-    <div className="mb-6">
-      <HandoffForm studentId={id} teachers={colleagues.data?.filter((row) => row.id !== context.userId) ?? []} />
-    </div>
 
     {pending.length ? <div role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-bold">先生の確認が必要な分析が{pending.length}件あります</p>
@@ -171,7 +171,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
         <HandoffList
           initial={handoffs.data}
           mode={handoffs.data.some((row) => row.to_user === context.userId && row.status === 'pending') ? 'inbox' : 'admin'}
-          names={Object.fromEntries((colleagues.data ?? []).map((row) => [row.id, row.display_name]).concat([[id, user.data.display_name]]))}
+          names={Object.fromEntries(colleagues.map((row) => [row.id, row.display_name]).concat([[id, user.data.display_name]]))}
           linkStudents={false}
         />
       </Panel>

@@ -37,6 +37,8 @@ const csp = [
 const nextConfig: NextConfig = {
   // サーバの実装を名乗らない。
   poweredByHeader: false,
+  // 開発時の丸いバッジを出さない。ガイド用の画面写真に写り込むため。
+  devIndicators: false,
   async headers() {
     return [{
       source: '/:path*',
