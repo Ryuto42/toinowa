@@ -39,6 +39,7 @@ export function usageFeature(requestType: string): { feature: string; location: 
     teacher_insight: ['クラスの分析', '先生：クラスの状況'],
     summarize_conversation: ['対話履歴の要約', '長い対話の自動処理'],
     ai_text_judge: ['回答の整合性チェック', '生徒の説明の分析'],
+    student_care: ['生徒の相談・言葉遣いの確認', '生徒：学習前の文脈判定'],
     safety_classify: ['安全性チェック', '入力の安全性判定'],
     voice_transcribe: ['声での説明の書き起こし', '生徒：課題（音声入力）'],
   };

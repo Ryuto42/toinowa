@@ -27,7 +27,7 @@ export default async function InterventionsPage() {
     </div>
     <Panel>{rows.length ? <InterventionList initial={rows} /> : <EmptyState>いま要フォローの生徒はいません</EmptyState>}</Panel>
     <div className="mt-6">
-      <Panel title="遮断した入力" description="AIに渡す前に止めた入力です。対応は不要ですが、何が起きているかを確認できます。">
+      <Panel title="安全性・相談の記録" description="相談への対応と言葉遣いへの注意、危険な指示の遮断を区別して表示します。対応が必要な相談は要フォローも確認してください。">
         <GuardEventFeed rows={guardEvents} />
       </Panel>
     </div>

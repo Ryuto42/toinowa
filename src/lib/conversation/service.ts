@@ -225,6 +225,8 @@ export async function appendMessage(input: {
   content: string;
   channel?: Channel;
   channelMessageId?: string;
+  /** サーバーが判定した相談等。クライアントからは受け取らない。 */
+  careLabel?: string;
 }) {
   const conversation = await getConversation(input.context, input.conversationId);
   if (input.actor === 'student' && conversation.student_id !== input.context.userId) {
@@ -244,6 +246,7 @@ export async function appendMessage(input: {
     masked = checked.masked.text;
     safetyFlags = { pii: checked.inspection.categories };
   }
+  if (input.careLabel) safetyFlags.student_care = [input.careLabel];
   const seq = conversation.message_count + 1;
   const { data, error } = await adminDb().from('messages').insert({
     tenant_id: input.context.tenantId,

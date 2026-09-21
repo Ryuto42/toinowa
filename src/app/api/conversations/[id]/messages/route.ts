@@ -14,7 +14,9 @@ import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
 import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
-import { WELLBEING_TITLES, detectWellbeing } from '@/lib/security/wellbeing';
+import { activeCare, asksToResume, carePriority, careReply, careTag, CARE_TITLES, isLearningMessage, type CareDecision } from '@/lib/security/student-care';
+import { classifyStudentCare } from '@/lib/security/student-care-agent';
+import { preCheck } from '@/lib/security/guard';
 import { recordGuardEvent } from '@/lib/security/audit';
 import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
@@ -115,42 +117,53 @@ export async function POST(request: Request, route: Context) {
     if (conversation.state === 'completed') {
       return json({ message: 'この対話はここで完了しました。' }, { status: 409 });
     }
-    const studentMessage = await appendMessage({
-      context,
-      conversationId,
-      actor: context.role === 'student' ? 'student' : 'teacher',
-      content: body.content,
-      channel: body.channel,
-      channelMessageId: body.channelMessageId,
-    });
     const traceId = traceIdFrom(request);
-    // つらい相談は遮断しない。返信はそのまま続けたうえで、先生の要フォローに上げる。
-    if (context.role === 'student') {
-      const signal = detectWellbeing(body.content);
-      if (signal) {
-        const { tenantId, userId } = context;
-        after(async () => {
-          recordGuardEvent({
-            tenantId,
-            studentId: userId,
-            conversationId,
-            source: 'app_rule',
-            category: signal.category,
-            rule: 'wellbeing_keyword',
-            matchedExcerpt: signal.matched.join(' / '),
-          });
-          await raiseEscalation({
-            tenantId,
-            studentId: userId,
-            classroomId: await classroomOfStudent(tenantId, userId),
-            kind: 'distress',
-            priority: 'urgent',
-            title: WELLBEING_TITLES[signal.category],
-            payload: { category: signal.category, matched: signal.matched },
+    const previousMessages = await listMessages(context, conversationId);
+    const paused = context.role === 'student' ? activeCare(previousMessages) : null;
+    // 学力の回答として保存する前に、相談・暴言への対応を決める。
+    const care = context.role === 'student' && !(conversation.purpose === 'tutorial' && !paused && body.content === TUTORIAL_STOP_MESSAGE)
+      ? await classifyStudentCare(preCheck(body.content).masked.text, previousMessages, {
+        traceId, tenantId: context.tenantId, studentId: context.userId, userId: context.userId, conversationId,
+      }) : null;
+    const resume = Boolean(paused && asksToResume(body.content) && care?.category === 'normal');
+    const category: CareDecision['category'] = paused && !resume && (!care || care.category === 'normal' || care.category === 'hostility' || care.category === 'unavailable')
+      ? paused : care?.category ?? 'normal';
+    const careLabel = resume ? 'resume' : category !== 'normal' ? category : undefined;
+    const studentMessage = await appendMessage({
+      context, conversationId, actor: context.role === 'student' ? 'student' : 'teacher',
+      content: body.content, channel: body.channel, channelMessageId: body.channelMessageId,
+      careLabel,
+    });
+    if (careLabel) {
+      let recorded = false;
+      if (category !== 'normal' && category !== 'unavailable') {
+        const repeatHostility = previousMessages.some(row => row.actor === 'student' && careTag(row) === 'hostility');
+        if (category !== 'hostility' || repeatHostility) {
+          const escalationId = await raiseEscalation({
+            tenantId: context.tenantId, studentId: conversation.student_id,
+            classroomId: await classroomOfStudent(context.tenantId, conversation.student_id).catch(() => null),
+            kind: category === 'hostility' ? 'safety' : 'distress', priority: carePriority(category),
+            title: CARE_TITLES[category],
+            payload: { category, conversationId, messageId: studentMessage.id,
+              excerpt: studentMessage.content_redacted.slice(0, 240),
+              reasons: [care?.reason ?? '相談の途中のため、学習を休止しています。'], source: care?.source ?? 'rule' },
             dedupeHours: 6,
           });
+          recorded = Boolean(escalationId);
+        }
+        await recordGuardEvent({
+          tenantId: context.tenantId, studentId: conversation.student_id, conversationId,
+          source: care?.source === 'model' ? 'app_classifier' : 'app_rule', category,
+          rule: category === 'hostility' ? 'conversation_boundary' : 'wellbeing_support',
+          matchedExcerpt: studentMessage.content_redacted.slice(0, 240),
         });
       }
+      const message = resume
+        ? 'わかりました。無理のない範囲で、元のお題について説明してみてください。つらくなったら、いつでも休んで大丈夫です。'
+        : careReply(category, recorded, Boolean(paused));
+      await appendMessage({ context, conversationId, actor: 'agent', content: message, channel: body.channel, careLabel });
+      const payload = { message, traceId, runId: care?.runId, conversationCompleted: false };
+      return body.stream ? eventStream(payload) : json(payload);
     }
     if (conversation.purpose === 'tutorial') {
       const finishRequested = body.content === TUTORIAL_STOP_MESSAGE;
@@ -159,8 +172,9 @@ export async function POST(request: Request, route: Context) {
       let runId: string | undefined;
       if (!finishRequested) {
         const [history, audience] = await Promise.all([listMessages(context, conversationId), studentTutorialAudience(context.tenantId, conversation.student_id)]);
-        const studentTurn = Math.max(1, history.filter(item => item.actor === 'student').length);
-        const result = await tutorialAgent.run({ context: buildConversationContext('', history, 5000), audience, studentTurn }, {
+        const learningHistory = history.filter(isLearningMessage);
+        const studentTurn = Math.max(1, learningHistory.filter(item => item.actor === 'student').length);
+        const result = await tutorialAgent.run({ context: buildConversationContext('', learningHistory, 5000), audience, studentTurn }, {
           traceId, tenantId: context.tenantId, studentId: conversation.student_id,
           conversationId, userId: context.userId, modelClass: 'economy', routingReason: 'onboarding_tutorial',
         });
@@ -203,7 +217,7 @@ export async function POST(request: Request, route: Context) {
       }));
     }
 
-    const fullMessages = await listMessages(context, conversationId, 0);
+    const fullMessages = (await listMessages(context, conversationId, 0)).filter(isLearningMessage);
     const studentTurn = fullMessages.filter((item) => item.actor === 'student').length;
     const atMaxTurns = studentTurn >= MAX_EXPLANATION_TURNS;
     const requiredFocus = focusForTurn(studentTurn);

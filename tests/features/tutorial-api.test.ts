@@ -13,6 +13,7 @@ vi.mock('@/lib/conversation/service',async original=>({...(await original<object
 vi.mock('@/lib/tutorial/agent',()=>({tutorialAgent:{run:mocks.tutorial}}));
 vi.mock('@/lib/agents/catalog',()=>({learningSupportAgent:{run:mocks.learning}}));
 vi.mock('@/lib/integrity/record',()=>({recordAnswerIntegrity:mocks.integrity}));
+vi.mock('@/lib/security/student-care-agent',()=>({classifyStudentCare:vi.fn(async()=>({category:'normal',evidence:'',reason:'',source:'model'}))}));
 import { POST as start } from '@/app/api/student-tutorial/route';
 import { POST as reply } from '@/app/api/conversations/[id]/messages/route';
 const id='1f0b4c4c-a20e-4783-92bf-cea9f0c732d8';

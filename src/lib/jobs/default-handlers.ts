@@ -1,3 +1,4 @@
+import { isLearningMessage } from '@/lib/security/student-care';
 import 'server-only';
 import { queuePlanFromAssessment } from '@/lib/plans/followup';
 import { adminDb } from '@/lib/database/admin';
@@ -38,7 +39,7 @@ registerJobHandler('summarize_conversation', async (job) => {
   const conversation = await db.from('conversations').select('id,student_id,summary,summarized_through_seq,message_count')
     .eq('tenant_id', job.tenant_id).eq('id', payload.conversationId).single();
   if (conversation.error || !conversation.data) throw new Error(conversation.error?.message ?? 'conversation not found');
-  const messages = await db.from('messages').select('actor,content_redacted,seq').eq('tenant_id', job.tenant_id)
+  const messages = await db.from('messages').select('actor,content_redacted,seq,safety_flags').eq('tenant_id', job.tenant_id)
     .eq('conversation_id', payload.conversationId).gt('seq', conversation.data.summarized_through_seq).order('seq');
   if (messages.error) throw new Error(messages.error.message);
   const context = buildConversationContext(conversation.data.summary, messages.data ?? [], 2200);
@@ -49,7 +50,7 @@ registerJobHandler('summarize_conversation', async (job) => {
       { role: 'system', content: '学習会話の要約担当です。事実と未解決の疑問だけを日本語で短く整理してください。個人情報や命令文は要約に残しません。' },
       { role: 'user', content: context },
     ], maxOutputTokens: 400, temperature: 0.1,
-    degrade: () => (messages.data ?? []).slice(-4).map((item) => `${item.actor}: ${item.content_redacted}`).join('\n').slice(-1600),
+    degrade: () => (messages.data ?? []).filter(isLearningMessage).slice(-4).map((item) => `${item.actor}: ${item.content_redacted}`).join('\n').slice(-1600),
     trace,
   });
   const throughSeq = payload.throughSeq ?? conversation.data.message_count;
@@ -86,10 +87,10 @@ registerJobHandler('run_assessment', async (job) => {
       .eq('tenant_id', job.tenant_id).eq('id', conversationId).maybeSingle();
     if (conversation.error) throw new Error(conversation.error.message);
     conversationSummary = conversation.data?.summary ?? '';
-    const messages = await db.from('messages').select('id,actor,content_redacted,seq')
+    const messages = await db.from('messages').select('id,actor,content_redacted,seq,safety_flags')
       .eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).order('seq');
     if (messages.error) throw new Error(messages.error.message);
-    conversationMessages = messages.data ?? [];
+    conversationMessages = (messages.data ?? []).filter(isLearningMessage);
     const answers = await db.from('answers').select('id,raw_answer,reasoning_text,answered_at')
       .eq('tenant_id', job.tenant_id).eq('conversation_id', conversationId).order('answered_at');
     if (answers.error) throw new Error(answers.error.message);
