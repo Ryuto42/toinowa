@@ -5,6 +5,12 @@
   --foreground: #17233d;
 }
 
+/* 画面全体をわずかに縮める。Tailwind の余白・文字はすべて rem なので、
+   ここを変えるだけで比率を保ったまま一段小さくなる。 */
+html {
+  font-size: 15px;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -158,4 +164,22 @@ body:has(.chat-workspace) [data-shell-guide] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .chat-bubble-in { animation: ui-fade 220ms ease-out both; }
   .chat-line-in { animation: ui-fade 380ms ease-out both; }
+}
+
+/* ── トップページの登場 ───────────────────────────────────────
+   読み込み直後に下から浮かび上がる。順番に出して視線を追わせる。
+   動きを減らす設定の人には出さない（最初から表示された状態にする）。 */
+.lp-in { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-in {
+    opacity: 0;
+    animation: lp-rise 720ms cubic-bezier(0.22, 0.8, 0.3, 1) both;
+    animation-delay: var(--lp-delay, 0ms);
+  }
+}
+
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
 }
