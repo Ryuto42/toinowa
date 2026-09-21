@@ -45,7 +45,7 @@ async function write(rec: RunRecord): Promise<void> {
     latency_ms: meta.latencyMs,
     fallback_count: meta.fallbackCount,
     schema_valid: meta.schemaValid,
-    safety_result: (rec.safetyResult ?? {}) as never,
+    safety_result: ({ ...rec.safetyResult, unpricedAttempts: meta.unpricedAttempts ?? 0 }) as never,
     tool_calls: (rec.toolCalls ?? []) as never,
     status: rec.status,
     error_code: rec.errorCode ?? null,

@@ -1,3 +1,4 @@
+import { serverEnv } from '@/lib/shared/env.server';
 import { requireRole } from '@/lib/auth/guard';
 import { adminDb } from '@/lib/database/admin';
 import { json, routeError, ApiInputError } from '@/lib/api/http';
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     const rows: UsageRun[] = [];
     let truncated = false;
     for (let offset = 0; offset < 10000; offset += 1000) {
-      const result = await db.from('agent_runs').select('actor_id,student_id,status,resolved_model,input_tokens,output_tokens,estimated_cost_usd,fallback_count,created_at')
+      const result = await db.from('agent_runs').select('actor_id,student_id,status,resolved_model,input_tokens,output_tokens,estimated_cost_usd,fallback_count,created_at,safety_result')
         .eq('tenant_id', context.tenantId).gte('created_at', since).lte('created_at', until).order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
       if (result.error) throw new Error(result.error.message);
       rows.push(...(result.data ?? []));
@@ -28,6 +29,16 @@ export async function GET(request: Request) {
       for (const user of users.data ?? []) names[user.id] = user.display_name;
     }
     const grouped = summarizeUsage(rows, names);
-    return json({ grouped, summary: { requests: rows.length, costUsd: grouped.reduce((n,r) => n+r.costUsd,0), tokens: grouped.reduce((n,r) => n+r.tokens,0) }, truncated, updatedAt: until });
+    const [tenant, today] = await Promise.all([
+      db.from('tenants').select('ai_budget_limit_usd').eq('id', context.tenantId).single(),
+      db.rpc('today_ai_spend', { p_tenant: context.tenantId }),
+    ]);
+    if (tenant.error || today.error) throw new Error('予算を取得できませんでした');
+    const budget = { limitUsd: Math.min(Number(tenant.data.ai_budget_limit_usd), serverEnv.AI_DAILY_BUDGET_USD), spentUsd: Number(today.data) };
+    const unpricedRuns = rows.filter(row => {
+      const observation = row.safety_result as { unpricedAttempts?: number } | null;
+      return (observation?.unpricedAttempts ?? 0) > 0 || ((row.input_tokens ?? 0) + (row.output_tokens ?? 0) > 0 && observation?.unpricedAttempts === undefined && !Number(row.estimated_cost_usd));
+    }).length;
+    return json({ budget, unpricedRuns, grouped, summary: { requests: rows.length, costUsd: grouped.reduce((n,r) => n+r.costUsd,0), tokens: grouped.reduce((n,r) => n+r.tokens,0) }, truncated, updatedAt: until });
   } catch (error) { return routeError(error); }
 }

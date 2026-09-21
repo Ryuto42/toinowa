@@ -131,7 +131,7 @@ export function isGuardError(err: unknown): 'orca_guardrail' | 'orca_firewall' |
  * 無駄な課金と遅延を増やさないため。
  */
 export function isRetryable(err: unknown): boolean {
-  if (isGuardError(err)) return false; // 遮断は再試行しない
+  if (err instanceof SafetyBlocked || err instanceof BudgetExceeded || isGuardError(err)) return false; // 遮断は再試行しない
   if (isQuotaError(err)) return true; // 別モデルなら通る可能性がある
   const status = statusOf(err);
   if (status === null) return true; // ネットワーク・タイムアウト

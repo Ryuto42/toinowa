@@ -1,4 +1,6 @@
 import 'server-only';
+import { z } from 'zod';
+import { SafetyBlocked, isRetryable } from '@/lib/orcarouter/errors';
 import { adminDb } from '@/lib/database/admin';
 import type { Json } from '@/lib/database/types';
 import type { JobRow, JobStepResult } from './types';
@@ -49,16 +51,17 @@ async function completeStep(job: JobRow, result: JobStepResult): Promise<void> {
   if (error) throw new Error(`complete job failed: ${error.message}`);
 }
 
-async function retryOrDeadLetter(job: JobRow, error: unknown): Promise<void> {
+async function retryOrDeadLetter(job: JobRow, error: unknown): Promise<'retried' | 'deadLettered' | 'leaseLost'> {
   const message = error instanceof Error ? error.message : String(error);
   const db = adminDb();
-  if (job.attempt + 1 >= job.max_attempts) {
-    const { error: deadError } = await db.rpc('fail_job_permanently', {
+  if (job.attempt + 1 >= job.max_attempts || error instanceof SafetyBlocked || error instanceof z.ZodError || !isRetryable(error)) {
+    const { data: removed, error: deadError } = await db.rpc('fail_leased_job', {
       p_job_id: job.id,
+      p_lease_token: job.lease_token ?? '',
       p_error: message.slice(0, 2000),
     });
     if (deadError) throw new Error(`dead-letter failed: ${deadError.message}`);
-    return;
+    return removed ? 'deadLettered' : 'leaseLost';
   }
 
   const { error: retryError } = await db
@@ -74,6 +77,7 @@ async function retryOrDeadLetter(job: JobRow, error: unknown): Promise<void> {
     .eq('id', job.id)
     .eq('lease_token', job.lease_token ?? '');
   if (retryError) throw new Error(`retry job failed: ${retryError.message}`);
+  return 'retried';
 }
 
 export interface WorkerTickResult {
@@ -81,6 +85,7 @@ export interface WorkerTickResult {
   succeeded: number;
   retried: number;
   deadLettered: number;
+  leaseLost: number;
 }
 
 /** 1 tickは1ジョブ1ステップだけを実行し、Vercelのタイムアウトを避ける。 */
@@ -89,22 +94,29 @@ export async function runWorkerTick(options: {
   maxDurationMs?: number;
 } = {}): Promise<WorkerTickResult> {
   const started = Date.now();
-  const jobs = await claimJobs(Math.min(20, Math.max(1, options.limit ?? 1)));
+  const limit = Math.min(20, Math.max(1, options.limit ?? 1));
   const result: WorkerTickResult = {
-    claimed: jobs.length,
+    claimed: 0,
     succeeded: 0,
     retried: 0,
     deadLettered: 0,
+    leaseLost: 0,
   };
   const maxDuration = options.maxDurationMs ?? MAX_TICK_MS;
 
-  for (const job of jobs) {
+  for (let index = 0; index < limit; index++) {
     if (Date.now() - started >= maxDuration) break;
+    // 実行直前に1件だけ取得。未着手ジョブをリースしたまま時間切れにしない。
+    const [job] = await claimJobs(1);
+    if (!job) break;
+    result.claimed += 1;
+    if (job.attempt >= job.max_attempts) {
+      result[await retryOrDeadLetter(job, new Error('retry limit reached'))] += 1;
+      continue;
+    }
     const handler = jobHandler(job.kind);
     if (!handler) {
-      await retryOrDeadLetter(job, new Error(`no handler registered for ${job.kind}`));
-      if (job.attempt + 1 >= job.max_attempts) result.deadLettered += 1;
-      else result.retried += 1;
+      result[await retryOrDeadLetter(job, { status: 400, message: 'unknown job kind' })] += 1;
       continue;
     }
 
@@ -113,9 +125,7 @@ export async function runWorkerTick(options: {
       await completeStep(job, next);
       result.succeeded += next.nextStep === null ? 1 : 0;
     } catch (error) {
-      await retryOrDeadLetter(job, error);
-      if (job.attempt + 1 >= job.max_attempts) result.deadLettered += 1;
-      else result.retried += 1;
+      result[await retryOrDeadLetter(job, error)] += 1;
     }
   }
   return result;

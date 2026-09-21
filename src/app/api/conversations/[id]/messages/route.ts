@@ -45,15 +45,6 @@ function fallbackQuestion(focus: typeof FOCUS_BY_TURN[number]): string {
   }
 }
 
-function questionMatchesFocus(message: string, focus: typeof FOCUS_BY_TURN[number]): boolean {
-  const text = normalizedQuestion(message);
-  if (focus === 'relationship') return /(関係|つなが|一緒|決ま|形)/u.test(text);
-  if (focus === 'example') return /(例|たとえ|身近|具体)/u.test(text);
-  if (focus === 'boundary') return /(場合|条件|例外|当てはま|変わ)/u.test(text);
-  if (focus === 'summary') return /(まとめ|ひとこと|一言|要約)/u.test(text);
-  return false;
-}
-
 export async function GET(request: Request, route: Context) {
   try {
     const context = await requireAuth();
@@ -182,13 +173,14 @@ export async function POST(request: Request, route: Context) {
       });
       message = result.data.message;
       runId = result.meta.runId;
-      conversationCompleted = conversationCompleted || result.data.shouldFinish || requiredFocus === 'finish';
-      if (!result.data.shouldFinish && (
+      // AIは説明に応じて問いを選べる。短い初回発言だけで理解済みとはしない。
+      conversationCompleted = conversationCompleted || (result.data.shouldFinish && studentTurn >= 2);
+      if (conversationCompleted) message = '教えてくれてありがとう！自分の言葉で伝えようと頑張ったね。これで対話はおしまいだよ。';
+      if (!conversationCompleted && (
         hasRepeatedQuestion(message, fullMessages)
         || !/[?？]/u.test(message)
-        || !questionMatchesFocus(message, requiredFocus)
       )) {
-        message = fallbackQuestion(requiredFocus);
+        message = fallbackQuestion(requiredFocus === 'finish' ? 'summary' : requiredFocus);
       }
     }
     if (atMaxTurns) {

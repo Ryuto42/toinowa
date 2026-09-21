@@ -32,6 +32,7 @@ export function checkModelOutput(
   text: string,
   options: OutputCheckOptions = {},
 ): OutputCheckResult {
+  text = text.replace(/[\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069]/g, '').normalize('NFKC');
   const flags: string[] = [];
   const matched: string[] = [];
   for (const item of secretPatterns) {
@@ -42,7 +43,7 @@ export function checkModelOutput(
     }
   }
 
-  const fragments = options.systemFragments ?? [];
+  const fragments = (options.systemFragments ?? []).flatMap(fragment => [fragment, ...fragment.split(/[。\n]/u).filter(part => part.length >= 60)]).map(fragment => fragment.normalize('NFKC'));
   for (const fragment of fragments) {
     if (fragment.length >= 12 && text.includes(fragment)) {
       flags.push('system_prompt_leak');

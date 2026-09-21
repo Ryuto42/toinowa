@@ -9,7 +9,7 @@ const db = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 await db.connect();
 try {
   await db.query('begin');
-  for (const file of ['0017_feedback_privacy.sql','0018_student_planning.sql','0019_explanation_work.sql','0020_approval_decision.sql','0021_learning_service_grants.sql']) {
+  for (const file of ['0017_feedback_privacy.sql','0018_student_planning.sql','0019_explanation_work.sql','0020_approval_decision.sql','0021_learning_service_grants.sql','0024_lease_safe_failure.sql']) {
     const applied = await db.query('select 1 from private.schema_migrations where name=$1', [file]);
     if (!applied.rowCount) await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
   }
@@ -42,7 +42,15 @@ try {
   await db.query('reset role');
   const concept = (await db.query('select q.concept_id from public.questions q join public.assignments a on q.id=any(a.question_ids) where a.id=$1',[assignment])).rows[0].concept_id;
   assert(concept);
-  console.log('PASS: DDL / お題の原子的作成 / 冪等性 / 承認・配信 / 計画・詳細評価の非公開');
+  const job = (await db.query("insert into public.jobs(tenant_id,kind,idempotency_key,status,lease_token) values($1,'test_lease',gen_random_uuid()::text,'leased',gen_random_uuid()) returning id,lease_token", [tenant])).rows[0];
+  assert.equal((await db.query('select public.fail_leased_job($1,gen_random_uuid(),$2) as removed', [job.id,'stale worker'])).rows[0].removed, false, '古いリースはジョブを退避できない');
+  assert.equal((await db.query('select id from public.jobs where id=$1', [job.id])).rowCount, 1);
+  assert.equal((await db.query('select public.fail_leased_job($1,$2,$3) as removed', [job.id,job.lease_token,'blocked input'])).rows[0].removed, true, '現在のリースだけが退避できる');
+  assert.equal((await db.query('select id from public.jobs where id=$1', [job.id])).rowCount, 0);
+  assert.equal((await db.query('select last_error from public.jobs_dead where id=$1', [job.id])).rows[0].last_error, 'blocked input');
+  assert.equal((await db.query("select has_function_privilege('authenticated','public.fail_leased_job(uuid,uuid,text)','execute') as allowed")).rows[0].allowed, false);
+  assert.equal((await db.query("select has_function_privilege('service_role','public.fail_job_permanently(uuid,text)','execute') as allowed")).rows[0].allowed, false);
+  console.log('PASS: リース所有権・失敗退避・旧RPC無効化 / DDL / お題の原子的作成 / 冪等性 / 承認・配信 / 計画・詳細評価の非公開');
 } finally { await db.query('rollback'); await db.end(); }
 
 }

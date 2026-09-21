@@ -36,12 +36,13 @@ async function disabledModels(tenantId: string): Promise<Set<string>> {
   ) {
     return disabledCache.models;
   }
-  const { data } = await adminDb()
+  const { data, error } = await adminDb()
     .from('model_disables')
     .select('model')
     .eq('tenant_id', tenantId)
     .is('released_at', null);
 
+  if (error) throw new Error('AIモデルの停止設定を確認できませんでした');
   const models = new Set((data ?? []).map((r) => r.model));
   disabledCache = { at: now, tenantId, models };
   return models;
@@ -51,22 +52,20 @@ async function disabledModels(tenantId: string): Promise<Set<string>> {
  * 予算チェック。**呼び出しの前に**行う。
  * 超過を発見したリクエストで課金しないための順序。
  */
-async function assertBudget(tenantId: string): Promise<void> {
-  const tenant = await adminDb()
-    .from('tenants')
-    .select('ai_budget_limit_usd')
-    .eq('id', tenantId);
-  const tenantLimitValue = tenant.data?.[0]?.ai_budget_limit_usd;
-  const tenantLimit = tenantLimitValue === undefined
-    ? Number.POSITIVE_INFINITY
-    : Number(tenantLimitValue);
+async function assertBudget(tenantId: string, accruedCost = 0): Promise<void> {
+  const tenant = await adminDb().from('tenants').select('ai_budget_limit_usd').eq('id', tenantId);
+  const rawLimit = tenant.data?.[0]?.ai_budget_limit_usd;
+  const tenantLimit = Number(rawLimit);
+  if (tenant.error || rawLimit == null || !Number.isFinite(tenantLimit) || tenantLimit < 0) {
+    throw new Error('AI予算の設定を確認できませんでした');
+  }
   const limit = Math.min(serverEnv.AI_DAILY_BUDGET_USD, tenantLimit);
   const { data, error } = await adminDb().rpc('today_ai_spend', { p_tenant: tenantId });
-  if (error) {
-    throw new Error(`AI予算の確認に失敗しました: ${error.message}`);
+  const spent = Number(data);
+  if (error || data == null || !Number.isFinite(spent) || spent < 0) {
+    throw new Error('AI利用額を確認できませんでした');
   }
-  const spent = Number(data ?? 0);
-  if (spent >= limit) throw new BudgetExceeded(tenantId, spent, limit);
+  if (spent + accruedCost >= limit) throw new BudgetExceeded(tenantId, spent + accruedCost, limit);
 }
 
 /** 構造化出力の修復プロンプト。1回だけ使う。 */
@@ -138,6 +137,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
   let fallbackCount = 0;
   let schemaValid = true;
   let rateLimited = false;
+  let unpricedAttempts = 0;
 
   const finish = (
     data: Out,
@@ -157,6 +157,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
       degraded: false,
       rateLimited,
       attempts,
+      unpricedAttempts,
       modelTier: TIER,
       ...over,
     };
@@ -164,9 +165,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
       over.status ??
       (meta.degraded
         ? 'degraded'
-        : meta.rateLimited
-          ? 'rate_limited'
-          : !meta.schemaValid
+        : !meta.schemaValid
             ? 'schema_repaired'
             : meta.fallbackCount > 0
               ? 'failed_over'
@@ -201,6 +200,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         degraded: false,
         rateLimited,
         attempts,
+        unpricedAttempts,
         modelTier: TIER,
       },
       agentName: opts.agentName,
@@ -226,7 +226,11 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
   }
 
   // ── 梯子の組み立て。無効化されたモデルは実際に外す ──
-  const disabled = await disabledModels(opts.trace.tenantId);
+  let disabled: Set<string>;
+  try { disabled = await disabledModels(opts.trace.tenantId); } catch (error) {
+    recordTerminal('error', 'model_policy_unavailable');
+    throw error;
+  }
   const selected = opts.modelClass ? modelsForClass(opts.modelClass, serverEnv) : null;
   const primary = selected?.[0] ?? primaryModel(opts.router);
   const chain = (selected ?? fallbackModels(opts.router)).filter((m) => !disabled.has(m));
@@ -262,6 +266,13 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
     // 構造化出力の修復は「そのモデルの中で」1回だけ
     for (let repair = 0; repair <= (opts.schema ? 1 : 0); repair++) {
+      if (attempts.length) {
+        try { await assertBudget(opts.trace.tenantId, costUsd); } catch (error) {
+          if (error instanceof BudgetExceeded && opts.degrade) return finish(opts.degrade() as Out, { degraded: true });
+          recordTerminal(error instanceof BudgetExceeded ? 'rate_limited' : 'error', errorCodeOf(error));
+          throw error;
+        }
+      }
       const remainingMs = 45_000 - (performance.now() - t0);
       if (remainingMs <= 0) { lastError = new Error('AI request deadline exceeded'); break ladderLoop; }
       const attemptStart = performance.now();
@@ -322,7 +333,9 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         // スキーマ修復や別モデルでの再生成にも課金されるため、取得できた全応答を合算する。
         inputTokens += usage?.prompt_tokens ?? 0;
         outputTokens += usage?.completion_tokens ?? 0;
-        costUsd += usage?.cost_usd ?? 0;
+        const observedCost = usage?.cost_usd;
+        if (typeof observedCost === 'number' && Number.isFinite(observedCost) && observedCost >= 0) costUsd += observedCost;
+        else unpricedAttempts += 1;
 
         const content = res.choices[0]?.message?.content ?? '';
         attempts.push({
@@ -335,11 +348,13 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
 
         if (!opts.schema) {
           schemaValid = true;
+          opts.validateOutput?.(content as Out);
           return finish(content as Out);
         }
 
         const parsed = opts.schema.safeParse(jsonParse(content));
         if (parsed.success) {
+          opts.validateOutput?.(parsed.data as Out);
           return finish(parsed.data as Out);
         }
 
@@ -356,13 +371,14 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         continue;
       } catch (err) {
         lastError = err;
-        const guard = isGuardError(err);
+        const guard = err instanceof SafetyBlocked ? err.source : isGuardError(err);
         const quota = isQuotaError(err);
         if (quota) rateLimited = true;
 
         // SchemaRepairFailed は同じ試行の結果をすでに記録済みなので、
         // ここで重複行を作らない。それ以外は例外も1試行として残す。
-        if (!(err instanceof SchemaRepairFailed && attemptRecorded)) {
+        if (attemptRecorded && guard) attempts[attempts.length - 1].outcome = 'blocked';
+        if (!attemptRecorded) {
           attempts.push({
             attemptNo: attempts.length + 1,
             model,
@@ -386,15 +402,16 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
               inputTokens, outputTokens, costUsd,
               latencyMs: Math.round(performance.now() - t0),
               fallbackCount, schemaValid, degraded: false, rateLimited,
-              attempts, modelTier: TIER,
+              attempts, unpricedAttempts, modelTier: TIER,
             },
             agentName: opts.agentName,
             requestType: opts.requestType,
             trace: opts.trace,
             status: 'blocked',
             errorCode: errorCodeOf(err),
-            safetyResult: { source: guard, message: String(err) },
+            safetyResult: { source: guard, ...(err instanceof SafetyBlocked ? { rule: err.rule } : {}) },
           });
+          if (err instanceof SafetyBlocked) throw err;
           throw new SafetyBlocked(guard, errorCodeOf(err));
         }
 

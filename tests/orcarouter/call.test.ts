@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 const mocks = vi.hoisted(() => {
   const query = {
-    data: [] as unknown[],
+    data: [{ ai_budget_limit_usd: 1 }] as unknown[],
+    error: null as unknown,
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     is: vi.fn(() => query),
@@ -34,6 +35,7 @@ vi.mock('@/lib/orcarouter/routers', () => ({
   fallbackModels: () => ['model/primary', 'model/fallback'],
 }));
 
+import { SafetyBlocked } from '@/lib/orcarouter/errors';
 import { callModel } from '@/lib/orcarouter/call';
 
 const trace = {
@@ -59,7 +61,9 @@ describe('callModel', () => {
   beforeEach(() => {
     mocks.create.mockReset();
     mocks.recordRun.mockReset();
-    mocks.query.data = [];
+    mocks.query.data = [{ ai_budget_limit_usd: 1 }];
+    mocks.query.error = null;
+    trace.tenantId = crypto.randomUUID();
   });
 
   it('用途別モデルが遅い場合はautoを再試行せず別モデルに切り替える', async () => {
@@ -177,5 +181,64 @@ describe('callModel', () => {
       'error',
       'ok',
     ]);
+  });
+});
+
+describe('AI cost and output safeguards', () => {
+  const options = () => ({ router: 'assessment' as const, modelClass: 'advanced' as const, agentName: 'assessment' as const, requestType: 'test', messages: [{ role: 'user' as const, content: 'test' }], trace });
+  beforeEach(() => {
+    mocks.create.mockReset(); mocks.recordRun.mockReset();
+    mocks.query.data = [{ ai_budget_limit_usd: 1 }]; mocks.query.error = null;
+    trace.tenantId = crypto.randomUUID();
+  });
+  it.each([[], [{ ai_budget_limit_usd: null }], [{ ai_budget_limit_usd: 'bad' }], [{ ai_budget_limit_usd: -1 }]])('invalid or missing budget must prevent billing (%j)', async (...rows) => {
+    mocks.query.data = rows;
+    await expect(callModel(options())).rejects.toThrow();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('budget lookup errors fail closed', async () => {
+    mocks.query.error = { message: 'offline' };
+    await expect(callModel(options())).rejects.toThrow('予算');
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('zero budget produces an explicit local fallback without an AI call', async () => {
+    mocks.query.data = [{ ai_budget_limit_usd: 0 }];
+    const result = await callModel({ ...options(), degrade: () => '確認待ち' });
+    expect(result.meta.degraded).toBe(true); expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('does not pay for repair once this request consumed the available budget', async () => {
+    mocks.query.data = [{ ai_budget_limit_usd: 0.001 }];
+    mocks.create.mockReturnValue(queuedResponse(okResponse('invalid')));
+    await expect(callModel({ ...options(), schema: z.object({ answer: z.string() }) })).rejects.toThrow('上限');
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ meta: expect.objectContaining({ costUsd: 0.001 }) }));
+  });
+  it('logs blocked output as blocked and never retries it', async () => {
+    mocks.create.mockReturnValue(queuedResponse(okResponse('unsafe')));
+    await expect(callModel({ ...options(), validateOutput: () => { throw new SafetyBlocked('app_rule', 'secret'); } })).rejects.toBeInstanceOf(SafetyBlocked);
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.recordRun).toHaveBeenCalledTimes(1);
+    expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'blocked', meta: expect.objectContaining({ costUsd: 0.001, attempts: [expect.objectContaining({ outcome: 'blocked' })] }) }));
+  });
+  it('reports a recovered quota failure as successful failover', async () => {
+    mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status: 429 }) }).mockReturnValueOnce(queuedResponse(okResponse('recovered')));
+    const result = await callModel(options());
+    expect(result.meta.rateLimited).toBe(true);
+    expect(mocks.recordRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed_over' }));
+  });
+  it('marks missing costs instead of treating them as observed free usage', async () => {
+    const response = okResponse('ok');
+    response.data.usage = { prompt_tokens: 1, completion_tokens: 2 } as typeof response.data.usage;
+    mocks.create.mockReturnValue(queuedResponse(response));
+    const result = await callModel(options());
+    expect(result.meta.unpricedAttempts).toBe(1);
+    expect(result.meta.costUsd).toBe(0);
+  });
+  it('all-provider outage preserves a local fallback and the failed attempts', async () => {
+    mocks.create.mockReturnValue({ withResponse: vi.fn().mockRejectedValue({ status: 503 }) });
+    const result = await callModel({ ...options(), degrade: () => '先生の確認待ち' });
+    expect(result.data).toBe('先生の確認待ち'); expect(result.meta.degraded).toBe(true);
+    expect(result.meta.attempts.every(attempt => attempt.outcome === 'error')).toBe(true);
+    expect(mocks.create.mock.calls.length).toBeLessThanOrEqual(3);
   });
 });

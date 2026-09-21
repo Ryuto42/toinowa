@@ -1,6 +1,7 @@
 export interface UsageRun {
   actor_id?: string | null; student_id?: string | null; resolved_model: string | null;
   input_tokens: number | null; output_tokens: number | null; estimated_cost_usd: number | null;
+  safety_result?: unknown;
   status: string; fallback_count: number; created_at: string;
 }
 export function summarizeUsage(rows: UsageRun[], names: Record<string, string>) {

@@ -3,21 +3,42 @@ import { authErrorResponse, AuthRequiredError, ForbiddenError } from '@/lib/auth
 import { BudgetExceeded, SafetyBlocked, SchemaRepairFailed } from '@/lib/orcarouter/errors';
 
 export class ApiInputError extends Error {
-  readonly status = 400;
+  readonly status: number;
 
-  constructor(message = '入力が不正です') {
+  constructor(message = '入力が不正です', status = 400) {
     super(message);
     this.name = 'ApiInputError';
+    this.status = status;
   }
 }
 
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
+  // Content-Lengthだけに依存せずストリームの実サイズも制限する。
+  // 画像8枚の既存上限を含めて12MiB。無制限のJSONパースを避ける。
+  const maxBytes = 12 * 1024 * 1024;
+  if (Number(request.headers.get('content-length')) > maxBytes) throw new ApiInputError('入力サイズが上限を超えています', 413);
   let value: unknown;
+  const reader = request.body?.getReader();
+  if (!reader) throw new ApiInputError('JSON body が必要です');
   try {
-    value = await request.json();
-  } catch {
+    const decoder = new TextDecoder();
+    let total = 0;
+    let text = '';
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      total += chunk.value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new ApiInputError('入力サイズが上限を超えています', 413);
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    value = JSON.parse(text + decoder.decode());
+  } catch (error) {
+    if (error instanceof ApiInputError) throw error;
     throw new ApiInputError('JSON body が必要です');
-  }
+  } finally { reader.releaseLock(); }
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     throw new ApiInputError(z.prettifyError(parsed.error));
@@ -27,8 +48,8 @@ export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Prom
 
 export function json<T>(data: T, init?: ResponseInit): Response {
   return Response.json(data, {
-    headers: { 'Cache-Control': 'no-store', ...(init?.headers ?? {}) },
     ...init,
+    headers: (() => { const headers = new Headers(init?.headers); headers.set('Cache-Control', 'no-store'); return headers; })(),
   });
 }
 
@@ -62,5 +83,6 @@ export function uuidParam(value: string, label = 'id'): string {
 }
 
 export function traceIdFrom(request: Request): string {
-  return request.headers.get('x-trace-id') ?? crypto.randomUUID();
+  const parsed = z.uuid().safeParse(request.headers.get('x-trace-id'));
+  return parsed.success ? parsed.data : crypto.randomUUID();
 }

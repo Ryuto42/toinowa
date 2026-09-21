@@ -1,4 +1,5 @@
 import 'server-only';
+import { ApiInputError } from '@/lib/api/http';
 import { registerJobHandler } from './registry';
 import { adminDb } from '@/lib/database/admin';
 import { curriculumAgent } from '@/lib/agents/catalog';
@@ -7,8 +8,13 @@ import type { Json } from '@/lib/database/types';
 
 registerJobHandler('build_learning_plan', async job => {
   const payload = job.payload as { studentId?: string; requestedBy?: string; assessmentId?: string; classroomId?: string };
-  if (!payload?.studentId) throw new Error('studentId is required');
+  if (!payload?.studentId) throw new ApiInputError('studentId is required');
   const db = adminDb();
+  const enrollments = await db.from('enrollments').select('classroom_id').eq('tenant_id', job.tenant_id).eq('user_id', payload.studentId).eq('role', 'student').eq('active', true).order('id');
+  if (enrollments.error) throw new Error(enrollments.error.message);
+  const classroomId = payload.classroomId ? (enrollments.data?.some(row => row.classroom_id === payload.classroomId) ? payload.classroomId : null) : enrollments.data?.length === 1 ? enrollments.data[0].classroom_id : null;
+  if (!classroomId) throw new ApiInputError('生徒の担当クラスを設定してください');
+
   const previous = await db.from('learning_plans').select('id,tasks,status,rationale').eq('tenant_id', job.tenant_id).eq('id', job.id).maybeSingle();
   if (previous.error) throw new Error(previous.error.message);
   let plan = previous.data;
@@ -16,8 +22,8 @@ registerJobHandler('build_learning_plan', async job => {
     const profile = await db.from('student_profiles').select('*').eq('tenant_id', job.tenant_id).eq('user_id', payload.studentId).single();
     if (profile.error) throw new Error(profile.error.message);
     const value = profile.data;
-    const assessments = await db.from('assessments').select('score,override_score,override_note,confidence,reviewer_status,difficulty_at_time,component_scores,misconceptions,difficulty_reason,concepts(name)')
-      .eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('is_final', true).order('created_at', { ascending: false }).limit(5);
+    const assessments = await db.from('assessments').select('score,override_score,override_note,confidence,reviewer_status,difficulty_at_time,component_scores,misconceptions,difficulty_reason,concepts!inner(name,lessons!inner(classroom_id))')
+      .eq('tenant_id', job.tenant_id).eq('student_id', payload.studentId).eq('is_final', true).neq('reviewer_status', 'rejected').eq('concepts.lessons.classroom_id', classroomId).order('created_at', { ascending: false }).limit(5);
     if (assessments.error) throw new Error(assessments.error.message);
     const recent = assessments.data ?? [];
     const current = recent[0]?.difficulty_at_time;
@@ -26,8 +32,8 @@ registerJobHandler('build_learning_plan', async job => {
       concept: item.concepts?.name?.slice(0, 200), score: item.override_score ?? item.score,
       teacherNote: item.override_note?.slice(0, 600), confidence: item.confidence,
       reviewerStatus: item.reviewer_status, difficulty: item.difficulty_at_time,
-      analysis: item.difficulty_reason?.slice(0, 900),
-      misconceptions: JSON.stringify(item.misconceptions).slice(0, 600),
+      analysis: item.reviewer_status === 'overridden' ? undefined : item.difficulty_reason?.slice(0, 900),
+      misconceptions: item.reviewer_status === 'overridden' ? undefined : JSON.stringify(item.misconceptions).slice(0, 600),
     }));
 
     const result = await curriculumAgent.run({ studentId: payload.studentId, availableMinutes: value.daily_time_limit_min,
@@ -45,10 +51,6 @@ registerJobHandler('build_learning_plan', async job => {
     if (saved.error) throw new Error(saved.error.message);
     plan = saved.data;
   }
-  const enrollments = await db.from('enrollments').select('classroom_id').eq('tenant_id', job.tenant_id).eq('user_id', payload.studentId).eq('role', 'student').eq('active', true).order('id');
-  if (enrollments.error) throw new Error(enrollments.error.message);
-  const classroomId = payload.classroomId && enrollments.data?.some(row => row.classroom_id === payload.classroomId) ? payload.classroomId : enrollments.data?.length === 1 ? enrollments.data[0].classroom_id : null;
-  if (!classroomId) throw new Error('生徒の担当クラスを設定してください');
   const teachers = await db.from('enrollments').select('user_id').eq('tenant_id', job.tenant_id).eq('classroom_id', classroomId).eq('role', 'teacher').eq('active', true).order('id').limit(1);
   if (teachers.error) throw new Error(teachers.error.message);
   const admins = teachers.data?.length ? null : await db.from('users').select('id').eq('tenant_id', job.tenant_id).eq('role', 'admin').eq('status', 'active').order('id').limit(1);

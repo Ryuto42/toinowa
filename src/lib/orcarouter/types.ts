@@ -59,6 +59,8 @@ export interface CallMeta {
   outputTokens: number;
   /** usage.cost_usd の実測値。取れなければ 0（null にはしない） */
   costUsd: number;
+  /** 費用が応答に含まれず確認できなかった試行数 */
+  unpricedAttempts?: number;
   latencyMs: number;
   /**
    * フォールバックが何段起きたか。
@@ -95,6 +97,8 @@ export interface CallOptions<T extends z.ZodTypeAny | undefined = undefined> {
    * これが無いと、モデル障害がそのまま利用者へのエラーになる。
    */
   degrade?: () => T extends z.ZodTypeAny ? z.infer<T> : string;
+  /** 出力を公開・成功記録する前の検査。遮断時は再試行しない。 */
+  validateOutput?: (output: T extends z.ZodTypeAny ? z.infer<T> : string) => void;
   maxOutputTokens?: number;
   temperature?: number;
   trace: TraceCtx;
