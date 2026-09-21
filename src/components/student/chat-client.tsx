@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { TUTORIAL_STOP_MESSAGE } from '@/lib/tutorial/content';
 import { ConversationFeedback } from './feedback-card';
 import { useEffect, useRef, useState } from 'react';
 import { useWorkTelemetry } from './use-work-telemetry';
@@ -43,9 +42,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     if (log && followLatest.current) log.scrollTop = log.scrollHeight;
   }, [messages, busy, completed]);
 
-  async function send(event: { preventDefault: () => void }, preset?: string) {
+  async function send(event: { preventDefault: () => void }) {
     event.preventDefault();
-    const content = (preset ?? input).trim();
+    const content = input.trim();
     if (!content || busy || undoing || completed) return;
     followLatest.current = true;
     const measured = telemetry.consume();
@@ -163,7 +162,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     </div>
     {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">AIワークへ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
       {canUndo ? <div className="flex justify-end"><button type="button" onClick={undo} disabled={undoing || busy} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-600 underline disabled:opacity-50">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button></div> : null}
-      <form onSubmit={event => void send(event)} className="flex items-end gap-2">
+      <form onSubmit={event => void send(event)} className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
@@ -172,10 +171,12 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
             event.preventDefault();
             void send(event);
           }
-        }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} className="h-20 min-h-16 min-w-0 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 outline-none focus:border-emerald-600 sm:text-sm" />
-        <button disabled={busy || undoing || !input.trim()} className="shrink-0 self-end rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? <span className="inline-flex items-center gap-2"><Spinner light />考え中…</span> : '送信'}</button>
+        }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1 text-base outline-none" />
+        <button type="submit" disabled={busy || undoing || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
+          {busy ? <><Spinner /><span>考え中</span></> : <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></>}
+        </button>
       </form>
-      <div className="flex flex-wrap items-center justify-between gap-1"><p className="text-[11px] leading-4 text-slate-500">送信ボタン・Enterで送信 ／ Shift+Enterで改行</p>{tutorial ? <button type="button" disabled={busy || undoing} onClick={event => void send(event, TUTORIAL_STOP_MESSAGE)} className="shrink-0 text-xs text-slate-600 underline disabled:opacity-50">{TUTORIAL_STOP_MESSAGE}</button> : null}</div>
+      <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
     </div>}
     {error ? <p role="alert" className="max-h-16 shrink-0 overflow-y-auto text-sm text-rose-700">{error}</p> : null}
   </div>;

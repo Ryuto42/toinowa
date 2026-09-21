@@ -33,6 +33,9 @@ textarea {
   color: #0d5f59;
 }
 
+/* 共通の font: inherit より優先して、入力する文章の行間を整える。 */
+.chat-composer textarea { line-height: 1.5; }
+
 /* キーボード表示時や横向きの小さい画面では、会話と入力に高さを使う。 */
 .chat-workspace[data-compact="true"] .chat-instructions { display: none; }
 .chat-workspace[data-compact="true"] .chat-heading h1 { font-size: 1rem; max-height: 1.5rem; }
