@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
+import { DataTable } from '@/components/data-table';
 import { formatDateTime } from '@/lib/shared/format';
 
 export interface PublishedWork {
@@ -37,7 +38,13 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
+const STATUS_LABELS: Record<string, string> = { published: '公開中', draft: '先生の確認待ち', completed: '完了' };
+
+/**
+ * `variant='table'` は配信済みの一覧向け。他の一覧と同じ検索・絞り込み・並べ替えで見せる。
+ * 確認待ちは1件ずつ本文と理由を読んでチェックする画面なので、表にはしない。
+ */
+export function PublishedWorkList({ works, variant = 'review' }: { works: PublishedWork[]; variant?: 'review' | 'table' }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const previousOverflow = useRef<string | null>(null);
@@ -129,7 +136,34 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
       <button type="button" disabled={busy || refreshing || !chosen.length} onClick={publishSelected} className="mt-3 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">確認した{chosen.length}件を承認して配信</button>
       {batchStatus ? <p role="status" className="mt-2 text-sm">{batchStatus}</p> : null}
     </div> : null}
-    <div className="divide-y divide-slate-100">
+    {variant === 'table' ? <DataTable
+      rows={works}
+      getKey={work => work.assignmentId}
+      searchIn={work => `${work.title} ${work.classroomName} ${work.targetName}`}
+      searchPlaceholder="お題・クラス・対象で検索"
+      unit="件"
+      empty="該当する課題はありません"
+      initialSort={{ key: 'due', direction: 'desc' }}
+      filters={[
+        { key: 'classroom', label: 'クラス', options: [...new Set(works.map(work => work.classroomName))].sort((a, b) => a.localeCompare(b, 'ja')).map(name => ({ value: name, label: name })), match: (work, value) => work.classroomName === value },
+        { key: 'status', label: '状態', options: [{ value: 'published', label: '公開中' }, { value: 'completed', label: '完了' }], match: (work, value) => work.status === value },
+        { key: 'difficulty', label: '難易度', options: DIFFICULTY_LABELS.map((label, index) => ({ value: String(index + 1), label: `Lv.${index + 1} ${label}` })), match: (work, value) => work.difficulty === Number(value) },
+      ]}
+      columns={[
+        { key: 'title', label: 'お題', sortBy: work => work.title, render: work => <button type="button" onClick={() => open(work)}
+          disabled={busy || refreshing || !work.questionId} aria-haspopup="dialog"
+          className="text-left font-bold text-[#237d75] underline disabled:no-underline disabled:opacity-60">{work.title}</button> },
+        { key: 'target', label: 'クラス・対象', sortBy: work => `${work.classroomName} ${work.targetName}`, render: work => <span className="text-slate-500">{work.classroomName} · {work.targetName}</span> },
+        { key: 'difficulty', label: '難易度', hideOnMobile: true, align: 'right', sortBy: work => work.difficulty, render: work => `Lv.${work.difficulty}` },
+        { key: 'due', label: '期限', hideOnMobile: true, align: 'right', sortBy: work => work.dueAt, render: work => <span className="whitespace-nowrap">{formatDateTime(work.dueAt)}</span> },
+        { key: 'status', label: '状態', sortBy: work => STATUS_LABELS[work.status] ?? work.status, render: work => <StatusPill tone={work.status === 'published' ? 'emerald' : work.status === 'completed' ? 'amber' : 'blue'}>{STATUS_LABELS[work.status] ?? work.status}</StatusPill> },
+        { key: 'actions', label: '操作', align: 'right', render: work => <span className="flex items-center justify-end gap-3 whitespace-nowrap">
+          <button type="button" onClick={() => open(work)} disabled={busy || refreshing || !work.questionId}
+            className="text-sm font-bold text-[#237d75] disabled:opacity-40">編集</button>
+          <Link href={`/teacher/works/${work.assignmentId}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-700">分析を見る</Link>
+        </span> },
+      ]}
+    /> : <div className="divide-y divide-slate-100">
       {works.map((work) => <div
         key={work.assignmentId}
         className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
@@ -169,7 +203,7 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
           </Link>}
         </div>
       </div>)}
-    </div>
+    </div>}
 
     <dialog
       ref={dialogRef}

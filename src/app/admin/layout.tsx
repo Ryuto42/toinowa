@@ -8,6 +8,7 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
   const user = await (await createClient()).from('users').select('display_name').eq('id', context.userId).maybeSingle();
   return <AppShell roleLabel="管理者" userName={user.data?.display_name ?? '管理者'} homeHref="/admin/overview" modelTier={MODEL_TIER} nav={[
     { href: '/admin/overview', label: '全体状況', icon: 'dashboard' },
+    { href: '/admin/students', label: '生徒の学習状況', icon: 'chat' },
     { href: '/admin/users', label: 'ユーザー管理', icon: 'users' },
     { href: '/admin/classrooms', label: 'クラス管理', icon: 'book' },
     { href: '/admin/interventions', label: '要フォロー', icon: 'bolt' },

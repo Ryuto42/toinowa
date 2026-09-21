@@ -61,12 +61,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const needed = requiredRole(pathname);
-  // 管理者は先生の画面まで。生徒の画面はレイアウト側が requireRole('student') で弾くため、
-  // ここで通すとエラー画面になる。先に自分のホームへ戻す。
-  const roleAllowed =
-    needed === null ||
-    role === needed ||
-    (role === 'admin' && needed === 'teacher');
+  // 自分のロールの画面だけを通す。管理者にも先生の画面は出さない
+  // （管理者が必要とする生徒情報・提出状況は /admin 側に用意してある）。
+  const roleAllowed = needed === null || role === needed;
   if (!roleAllowed) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 });

@@ -27,14 +27,14 @@ export default async function AdminHandoffsPage() {
 
     <Panel title="受け取り待ち" description="長く止まっている引き継ぎは、担当の割り当てを見直してください">
       {pending.length
-        ? <HandoffList initial={pending} mode="admin" names={names} />
+        ? <HandoffList initial={pending} mode="admin" names={names} studentBase="/admin/students" />
         : <EmptyState>受け取り待ちの引き継ぎはありません</EmptyState>}
     </Panel>
 
     <div className="mt-6">
       <Panel title="これまでの引き継ぎ" description="直近100件">
         {settled.length
-          ? <HandoffList initial={settled} mode="admin" names={names} />
+          ? <HandoffList initial={settled} mode="admin" names={names} studentBase="/admin/students" />
           : <EmptyState>完了した引き継ぎはまだありません</EmptyState>}
       </Panel>
     </div>

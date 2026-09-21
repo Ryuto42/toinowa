@@ -67,7 +67,7 @@ export default async function TeacherAssignmentsPage() {
       })}</div><PreparationRefresh active={pending} />
     </Panel> : null}
     <div id="review"><Panel title={`先生の確認待ち（${drafts.length}件）`} description="生徒にはまだ表示されていません。お題と理由を確認して、配信する課題を選びます。">{drafts.length ? <PublishedWorkList works={drafts} /> : <EmptyState>授業記録を渡すと、ここに生徒別の課題案が届きます。</EmptyState>}</Panel></div>
-    <Panel title="配信済みの課題" description="提出後は、生徒の説明の分析から次の課題案と学習計画を更新します。">{live.length ? <PublishedWorkList works={live} /> : <EmptyState>承認して配信した課題がここに表示されます。</EmptyState>}</Panel>
+    <Panel title="配信済みの課題" description="提出後は、生徒の説明の分析から次の課題案と学習計画を更新します。">{live.length ? <PublishedWorkList works={live} variant="table" /> : <EmptyState>承認して配信した課題がここに表示されます。</EmptyState>}</Panel>
     <details className="rounded-xl border border-slate-200 p-5"><summary className="cursor-pointer text-sm font-bold text-slate-600">特定のテーマ・お題を指定したいとき</summary><div className="mt-4"><TopicFormDialog classrooms={availableClasses.map(c=>({...c,name:c.individual_student_id ? `個別指導：${students.find(s=>s.id===c.individual_student_id)?.name ?? '生徒'}` : c.name}))} students={students} /></div></details>
   </div>;
 }

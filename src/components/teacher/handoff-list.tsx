@@ -46,11 +46,13 @@ function asSnapshot(value: unknown): Snapshot {
  * `mode` は「自分が受け取る側か、送った側か、管理者として全部見ているか」。
  * 出せるボタンが変わるだけで、中身の見せ方は同じにしてある。
  */
-export function HandoffList({ initial, mode, names, linkStudents = true }: {
+export function HandoffList({ initial, mode, names, linkStudents = true, studentBase = '/teacher/students' }: {
   initial: HandoffRow[];
   mode: 'inbox' | 'outbox' | 'admin';
   names: Record<string, string>;
   linkStudents?: boolean;
+  /** 生徒の記録へのリンク先。管理者は /admin/students を見る。 */
+  studentBase?: string;
 }) {
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function HandoffList({ initial, mode, names, linkStudents = true }: {
             </div>
             <p className="mt-2 font-bold">
               {linkStudents
-                ? <Link href={`/teacher/students/${item.student_id}`} className="text-[#237d75] underline">{studentName}</Link>
+                ? <Link href={`${studentBase}/${item.student_id}`} className="text-[#237d75] underline">{studentName}</Link>
                 : studentName}
               <span className="ml-2 text-sm font-normal text-slate-500">
                 {names[item.from_user] ?? '先生'} → {names[item.to_user] ?? '先生'}

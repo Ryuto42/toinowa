@@ -36,7 +36,7 @@ function asStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
-export function InterventionList({ initial }: { initial: Escalation[] }) {
+export function InterventionList({ initial, studentBase = '/teacher/students' }: { initial: Escalation[]; studentBase?: string }) {
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -95,7 +95,7 @@ export function InterventionList({ initial }: { initial: Escalation[] }) {
           <p className="mt-2 font-bold">{item.title}</p>
           <p className="mt-1 text-sm text-slate-500">
             {item.student_id
-              ? <Link href={`/teacher/students/${item.student_id}`} className="font-semibold text-[#237d75] underline">
+              ? <Link href={`${studentBase}/${item.student_id}`} className="font-semibold text-[#237d75] underline">
                   {item.users?.display_name ?? '対象生徒'}の学習記録を見る
                 </Link>
               : (item.users?.display_name ?? '対象生徒')}

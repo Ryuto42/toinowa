@@ -2,8 +2,8 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 export interface TeacherOption { id: string; name: string }
-export function TeacherPicker({ teachers, selected = [] }: { teachers: TeacherOption[]; selected?: string[] }) {
-  return <fieldset className="min-w-0"><legend className="text-sm font-bold">担当の先生（任意・複数選択可）</legend><p className="mt-1 text-xs leading-6 text-slate-600">クラスなしで個別指導できます。未設定の場合は、後からユーザー編集で担当を追加してください。</p><div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">{teachers.length ? teachers.map(t => <label key={t.id} className="flex items-center gap-2 text-sm"><input name="teacherIds" type="checkbox" value={t.id} defaultChecked={selected.includes(t.id)} />{t.name}</label>) : <p className="text-sm text-slate-500">先生を先にユーザー登録すると、ここで選択できます。</p>}</div></fieldset>;
+export function TeacherPicker({ teachers, selected = [], legend = '担当の先生（任意・複数選択可）', hint = 'クラスなしで個別指導できます。未設定の場合は、後からユーザー編集で担当を追加してください。' }: { teachers: TeacherOption[]; selected?: string[]; legend?: string; hint?: string }) {
+  return <fieldset className="min-w-0"><legend className="text-sm font-bold">{legend}</legend><p className="mt-1 text-xs leading-6 text-slate-600">{hint}</p><div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">{teachers.length ? teachers.map(t => <label key={t.id} className="flex items-center gap-2 text-sm"><input name="teacherIds" type="checkbox" value={t.id} defaultChecked={selected.includes(t.id)} />{t.name}</label>) : <p className="text-sm text-slate-500">先生を先にユーザー登録すると、ここで選択できます。</p>}</div></fieldset>;
 }
 export function TeacherAssignment({ studentId, teachers, selected }: { studentId: string; teachers: TeacherOption[]; selected: string[] }) {
   const router = useRouter();
