@@ -18,7 +18,7 @@ export default async function AdminOverviewPage() {
     adminDb().from('agent_runs').select('id,status,agent_name,created_at').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(5),
   ]);
   return <div>
-    <PageTitle title="全体状況" description="説明ワーク、AI分析、要フォロー、AI利用状況を一つの画面で確認します。" />
+    <PageTitle title="ダッシュボード" description="説明ワーク、AI分析、要フォロー、AI利用状況を一つの画面で確認します。" />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="有効ユーザー" value={users.count ?? 0} />
       <MetricCard label="在籍生徒" value={students.count ?? 0} />

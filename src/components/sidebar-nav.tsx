@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/logout-button';
 
-export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart' | 'handoff';
+export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart' | 'handoff' | 'settings' | 'key' | 'bell';
 
 export interface SidebarNavItem {
   href: string;
@@ -19,12 +19,23 @@ function NavIcon({ name }: { name: NavIconName }) {
   if (name === 'book') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" /><path {...common} d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20M8 7h8M8 11h6" /></svg>;
   if (name === 'users') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="9" cy="8" r="3" /><path {...common} d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a2.5 2.5 0 0 1 0 5M17 14a4.5 4.5 0 0 1 3.5 4" /></svg>;
   if (name === 'bolt') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" /></svg>;
+  if (name === 'settings') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="12" cy="12" r="3" /><path {...common} d="M19.4 14a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 18.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H2.8a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.1 7L4 6.9a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 2.9v-.1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1.1Z" /></svg>;
+  if (name === 'key') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="8" cy="12" r="4" /><path {...common} d="M12 12h9M18 12v3M15.5 12v2.5" /></svg>;
+  if (name === 'bell') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10Z" /><path {...common} d="M10 19a2 2 0 0 0 4 0" /></svg>;
   if (name === 'handoff') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="6.5" cy="7" r="2.5" /><circle {...common} cx="17.5" cy="7" r="2.5" /><path {...common} d="M3 19a3.5 3.5 0 0 1 7 0M14 19a3.5 3.5 0 0 1 7 0M9.5 13h5m0 0-1.8-1.8M14.5 13l-1.8 1.8" /></svg>;
   if (name === 'check') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="12" cy="12" r="8.5" /><path {...common} d="m8.5 12 2.3 2.3 4.8-5" /></svg>;
   if (name === 'screen') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><rect {...common} x="3.5" y="4" width="17" height="12" rx="1.5" /><path {...common} d="M8 20h8M12 16v4" /></svg>;
   if (name === 'chat') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M5 18.5 3.5 21l4.2-1.7A8.5 8.5 0 1 0 5 18.5Z" /><path {...common} d="M8 10h8M8 13h5" /></svg>;
   if (name === 'chart') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M4 19V5M4 19h17" /><path {...common} d="m7 15 3-4 3 2 5-6" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="m4 11 8-7 8 7" /><path {...common} d="M6 10v9h12v-9M10 19v-5h4v5" /></svg>;
+}
+
+/** クリック直後から、遷移が始まったことを示す小さな印。 */
+function LinkPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <span aria-hidden="true"
+    className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[#9fc4bf] border-t-transparent" />;
 }
 
 export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavItem[]; homeHref: string; userName: string }) {
@@ -38,6 +49,7 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
           <span className={active ? 'text-[#008477]' : 'text-[#6f9792]'}><NavIcon name={item.icon ?? 'dashboard'} /></span>
           <span className="flex-1">{item.label}</span>
           {item.badge ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">{item.badge}</span> : null}
+          <LinkPending />
         </Link>;
       })}
     </nav>
@@ -69,6 +81,7 @@ export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHr
             <NavIcon name={item.icon ?? 'dashboard'} />
             <span className="text-center">{item.label}</span>
             {item.badge ? <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold text-white">{item.badge}</span> : null}
+            <span className="absolute left-2 top-2"><LinkPending /></span>
           </Link>
         </li>;
       })}

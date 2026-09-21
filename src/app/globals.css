@@ -44,3 +44,88 @@ textarea {
 body:has(.chat-workspace) [data-shell-mobile-header],
 body:has(.chat-workspace) [data-shell-mobile-nav],
 body:has(.chat-workspace) [data-shell-guide] { display: none; }
+
+/* ════════════════════════════════════════════════════════════
+   動きの共通ルール
+   画面ごとに違う動きをすると、操作が効いたのかどうかの判断が
+   毎回やり直しになる。押した感・出てくる感・読み込み中をここで統一する。
+   ════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 押したときに少しへこむ。クリックが届いたことを手応えとして返す。 */
+  button:not(:disabled),
+  a[href],
+  summary {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
+      box-shadow 150ms ease, transform 120ms ease, opacity 150ms ease;
+  }
+  button:not(:disabled):active,
+  a[href]:active,
+  summary:active { transform: scale(0.97); }
+}
+
+/* キーボード操作でも押せる位置が分かるようにする。 */
+:where(button, a[href], summary, [role="tab"]):focus-visible {
+  outline: 2px solid #237d75;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@keyframes ui-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ポップアップ。開くときも閉じるときも同じ動きにする。
+   キーフレームだと閉じる側が効かない（display:none が即座に当たる）ので、
+   @starting-style と allow-discrete を使って display の切り替えを待たせる。 */
+@media (prefers-reduced-motion: no-preference) {
+  dialog {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  dialog[open] { opacity: 1; transform: none; }
+  @starting-style {
+    dialog[open] { opacity: 0; transform: translateY(10px) scale(0.98); }
+  }
+
+  dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 180ms ease,
+      overlay 180ms ease allow-discrete,
+      display 180ms ease allow-discrete;
+  }
+  dialog[open]::backdrop { opacity: 1; }
+  @starting-style {
+    dialog[open]::backdrop { opacity: 0; }
+  }
+}
+
+/* 画面の中身。骨組みから本文へ差し替わったことを、上から順に現れる動きで示す。
+   まとめて1回フェードさせるより、どこが埋まったのかが追いやすい。 */
+@keyframes ui-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  /* 直下はページ全体の器。ここは淡く出すだけにして、位置は動かさない。 */
+  .page-enter > * { animation: ui-fade 200ms ease-out both; }
+  /* その中の見出し・指標・パネルを、上から順に少し遅らせて出す。
+     位置は動かさない。骨組みと同じ場所のまま濃くなるので、読む位置がずれない。 */
+  .page-enter > * > * { animation: ui-fade 320ms ease-out both; }
+  .page-enter > * > *:nth-child(2) { animation-delay: 60ms; }
+  .page-enter > * > *:nth-child(3) { animation-delay: 120ms; }
+  .page-enter > * > *:nth-child(4) { animation-delay: 180ms; }
+  .page-enter > * > *:nth-child(n + 5) { animation-delay: 240ms; }
+}
+
+/* 読み込み中の骨組み。灰色の帯を左から右へ流す。 */
+.skeleton {
+  background-color: #e9eef0;
+  background-image: linear-gradient(90deg, #e9eef0 0%, #f4f7f8 50%, #e9eef0 100%);
+  background-size: 200% 100%;
+  border-radius: 0.75rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: ui-shimmer 1.4s linear infinite; }
+}
