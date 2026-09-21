@@ -11,8 +11,8 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
     { href: '/admin/overview', label: '全体状況', icon: 'dashboard' },
     { href: '/admin/users', label: 'ユーザー管理', icon: 'users' },
     { href: '/admin/classrooms', label: 'クラス管理', icon: 'book' },
-    { href: '/admin/interventions', label: '介入', icon: 'bolt' },
-    { href: '/admin/handoffs', label: '引き継ぎ', icon: 'check' },
+    { href: '/admin/interventions', label: '要フォロー', icon: 'bolt' },
+    { href: '/admin/handoffs', label: '引き継ぎ', icon: 'handoff' },
     { href: '/admin/usage', label: 'AI利用状況', icon: 'chart' },
     { href: '/admin/settings', label: '設定', icon: 'screen' },
   ]}>{children}<AnalysisMonitor /></AppShell>;

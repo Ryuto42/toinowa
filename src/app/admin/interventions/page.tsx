@@ -17,7 +17,7 @@ export default async function AdminInterventionsPage() {
   const byKind = (kind: string) => rows.filter((row) => row.kind === kind).length;
 
   return <div>
-    <PageTitle title="介入" />
+    <PageTitle title="要フォロー" />
     <p className="-mt-6 mb-8 text-sm text-[#60708d]">
       安全上の懸念、生成AIの疑い、繰り返すつまずき、学習停滞をまとめて確認します。
     </p>
@@ -32,7 +32,7 @@ export default async function AdminInterventionsPage() {
         tone="slate" note="未着手・途中で停止" />
     </div>
     <Panel title="未対応">
-      {rows.length ? <InterventionList initial={rows} /> : <EmptyState>未対応の介入はありません</EmptyState>}
+      {rows.length ? <InterventionList initial={rows} /> : <EmptyState>いま要フォローの生徒はいません</EmptyState>}
     </Panel>
   </div>;
 }

@@ -67,6 +67,19 @@ export type EscalationStatus =
   | 'resolved'
   | 'dismissed';
 
+export type HandoffReason =
+  | 'class_change'
+  | 'substitute'
+  | 'promotion'
+  | 'consult'
+  | 'other';
+
+export type HandoffStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'cancelled';
+
 export type InterventionPriority =
   | 'urgent'
   | 'high'
@@ -1370,6 +1383,90 @@ export interface Database {
             columns: ['tenant_id'];
             isOneToOne: false;
             referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      handoffs: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          student_id: string;
+          from_user: string;
+          to_user: string;
+          classroom_id: string | null;
+          reason: HandoffReason;
+          note: string;
+          snapshot: Json;
+          status: HandoffStatus;
+          created_at: string;
+          responded_at: string | null;
+          response_note: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          student_id: string;
+          from_user: string;
+          to_user: string;
+          classroom_id?: string | null;
+          reason?: HandoffReason;
+          note: string;
+          snapshot?: Json;
+          status?: HandoffStatus;
+          created_at?: string;
+          responded_at?: string | null;
+          response_note?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          student_id?: string;
+          from_user?: string;
+          to_user?: string;
+          classroom_id?: string | null;
+          reason?: HandoffReason;
+          note?: string;
+          snapshot?: Json;
+          status?: HandoffStatus;
+          created_at?: string;
+          responded_at?: string | null;
+          response_note?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'handoffs_classroom_id_fkey';
+            columns: ['classroom_id'];
+            isOneToOne: false;
+            referencedRelation: 'classrooms';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'handoffs_from_user_fkey';
+            columns: ['from_user'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'handoffs_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'handoffs_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'handoffs_to_user_fkey';
+            columns: ['to_user'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
         ];
@@ -2885,6 +2982,8 @@ export interface Database {
       conv_state: ConvState;
       escalation_kind: EscalationKind;
       escalation_status: EscalationStatus;
+      handoff_reason: HandoffReason;
+      handoff_status: HandoffStatus;
       intervention_priority: InterventionPriority;
       job_status: JobStatus;
       lesson_status: LessonStatus;
