@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/guard';
+import { OpsAutoRefresh } from '@/components/teacher/ops-auto-refresh';
 import { createClient } from '@/lib/database/server';
+import { adminDb } from '@/lib/database/admin';
 import { EmptyState, MetricCard, PageTitle, Panel, ScoreBar, StatusPill } from '@/components/dashboard';
 
 export default async function TeacherDashboardPage() {
@@ -11,7 +13,8 @@ export default async function TeacherDashboardPage() {
     db.from('concepts').select('id,name').eq('tenant_id', context.tenantId),
     db.from('escalations').select('id,title,priority,status').eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }).limit(5),
     db.from('assessments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
-    db.from('agent_runs').select('estimated_cost_usd').eq('tenant_id', context.tenantId),
+    // agent_runs は内部表でRLSポリシーを持たないため、service role で読む。
+    adminDb().from('agent_runs').select('estimated_cost_usd').eq('tenant_id', context.tenantId),
   ]);
   const conceptNames = new Map((concepts.data ?? []).map((concept) => [concept.id, concept.name]));
   const latestByConcept = new Map<string, number | null>();
@@ -23,6 +26,7 @@ export default async function TeacherDashboardPage() {
   const cost = (runs.data ?? []).reduce((sum, run) => sum + Number(run.estimated_cost_usd ?? 0), 0);
 
   return <div>
+    <OpsAutoRefresh />
     <PageTitle title="ダッシュボード" />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="平均理解度" value={average === null ? '—' : `${average}%`} note={average === null ? 'データ収集中' : `${scores.length}単元の観測データ`} />

@@ -2,7 +2,7 @@ import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
 import { TopicFormDialog } from '@/components/teacher/topic-form-dialog';
 import { PublishedWorkList, type PublishedWork } from '@/components/teacher/published-work-list';
-import { EmptyState, Panel } from '@/components/dashboard';
+import { EmptyState, PageTitle, Panel } from '@/components/dashboard';
 
 export default async function TeacherAssignmentsPage() {
   const context = await requireRole('teacher', 'admin');
@@ -11,7 +11,7 @@ export default async function TeacherAssignmentsPage() {
     db.from('classrooms').select('id,name,subject').eq('tenant_id', context.tenantId).order('name'),
     db.from('assignments')
       .select('id,lesson_id,classroom_id,student_id,status,due_at,question_ids,lessons(title),classrooms(name),users!assignments_student_id_fkey(display_name)')
-      .eq('tenant_id', context.tenantId).in('status', ['published', 'completed'])
+      .eq('tenant_id', context.tenantId).in('status', ['draft', 'published', 'completed'])
       .order('created_at', { ascending: false }).limit(50),
   ]);
   const enrollments = await db.from('enrollments')
@@ -48,17 +48,22 @@ export default async function TeacherAssignmentsPage() {
     };
   });
 
+  const drafts = works.filter(work => work.status === 'draft');
+  const live = works.filter(work => work.status !== 'draft');
+
   return <div>
-    {/* PageTitle は title しか描画しないため、見出しとボタンはここで組む */}
-    <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-[#17233d] sm:text-[36px]">説明ワーク</h1>
-        <p className="mt-2 text-sm text-[#60708d]">授業で扱った概念を、生徒が初学者にも伝わるように説明するワークとして公開します。</p>
-      </div>
-      <TopicFormDialog classrooms={classrooms.data ?? []} students={students} />
-    </header>
+    <PageTitle
+      title="説明ワーク"
+      description="授業で扱った概念を、生徒が初学者にも伝わるように説明するワークとして公開します。"
+      action={<TopicFormDialog classrooms={classrooms.data ?? []} students={students} />}
+    />
+    {drafts.length ? <div className="mb-6">
+      <Panel title="AIからの提案（未公開）" description="前回の説明をもとにAIが用意したお題です。確認して期限を決めると生徒に届きます。">
+        <PublishedWorkList works={drafts} />
+      </Panel>
+    </div> : null}
     <Panel title="公開済みの説明ワーク" description="行を選ぶとお題を編集できます。">
-      {works.length ? <PublishedWorkList works={works} /> : <EmptyState>まだ説明ワークはありません。</EmptyState>}
+      {live.length ? <PublishedWorkList works={live} /> : <EmptyState>まだ説明ワークはありません。</EmptyState>}
     </Panel>
   </div>;
 }

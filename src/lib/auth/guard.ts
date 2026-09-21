@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { z } from 'zod';
 import { adminDb } from '@/lib/database/admin';
 import { createClient } from '@/lib/database/server';
@@ -16,7 +17,8 @@ const claimsSchema = z.object({
  * Supabaseの署名検証済みJWTクレームから認証コンテキストを作る。
  * getSession()のCookie値は直接信頼せず、getClaims()を使う。
  */
-export async function requireAuth(options: { allowPasswordChange?: boolean } = {}): Promise<AuthContext> {
+/** 1リクエスト内で何度呼んでも users への問い合わせは1回で済ませる。 */
+const loadAuth = cache(async (allowPasswordChange: boolean): Promise<AuthContext> => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims) throw new AuthRequiredError();
@@ -28,12 +30,16 @@ export async function requireAuth(options: { allowPasswordChange?: boolean } = {
 
   const user = await adminDb().from('users').select('status,must_change_password').eq('id', parsed.data.sub).eq('tenant_id', parsed.data.tenant_id).single();
   if (user.error || user.data.status !== 'active') throw new AuthRequiredError();
-  if (user.data.must_change_password && !options.allowPasswordChange) throw new ForbiddenError('初期パスワードを変更してから利用してください');
+  if (user.data.must_change_password && !allowPasswordChange) throw new ForbiddenError('初期パスワードを変更してから利用してください');
   return {
     userId: parsed.data.sub,
     tenantId: parsed.data.tenant_id,
     role: parsed.data.app_role,
   };
+});
+
+export function requireAuth(options: { allowPasswordChange?: boolean } = {}): Promise<AuthContext> {
+  return loadAuth(options.allowPasswordChange ?? false);
 }
 
 export async function requireRole<const R extends Role>(...allowed: R[]): Promise<AuthContext & { role: R }> {

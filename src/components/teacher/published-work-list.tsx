@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
@@ -71,10 +72,11 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
     dialogRef.current?.close();
   }
 
-  async function save() {
+  async function save(publish = false) {
     if (busy || !target) return;
+    if (publish && !dueAt) { setStatus('公開するには期限を設定してください'); return; }
     setBusy(true);
-    setStatus('保存しています…');
+    setStatus(publish ? '公開しています…' : '保存しています…');
     try {
       const response = await fetch(`/api/topics/${target.assignmentId}`, {
         method: 'PATCH',
@@ -82,6 +84,7 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
         body: JSON.stringify({
           title, body, content, difficulty,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          ...(publish ? { publish: true } : {}),
         }),
       });
       const result = await response.json();
@@ -97,27 +100,36 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
 
   return <>
     <div className="divide-y divide-slate-100">
-      {works.map((work) => <button
+      {works.map((work) => <div
         key={work.assignmentId}
-        type="button"
-        onClick={() => open(work)}
-        disabled={!work.questionId}
-        aria-haspopup="dialog"
-        className="flex w-full flex-col gap-2 py-4 text-left transition first:pt-0 hover:bg-slate-50/80 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
       >
-        <div className="min-w-0">
+        <button
+          type="button"
+          onClick={() => open(work)}
+          disabled={!work.questionId}
+          aria-haspopup="dialog"
+          className="min-w-0 flex-1 rounded-lg px-1 py-1 text-left transition hover:bg-slate-50/80 disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <p className="font-bold">{work.title}</p>
           <p className="mt-1 text-sm text-slate-500">
             {work.classroomName} · {work.targetName} · Lv.{work.difficulty} · 期限 {formatDate(work.dueAt)}
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <StatusPill tone={work.status === 'published' ? 'emerald' : 'amber'}>
-            {work.status === 'published' ? '公開中' : work.status}
+        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <StatusPill tone={work.status === 'published' ? 'emerald' : work.status === 'draft' ? 'blue' : 'amber'}>
+            {work.status === 'published' ? '公開中' : work.status === 'draft' ? '下書き' : work.status === 'completed' ? '完了' : work.status}
           </StatusPill>
-          <span aria-hidden="true" className="text-sm font-bold text-[#237d75]">編集 ›</span>
+          <button type="button" onClick={() => open(work)} disabled={!work.questionId}
+            className="text-sm font-bold text-[#237d75] disabled:opacity-40">
+            {work.status === 'draft' ? '確認して公開' : '編集'}
+          </button>
+          {work.status === 'draft' ? null : <Link href={`/teacher/works/${work.assignmentId}`}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-700">
+            分析を見る
+          </Link>}
         </div>
-      </button>)}
+      </div>)}
     </div>
 
     <dialog
@@ -135,7 +147,7 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id={headingId} className="text-xl font-bold">説明ワークを編集</h2>
+          <h2 id={headingId} className="text-xl font-bold">{target?.status === 'draft' ? 'AIの提案を確認して公開' : '説明ワークを編集'}</h2>
           <p className="mt-1 text-sm text-slate-500">
             {target ? `${target.classroomName} · ${target.targetName}` : ''}
           </p>
@@ -176,13 +188,19 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
         </label>
         <p className="text-xs text-slate-500">
           配信先のクラスと生徒は変更できません。別の相手に出す場合は新しく作成してください。
+          {target?.status === 'draft' ? ' このお題は前回の説明をもとにAIが提案したものです。公開するまで生徒には表示されません。' : ''}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={save}
+          <button type="button" onClick={() => save(target?.status === 'draft')}
             disabled={busy || !title.trim() || !body.trim()}
             className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50">
-            変更を保存
+            {target?.status === 'draft' ? '公開する' : '変更を保存'}
           </button>
+          {target?.status === 'draft' ? <button type="button" onClick={() => save(false)}
+            disabled={busy || !title.trim() || !body.trim()}
+            className="rounded-xl border border-slate-300 px-5 py-3 font-bold transition hover:bg-slate-50 disabled:opacity-50">
+            下書きのまま保存
+          </button> : null}
           {status ? <span role="status" className="text-sm leading-7">{status}</span> : null}
         </div>
       </div>

@@ -15,6 +15,8 @@ const schema = z.object({
   difficulty: z.number().int().min(1).max(5),
   content: z.string().trim().max(20000).default(''),
   dueAt: z.iso.datetime().nullable().optional(),
+  /** 下書き（AIが提案したお題）を公開に切り替える。 */
+  publish: z.boolean().optional(),
 });
 
 /**
@@ -59,6 +61,8 @@ export async function PATCH(request: Request, route: Context) {
     if (input.dueAt && new Date(input.dueAt).getTime() <= Date.now()) {
       throw new ApiInputError('今より後の期限を設定してください');
     }
+    // 期限のない課題は生徒の画面で締切が空欄になり、停滞検知も効かない。
+    if (input.publish && !input.dueAt) throw new ApiInputError('公開するには期限を設定してください');
 
     // 入力は保存前に必ずマスク・検査を通す（作成時と同じ経路）
     const title = preCheck(input.title).masked.text;
@@ -78,14 +82,19 @@ export async function PATCH(request: Request, route: Context) {
     rubric.reference = content;
 
     const updates = await Promise.all([
-      db.from('lessons').update({ title, objectives: [title] as unknown as Json })
+      db.from('lessons').update({
+        title, objectives: [title] as unknown as Json,
+        ...(input.publish ? { status: 'published' as const } : {}),
+      })
         .eq('tenant_id', context.tenantId).eq('id', assignment.data.lesson_id),
       db.from('concepts').update({ name: title, description: content })
         .eq('tenant_id', context.tenantId).eq('id', question.data.concept_id),
       db.from('questions').update({ body, difficulty: input.difficulty, grading_rubric: rubric as Json })
         .eq('tenant_id', context.tenantId).eq('id', questionId),
-      db.from('assignments').update({ due_at: input.dueAt ?? null })
-        .eq('tenant_id', context.tenantId).eq('id', assignmentId),
+      db.from('assignments').update({
+        due_at: input.dueAt ?? null,
+        ...(input.publish ? { status: 'published' as const, published_at: new Date().toISOString(), approved_by: context.userId } : {}),
+      }).eq('tenant_id', context.tenantId).eq('id', assignmentId),
     ]);
     for (const result of updates) if (result.error) throw new Error(result.error.message);
 
@@ -93,9 +102,9 @@ export async function PATCH(request: Request, route: Context) {
       tenantId: context.tenantId, actorId: context.userId, actorRole: context.role,
       action: 'topic.update', resourceType: 'assignment', resourceId: assignmentId,
       result: 'allow', traceId: traceIdFrom(request),
-      detail: { difficulty: input.difficulty },
+      detail: { difficulty: input.difficulty, published: input.publish ?? false },
     });
-    return json({ assignmentId });
+    return json({ assignmentId, status: input.publish ? 'published' : assignment.data.status });
   } catch (error) {
     return routeError(error);
   }

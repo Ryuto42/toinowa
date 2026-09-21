@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
+import { adminDb } from '@/lib/database/admin';
 import { MetricCard, PageTitle, Panel, StatusPill } from '@/components/dashboard';
 
 export default async function AdminOverviewPage() {
@@ -13,10 +14,11 @@ export default async function AdminOverviewPage() {
     db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
     db.from('assessments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
     db.from('escalations').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).in('status', ['open', 'acknowledged']),
-    db.from('agent_runs').select('id,status,agent_name,created_at').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(5),
+    // agent_runs は authenticated 向けポリシーを持たない内部表。RLSクライアントでは常に0件になる。
+    adminDb().from('agent_runs').select('id,status,agent_name,created_at').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(5),
   ]);
   return <div>
-    <PageTitle eyebrow="Admin" title="全体状況" description="説明ワーク、AI分析、引き継ぎ、AI利用状況を一つの画面で確認します。" />
+    <PageTitle title="全体状況" description="説明ワーク、AI分析、引き継ぎ、AI利用状況を一つの画面で確認します。" />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="有効ユーザー" value={users.count ?? 0} />
       <MetricCard label="在籍生徒" value={students.count ?? 0} />

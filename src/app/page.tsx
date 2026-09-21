@@ -24,7 +24,6 @@ export default async function Home() {
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#096f68]"><BrandMark />{BRAND.shortName}</Link>
         <nav className="hidden items-center gap-8 text-xs font-semibold text-[#4b5369] sm:flex">
           <a href="#process" className="rounded-full bg-[#e9edff] px-4 py-2 text-[#4e5bc5]">学びのプロセス</a>
-          <a href="#cases" className="hover:text-[#087c73]">導入事例</a>
           <Link href="/login" className="hover:text-[#087c73]">ログイン</Link>
         </nav>
         <Link href="/login" aria-label="ログイン" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3d35c8] text-white shadow-sm"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="3" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg></Link>
@@ -39,7 +38,7 @@ export default async function Home() {
           <p className="mt-7 max-w-xl text-base leading-8 text-[#59647a] sm:text-lg">正解を急がせない、対話から深める学び。<br />授業のあとの小さなつまずきを、確かな理解へ。</p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Link href="/login" className="inline-flex items-center gap-2 rounded-full bg-[#087c73] px-6 py-3 text-sm font-bold text-white shadow-[0_8px_16px_-10px_rgba(0,100,90,0.7)] transition hover:bg-[#05675f]">授業の対話を体験する <span aria-hidden="true">→</span></Link>
-            <a href="#cases" className="rounded-full border border-[#e6e5ed] bg-white px-6 py-3 text-sm font-bold text-[#4a5369] shadow-sm transition hover:border-[#b9dcd5]">資料請求・デモ</a>
+            <a href="#process" className="rounded-full border border-[#e6e5ed] bg-white px-6 py-3 text-sm font-bold text-[#4a5369] shadow-sm transition hover:border-[#b9dcd5]">学びのプロセスを見る</a>
           </div>
           <div className="mt-8 flex flex-wrap gap-2 text-xs font-semibold text-[#66807d]">{subjects.map((subject) => <span key={subject} className="rounded-full bg-[#e7f5f1] px-3 py-1.5">{subject}</span>)}</div>
         </div>
@@ -64,6 +63,6 @@ export default async function Home() {
         ].map(([number, title, description, note]) => <article key={number} className="rounded-[22px] border border-[#e8e8ee] bg-white p-7"><p className="text-xs font-bold tracking-[0.18em] text-[#087c73]">{number}</p><h2 className="mt-5 text-base font-bold">{title}</h2><p className="mt-3 text-sm leading-6 text-[#69748b]">{description}</p><p className="mt-5 text-[10px] font-semibold text-[#47857d]">{note}</p></article>)}
       </section>
     </main>
-    <footer id="cases" className="border-t border-[#e7e8f1] bg-[#f1f3ff]"><div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-7 text-[11px] text-[#69738d] sm:px-10 lg:px-14"><span className="flex items-center gap-2 font-semibold text-[#087c73]"><BrandMark />{BRAND.shortName}</span><span>© 2024 StudyPilot. All rights reserved. 問いからはじまる、深い学びを。</span></div></footer>
+    <footer className="border-t border-[#e7e8f1] bg-[#f1f3ff]"><div className="mx-auto flex max-w-[1440px] items-center justify-between px-6 py-7 text-[11px] text-[#69738d] sm:px-10 lg:px-14"><span className="flex items-center gap-2 font-semibold text-[#087c73]"><BrandMark />{BRAND.shortName}</span><span>© {new Date().getFullYear()} {BRAND.name}. 問いからはじまる、深い学びを。</span></div></footer>
   </div>;
 }

@@ -34,10 +34,10 @@ describe('evaluatePace', () => {
   });
 
   it('16分以上かかれば、比率が範囲内でも too_slow', () => {
-    // 2000文字なら想定1667秒。1000秒は比率上は妥当だが…
-    expect(evaluatePace(2000, 1000).verdict).toBe('expected');
+    // 2000文字なら想定1667秒。800秒は比率上も範囲内で、15分未満。
+    expect(evaluatePace(2000, 800).verdict).toBe('expected');
     // 15分を超えたら離席とみなす
-    expect(evaluatePace(2000, 1000 + 15 * 60).verdict).toBe('too_slow');
+    expect(evaluatePace(2000, 15 * 60 + 1).verdict).toBe('too_slow');
   });
 
   it('減点は最大でも15%に留める', () => {

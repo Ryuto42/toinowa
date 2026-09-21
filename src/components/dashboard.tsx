@@ -1,5 +1,11 @@
-export function PageTitle({ title }: { eyebrow?: string; title: string; description?: string; action?: React.ReactNode }) {
-  return <header className="mb-8"><h1 className="text-3xl font-bold tracking-tight text-[#17233d] sm:text-[36px]">{title}</h1></header>;
+export function PageTitle({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+  return <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="min-w-0">
+      <h1 className="text-3xl font-bold tracking-tight text-[#17233d] sm:text-[36px]">{title}</h1>
+      {description ? <p className="mt-2 max-w-2xl text-sm leading-7 text-[#60708d]">{description}</p> : null}
+    </div>
+    {action ? <div className="shrink-0">{action}</div> : null}
+  </header>;
 }
 
 export function MetricCard({ label, value, note, tone = 'emerald' }: { label: string; value: string | number; note?: string; tone?: 'emerald' | 'amber' | 'rose' | 'slate' }) {

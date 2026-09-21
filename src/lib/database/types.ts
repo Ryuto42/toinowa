@@ -2563,6 +2563,14 @@ export interface Database {
         };
         Returns: number;
       };
+      undo_last_exchange: {
+        Args: {
+          p_tenant: string;
+          p_student: string;
+          p_conversation: string;
+        };
+        Returns: Json[];
+      };
     };
     CompositeTypes: {
       [_ in never]: never;

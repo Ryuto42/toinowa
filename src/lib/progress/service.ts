@@ -69,3 +69,24 @@ export async function markCompleted(tenantId: string, assignmentId: string, stud
   }, { onConflict: 'assignment_id,student_id' });
   if (error) throw new Error(error.message);
 }
+
+/**
+ * 学習の連続日数を更新する。完了した日を基準に、前日も完了していれば継続、
+ * 同じ日に複数完了しても増やさない。判定は Asia/Tokyo の暦日で行う。
+ */
+export async function updateStreak(tenantId: string, studentId: string) {
+  const db = adminDb();
+  const profile = await db.from('student_profiles').select('streak_days,last_active_on')
+    .eq('tenant_id', tenantId).eq('user_id', studentId).maybeSingle();
+  if (profile.error) throw new Error(profile.error.message);
+  if (!profile.data) return;
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const last = profile.data.last_active_on;
+  if (last === today) return;
+  const yesterday = new Date(Date.now() + 9 * 3600_000 - 86_400_000).toISOString().slice(0, 10);
+  const streak = last === yesterday ? (profile.data.streak_days ?? 0) + 1 : 1;
+  const { error } = await db.from('student_profiles')
+    .update({ streak_days: streak, last_active_on: today })
+    .eq('tenant_id', tenantId).eq('user_id', studentId);
+  if (error) throw new Error(error.message);
+}

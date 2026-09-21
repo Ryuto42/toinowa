@@ -8,7 +8,12 @@ import { assessmentAgent } from '@/lib/agents/catalog';
 import { computeMastery } from '@/lib/mastery/compute';
 import { combinePace, evaluatePace } from '@/lib/integrity/pace';
 import { checkRepeatedMisconception } from '@/lib/interventions/detectors';
-import { markCompleted } from '@/lib/progress/service';
+import { markCompleted, updateStreak } from '@/lib/progress/service';
+import { scheduleReview } from '@/lib/mastery/review';
+import { pushToStudent } from '@/lib/notifications/push';
+
+/** これ未満の確信度は先生の確認待ちにする（設計書12.2）。 */
+const LOW_CONFIDENCE = 0.6;
 import type { DifficultyLevel } from '@/lib/mastery/types';
 import type { Json } from '@/lib/database/types';
 
@@ -170,16 +175,61 @@ registerJobHandler('run_assessment', async (job) => {
     difficulty_at_time: question.data.difficulty,
     recommended_difficulty: question.data.difficulty,
     difficulty_reason: analysisNote,
-    reviewer_status: 'auto_approved',
+    // 観測が少ない・成分がばらついている評価は自動で確定させず、先生の確認へ回す。
+    reviewer_status: mastery.confidence < LOW_CONFIDENCE ? 'pending_review' : 'auto_approved',
     agent_run_id: result.meta.runId,
   }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
   // 分析まで終わったので課題を完了にする（生徒の自己申告ではなくここで決める）
   if (answer.data.assignment_id) {
     await markCompleted(job.tenant_id, answer.data.assignment_id, payload.studentId);
+    await updateStreak(job.tenant_id, payload.studentId);
   }
+  // 次の復習日を積む（間隔反復）。評価が確定したここでしか決められない。
+  await scheduleReview({
+    tenantId: job.tenant_id,
+    studentId: payload.studentId,
+    conceptId: question.data.concept_id,
+    assessmentId: inserted.data.id,
+    score: result.meta.degraded ? null : mastery.score,
+  });
   // 同じつまずきが続いていれば先生へ上げる
   await checkRepeatedMisconception(job.tenant_id, payload.studentId, question.data.concept_id);
   await queuePlanFromAssessment(job.tenant_id, inserted.data.id);
   return { nextStep: null, state: { assessmentId: inserted.data.id } };
+});
+
+/**
+ * 通知をブラウザのプッシュで届ける。
+ *
+ * 通知行は pg_cron（復習リマインド）やアプリ側が作る。ここは配信だけを担当し、
+ * 送れたものに delivered_at を立てる。VAPIDが未設定の環境でも落とさず、
+ * 「画面のお知らせには出る／プッシュは飛ばない」状態で動く。
+ */
+registerJobHandler('deliver_notifications', async (job) => {
+  const db = adminDb();
+  const pending = await db.from('notifications')
+    .select('id,student_id,title,body,href')
+    .eq('tenant_id', job.tenant_id).is('delivered_at', null)
+    .lte('scheduled_for', new Date().toISOString())
+    .order('scheduled_for').limit(50);
+  if (pending.error) throw new Error(pending.error.message);
+  const rows = pending.data ?? [];
+  if (!rows.length) return { nextStep: null, state: { delivered: 0 } };
+
+  let delivered = 0;
+  for (const row of rows) {
+    const sent = await pushToStudent({
+      tenantId: job.tenant_id, studentId: row.student_id,
+      title: row.title, body: row.body, href: row.href,
+    }).catch(() => false);
+    if (sent) delivered += 1;
+    // 送れても送れなくても既読待ちの通知として確定させる。
+    // 立てないと毎周期で同じ行を掴み続ける。
+    await db.from('notifications').update({
+      delivered_at: new Date().toISOString(),
+      ...(sent ? { delivered_channels: ['web' as const] } : {}),
+    }).eq('tenant_id', job.tenant_id).eq('id', row.id);
+  }
+  return { nextStep: null, state: { delivered, considered: rows.length } };
 });

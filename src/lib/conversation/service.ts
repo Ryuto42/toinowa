@@ -265,3 +265,26 @@ export function maybeQueueConversationSummary(input: { tenantId: string; convers
     traceId: input.traceId,
   }).then(() => triggerWorkerTick());
 }
+
+/**
+ * 直前の「生徒の送信 → AIの返信」を取り消す。
+ *
+ * 誤送信の取り返しがつかないと、生徒は書くこと自体をためらう。
+ * 取り消せるのは最後の1往復だけで、それより前には戻せない
+ * （評価の根拠が後からいくらでも書き換わると、分析が信用できなくなるため）。
+ */
+export async function undoLastExchange(context: AuthContext, conversationId: string) {
+  const conversation = await getConversation(context, conversationId);
+  if (conversation.state === 'completed') throw new Error('対話が終わっているため取り消せません');
+  // 消せる範囲を関数の中に閉じ込める。アプリ側から seq を指定できないようにするため、
+  // messages/answers への DELETE 権限は開けずに RPC 経由でのみ行う。
+  const { data, error } = await adminDb().rpc('undo_last_exchange', {
+    p_tenant: context.tenantId,
+    p_student: conversation.student_id,
+    p_conversation: conversationId,
+  });
+  if (error) throw new Error(error.message);
+  const row = (data as unknown as Array<{ restored_text: string | null; removed_count: number | null }> | null)?.[0];
+  if (!row) throw new Error('取り消せる送信がありません');
+  return { restoredText: row.restored_text ?? '', removedCount: row.removed_count ?? 0 };
+}

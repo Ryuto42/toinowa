@@ -9,7 +9,7 @@ const db = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 await db.connect();
 try {
   await db.query('begin');
-  for (const file of ['0017_feedback_privacy.sql','0018_student_planning.sql','0019_explanation_work.sql','0020_approval_decision.sql','0021_learning_service_grants.sql','0024_lease_safe_failure.sql']) {
+  for (const file of ['0017_feedback_privacy.sql','0018_student_planning.sql','0019_explanation_work.sql','0021_learning_service_grants.sql','0024_lease_safe_failure.sql','0031_undo_last_exchange.sql','0032_scope_teacher_write_policies.sql']) {
     const applied = await db.query('select 1 from private.schema_migrations where name=$1', [file]);
     if (!applied.rowCount) await db.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
   }
@@ -25,19 +25,19 @@ try {
   const create = 'select public.create_explanation_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) as id';
   const assignment = (await db.query(create,args)).rows[0].id;
   assert.equal((await db.query(create,args)).rows[0].id,assignment, '再実行で重複しない');
-  const approval = (await db.query('select id from public.approvals where resource_id=$1',[assignment])).rows[0].id;
   const claims = JSON.stringify({ sub: student.id, tenant_id: tenant, app_role: 'student', role: 'authenticated' });
   await db.query("select set_config('request.jwt.claims',$1,true)",[claims]);
   await db.query('set local role authenticated');
-  assert.equal((await db.query('select id from public.assignments where id=$1',[assignment])).rowCount,0,'未承認の課題は生徒へ見えない');
+  assert.equal((await db.query('select id from public.assignments where id=$1',[assignment])).rowCount,0,'下書きの課題は生徒へ見えない');
   assert.equal((await db.query('select id from public.learning_plans where id=$1',[plan])).rowCount,0,'計画表は生徒へ見えない');
   await db.query('reset role');
-  await db.query("select public.decide_learning_approval($1,$2,$3,'approved','',now()+interval '1 day')",[tenant,admin.id,approval]);
-  await db.query("select public.decide_learning_approval($1,$2,$3,'approved','',now()+interval '1 day')",[tenant,admin.id,approval]);
+  // 承認プロセスは廃止したので、下書きは先生が期限を決めて公開する（/api/topics/[id] と同じ更新）。
+  await db.query("update public.assignments set status='published', published_at=now(), due_at=now()+interval '1 day' where id=$1",[assignment]);
+  await db.query("update public.lessons set status='published' where id=(select lesson_id from public.assignments where id=$1)",[assignment]);
   const saved = (await db.query('select status,due_at from public.assignments where id=$1',[assignment])).rows[0];
   assert.equal(saved.status,'published'); assert(saved.due_at);
   await db.query('set local role authenticated');
-  assert.equal((await db.query('select id from public.assignments where id=$1',[assignment])).rowCount,1,'承認後に対象生徒が参照できる');
+  assert.equal((await db.query('select id from public.assignments where id=$1',[assignment])).rowCount,1,'公開後に対象生徒が参照できる');
   assert.equal((await db.query('select id from public.assessments where student_id=$1',[student.id])).rowCount,0,'生徒から詳細評価への直接アクセスを遮断');
   await db.query('reset role');
   const concept = (await db.query('select q.concept_id from public.questions q join public.assignments a on q.id=any(a.question_ids) where a.id=$1',[assignment])).rows[0].concept_id;
@@ -50,7 +50,14 @@ try {
   assert.equal((await db.query('select last_error from public.jobs_dead where id=$1', [job.id])).rows[0].last_error, 'blocked input');
   assert.equal((await db.query("select has_function_privilege('authenticated','public.fail_leased_job(uuid,uuid,text)','execute') as allowed")).rows[0].allowed, false);
   assert.equal((await db.query("select has_function_privilege('service_role','public.fail_job_permanently(uuid,text)','execute') as allowed")).rows[0].allowed, false);
-  console.log('PASS: リース所有権・失敗退避・旧RPC無効化 / DDL / お題の原子的作成 / 冪等性 / 承認・配信 / 計画・詳細評価の非公開');
+  // 取り消しRPCは最後の1往復だけを消す
+  const conversation = (await db.query("insert into public.conversations(tenant_id,student_id,concept_id,channel,state,message_count) values($1,$2,$3,'web','active',2) returning id",[tenant,student.id,concept])).rows[0].id;
+  await db.query("insert into public.messages(tenant_id,conversation_id,seq,actor,content_redacted,channel) values($1,$2,1,'agent','お題','web'),($1,$2,2,'student','間違えた説明','web')",[tenant,conversation]);
+  const undone = (await db.query('select * from public.undo_last_exchange($1,$2,$3)',[tenant,student.id,conversation])).rows[0];
+  assert.equal(undone.restored_text,'間違えた説明','取り消した文章を返す');
+  assert.equal((await db.query('select seq from public.messages where conversation_id=$1',[conversation])).rowCount,1,'AIの最初の問いかけは残る');
+  assert.equal((await db.query("select has_function_privilege('authenticated','public.undo_last_exchange(uuid,uuid,uuid)','execute') as allowed")).rows[0].allowed,false);
+  console.log('PASS: リース所有権・失敗退避・旧RPC無効化 / DDL / お題の原子的作成 / 冪等性 / 公開・配信 / 計画・詳細評価の非公開 / 送信の取り消し');
 } finally { await db.query('rollback'); await db.end(); }
 
 }

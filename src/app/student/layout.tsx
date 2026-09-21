@@ -9,6 +9,7 @@ export default async function StudentLayout({ children }: LayoutProps<'/student'
   return <AppShell roleLabel="生徒" userName={user.data?.display_name ?? '生徒'} homeHref="/student/home" nav={[
     { href: '/student/home', label: '今日の学習', icon: 'home' },
     { href: '/student/study', label: 'AIワーク', icon: 'chat' },
-    { href: '/student/records', label: 'フィードバック', icon: 'chart', badge: unread.count ?? 0 },
+    { href: '/student/records', label: 'フィードバック', icon: 'chart' },
+    { href: '/student/notifications', label: 'お知らせ', icon: 'bolt', badge: unread.count ?? 0 },
   ]}>{children}</AppShell>;
 }

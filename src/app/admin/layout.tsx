@@ -13,5 +13,6 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
     { href: '/admin/interventions', label: '介入', icon: 'bolt' },
     { href: '/admin/handoffs', label: '引き継ぎ', icon: 'check' },
     { href: '/admin/usage', label: 'AI利用状況', icon: 'chart' },
+    { href: '/admin/settings', label: '設定', icon: 'screen' },
   ]}>{children}</AppShell>;
 }

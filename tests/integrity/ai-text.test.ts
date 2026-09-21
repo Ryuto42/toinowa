@@ -43,13 +43,25 @@ describe('detectAiText', () => {
     expect(result.needsJudge).toBe(false);
   });
 
-  it('灰色のときだけLLM判定に回す', () => {
+  it('疑いが出たら必ずLLM判定に回す（反証を集めるため）', () => {
     // 手がかりが無ければ回さない
     expect(detectAiText(humanText, {}).needsJudge).toBe(false);
-    // 貼り付け＋速すぎ＝真っ黒なので、LLMに聞くまでもない
+    // 真っ黒に見えるときほど、反証を集めてから先生に出す
     const black = detectAiText(aiText, { pasteCount: 2, elapsedSec: 3, keystrokes: 2 });
     expect(black.score).toBeGreaterThanOrEqual(0.75);
-    expect(black.needsJudge).toBe(false);
+    expect(black.needsJudge).toBe(true);
+  });
+
+  it('弱い手がかり1つだけでは疑わない', () => {
+    // 文の長さが揃っているだけの、丁寧に書けた生徒の説明
+    const result = detectAiText(humanText, { elapsedSec: 180, keystrokes: 140, typingMs: 120_000, pasteCount: 0 });
+    expect(result.signals.length).toBe(1);
+    expect(result.score).toBeLessThan(0.35);
+  });
+
+  it('打鍵も貼り付けも0なら「計測できなかった」として証拠にしない', () => {
+    const result = detectAiText(aiText, { elapsedSec: 300, keystrokes: 0, pasteCount: 0 });
+    expect(result.signals.some((s) => s.key === 'keystroke_gap')).toBe(false);
   });
 
   it('スコアは常に 0..1 に収まる', () => {

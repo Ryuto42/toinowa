@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 export interface Escalation {
@@ -9,6 +10,7 @@ export interface Escalation {
   priority: string;
   status: string;
   created_at: string;
+  student_id?: string | null;
   payload?: unknown;
   users?: { display_name?: string } | null;
 }
@@ -37,29 +39,38 @@ function asStrings(value: unknown): string[] {
 export function InterventionList({ initial }: { initial: Escalation[] }) {
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  async function resolve(id: string) {
-    const note = window.prompt('対応内容を入力してください') ?? '';
-    setBusy(id);
+  async function close(id: string, verdict?: 'not_ai' | 'confirmed_ai') {
+    const note = verdict === 'not_ai' ? '先生が確認し、生成AIではないと判断しました。'
+      : verdict === 'confirmed_ai' ? '先生が確認し、生成AIの利用があったと判断しました。'
+      : '先生が確認しました。';
+    setBusy(id); setError('');
     try {
       const response = await fetch(`/api/escalations/${id}/resolve`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status: 'resolved', note }),
+        body: JSON.stringify({ status: 'resolved', note, ...(verdict ? { verdict } : {}) }),
       });
       if (response.ok) setItems((current) => current.filter((item) => item.id !== id));
+      else setError('保存できませんでした。時間をおいてもう一度お試しください。');
+    } catch {
+      setError('通信に失敗しました。');
     } finally {
       setBusy(null);
     }
   }
 
-  return <div className="space-y-3">{items.map((item) => {
+  return <div className="space-y-3">
+    {error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+    {items.map((item) => {
     const payload = asRecord(item.payload);
     const reasons = asStrings(payload.reasons);
     const humanSignals = asStrings(payload.humanSignals);
     const occurrences = Number(payload.occurrences ?? 1);
     const likelihood = typeof payload.likelihood === 'number' ? payload.likelihood : null;
     const excerpt = typeof payload.excerpt === 'string' ? payload.excerpt : '';
+    const suspectedAi = item.kind === 'ai_suspected';
 
     return <article key={item.id} className="rounded-xl border border-slate-200 p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -78,20 +89,45 @@ export function InterventionList({ initial }: { initial: Escalation[] }) {
               ? <span className="text-xs text-slate-500">{occurrences}回検知</span>
               : null}
             {likelihood !== null
-              ? <span className="text-xs text-slate-500">可能性 {Math.round(likelihood * 100)}%</span>
+              ? <span className="text-xs text-slate-500">目安 {Math.round(likelihood * 100)}%</span>
               : null}
           </div>
           <p className="mt-2 font-bold">{item.title}</p>
-          <p className="mt-1 text-sm text-slate-500">{item.users?.display_name ?? '対象生徒'}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {item.student_id
+              ? <Link href={`/teacher/students/${item.student_id}`} className="font-semibold text-[#237d75] underline">
+                  {item.users?.display_name ?? '対象生徒'}の学習記録を見る
+                </Link>
+              : (item.users?.display_name ?? '対象生徒')}
+          </p>
         </div>
-        <button
-          type="button"
-          disabled={busy === item.id}
-          onClick={() => resolve(item.id)}
-          className="shrink-0 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-        >
-          対応済みにする
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {suspectedAi ? <>
+            <button
+              type="button"
+              disabled={busy === item.id}
+              onClick={() => close(item.id, 'not_ai')}
+              className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-bold text-emerald-700 disabled:opacity-50"
+            >
+              問題なし
+            </button>
+            <button
+              type="button"
+              disabled={busy === item.id}
+              onClick={() => close(item.id, 'confirmed_ai')}
+              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+            >
+              AI利用と判断
+            </button>
+          </> : <button
+            type="button"
+            disabled={busy === item.id}
+            onClick={() => close(item.id)}
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+          >
+            確認しました
+          </button>}
+        </div>
       </div>
 
       {reasons.length || humanSignals.length || excerpt ? <details className="mt-3">

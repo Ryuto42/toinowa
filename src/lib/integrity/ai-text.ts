@@ -42,6 +42,19 @@ export interface HeuristicResult {
 const GREY_LOWER = 0.35;
 const GREY_UPPER = 0.75;
 
+/** 貼り付けが無いとき、ヒューリスティック単独で出せる上限。 */
+const HEURISTIC_ONLY_CEILING = 0.8;
+
+/**
+ * 分母の下限。
+ *
+ * 発火した指標の重みだけで割ると、弱い手がかりが1つ当たっただけで
+ * その指標の強さがそのままスコアになる（例: 文の長さが揃っている → 0.55）。
+ * 丁寧に書ける生徒が毎回疑われることになるので、
+ * 「いくつの材料が揃ったか」も効くように固定の下限で割る。
+ */
+const BASELINE_WEIGHT = 6;
+
 /** 論述的な接続表現。AIの文章は密度が高くなりやすい */
 const FORMAL_CONNECTIVES = /(また|さらに|一方で|したがって|このように|つまり|加えて|すなわち|具体的には|以上のように|重要です|考えられます|といえます)/gu;
 /** 生徒の書き言葉に出る、ためらい・口語のしるし */
@@ -85,7 +98,12 @@ export function detectAiText(text: string, signals: TypingSignals = {}): Heurist
   }
 
   // ── 打鍵数と文字数の乖離: 打たずに文字が増えている ──
-  if (typeof signals.keystrokes === 'number' && chars >= 40) {
+  //
+  // 打鍵0・貼り付け0は「打たずに書いた」ではなく「計測できなかった」。
+  // 日本語IMEの確定入力・音声入力・モバイルキーボード・支援技術では
+  // keydown が届かないことがある。計測不能を証拠として使わない。
+  const measured = !(pastes === 0 && signals.keystrokes === 0);
+  if (measured && typeof signals.keystrokes === 'number' && chars >= 40) {
     const perChar = signals.keystrokes / chars;
     if (perChar < 0.4) {
       out.push({
@@ -98,7 +116,7 @@ export function detectAiText(text: string, signals: TypingSignals = {}): Heurist
   }
 
   // ── 打鍵速度: 人が打てる速さを超えている ──
-  if (signals.typingMs && signals.typingMs > 0 && chars >= 40) {
+  if (measured && signals.typingMs && signals.typingMs > 0 && chars >= 40) {
     const cps = chars / (signals.typingMs / 1000);
     if (cps > 6) {
       out.push({
@@ -173,14 +191,20 @@ export function detectAiText(text: string, signals: TypingSignals = {}): Heurist
   }
 
   const totalWeight = out.reduce((a, s) => a + s.weight, 0);
-  const score = totalWeight
-    ? Math.min(1, out.reduce((a, s) => a + s.score * s.weight, 0) / totalWeight)
+  const raw = totalWeight
+    ? Math.min(1, out.reduce((a, s) => a + s.score * s.weight, 0) / Math.max(totalWeight, BASELINE_WEIGHT))
     : 0;
+
+  // 貼り付けが観測されていない限り、機械的な指標だけで断定させない。
+  // 「可能性100%」は誰も検証できない数字で、先生の判断を奪う。
+  const score = pastes > 0 ? raw : Math.min(raw, HEURISTIC_ONLY_CEILING);
 
   return {
     score,
     signals: out,
-    needsJudge: score >= GREY_LOWER && score < GREY_UPPER,
+    // 灰色だけでなく「黒に見えるもの」もLLM判定へ回す。
+    // 疑いが強いときほど反証が要る。
+    needsJudge: score >= GREY_LOWER,
   };
 }
 

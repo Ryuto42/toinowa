@@ -15,7 +15,9 @@
     "prebuild": "node scripts/prepare-pdf.mjs",
     "test:db": "tsx scripts/check-feature-schema.ts",
     "test:smoke": "tsx scripts/smoke-features.ts",
-    "benchmark:feedback": "tsx scripts/benchmark-feedback.ts"
+    "benchmark:feedback": "tsx scripts/benchmark-feedback.ts",
+    "db:worker": "tsx scripts/configure-worker.ts",
+    "db:reset-chats": "tsx scripts/reset-chats.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.53",
@@ -23,6 +25,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "@types/web-push": "^3.6.4",
     "ai": "^7.0.107",
     "date-fns": "^4.4.0",
     "js-tiktoken": "^1.0.21",
@@ -34,6 +37,7 @@
     "react-dom": "19.2.8",
     "react-hook-form": "^7.88.0",
     "server-only": "^0.0.1",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {

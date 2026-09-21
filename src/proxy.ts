@@ -13,6 +13,10 @@ function requiredRole(pathname: string): 'student' | 'teacher' | 'admin' | null 
   return null;
 }
 
+function homeFor(role: 'student' | 'teacher' | 'admin'): string {
+  return role === 'student' ? '/student/home' : role === 'teacher' ? '/teacher/dashboard' : '/admin/overview';
+}
+
 function isProtected(pathname: string): boolean {
   return (
     protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
@@ -57,16 +61,17 @@ export async function proxy(request: NextRequest) {
   }
 
   const needed = requiredRole(pathname);
+  // 管理者は先生の画面まで。生徒の画面はレイアウト側が requireRole('student') で弾くため、
+  // ここで通すとエラー画面になる。先に自分のホームへ戻す。
   const roleAllowed =
     needed === null ||
-    role === 'admin' ||
     role === needed ||
-    (needed === 'teacher' && role === 'teacher');
+    (role === 'admin' && needed === 'teacher');
   if (!roleAllowed) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL(homeFor(role), request.url));
   }
   return response;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { ConversationFeedback } from './feedback-card';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkTelemetry } from './use-work-telemetry';
 
 export interface ChatMessage {
@@ -26,6 +26,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const [completed, setCompleted] = useState(initialCompleted);
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  // 直前の1往復だけ取り消せる。取り消した直後は、さらに前へは戻せない。
+  const [canUndo, setCanUndo] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const sequence = useRef(Math.max(0, ...initialMessages.map((message) => message.seq)));
   // 取り組みの様子を裏で記録する（生徒には見せない）
   const telemetry = useWorkTelemetry(assignmentId);
@@ -35,7 +38,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     endOfMessages.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, busy]);
 
-  async function send(event: FormEvent) {
+  async function send(event: { preventDefault: () => void }) {
     event.preventDefault();
     const content = input.trim();
     if (!content || busy || completed) return;
@@ -107,6 +110,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       if (buffer.trim()) consume(buffer);
       setStreamingId(null);
       setBusy(false);
+      setCanUndo(true);
     } catch {
       setError('通信に失敗しました。もう一度送信してください。');
       setStreamingId(null);
@@ -114,8 +118,30 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     }
   }
 
+  async function undo() {
+    if (!canUndo || undoing || busy || completed) return;
+    setUndoing(true);
+    setError('');
+    try {
+      const response = await fetch('/api/conversations/' + conversationId + '/undo', { method: 'POST' });
+      const result = await response.json() as { restoredText?: string; message?: string };
+      if (!response.ok) { setError(result.message ?? '取り消せませんでした。'); return; }
+      // 画面からも最後の「生徒→AI」を外し、書いた文章を入力欄に戻す
+      setMessages((current) => {
+        const lastStudent = [...current].reverse().find((message) => message.actor === 'student');
+        return lastStudent ? current.filter((message) => message.seq < lastStudent.seq) : current;
+      });
+      setInput(result.restoredText ?? '');
+      setCanUndo(false);
+    } catch {
+      setError('通信に失敗しました。');
+    } finally {
+      setUndoing(false);
+    }
+  }
+
   return <div className="grid gap-4">
-    <div role="log" aria-live="polite" className="min-h-[520px] space-y-5 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+    <div role="log" aria-live="polite" className="h-[min(58vh,560px)] space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
       {messages.length === 0 ? <div className="mx-auto max-w-md py-20 text-center"><p className="text-lg font-bold">AIへの説明を始めましょう</p><p className="mt-2 text-sm leading-6 text-slate-500">授業で学んだ概念を、何も知らないAIに教えてください。</p></div> : null}
       {messages.map((message) => {
         const isStudent = message.actor === 'student';
@@ -134,10 +160,25 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
         <button type="button" onClick={() => setInput('この概念は何を表すのかを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">意味を説明する</button>
         <button type="button" onClick={() => setInput('理由や他の概念とのつながりを説明します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">つながりを説明する</button>
         <button type="button" onClick={() => setInput('具体例やたとえを追加します')} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs">具体例を出す</button>
+        {canUndo ? <button
+          type="button"
+          onClick={undo}
+          disabled={undoing || busy}
+          className="ml-auto rounded-full border border-slate-400 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 disabled:opacity-50"
+        >
+          {undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}
+        </button> : null}
       </div>
       <form onSubmit={send} className="flex gap-2">
         <label className="sr-only" htmlFor="chat-input">AIへの説明</label>
-        <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={telemetry.onKeyDown} onPaste={telemetry.onPaste} rows={3} maxLength={8000} placeholder="AIに教える内容を、自分の言葉で書いてください" className="min-h-16 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-emerald-600" />
+        <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
+          telemetry.onKeyDown();
+          // 日本語入力の変換確定でEnterが来るので、変換中は送信しない
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            void send(event);
+          }
+        }} onPaste={telemetry.onPaste} rows={3} maxLength={8000} placeholder="AIに教える内容を、自分の言葉で書いてください（Enterで送信／Shift+Enterで改行）" className="min-h-16 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-emerald-600" />
         <button disabled={busy || !input.trim()} className="self-end rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? <span className="inline-flex items-center gap-2"><Spinner light />考え中…</span> : '送信'}</button>
       </form>
     </>}

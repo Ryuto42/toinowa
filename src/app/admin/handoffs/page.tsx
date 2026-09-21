@@ -22,7 +22,7 @@ export default async function AdminHandoffsPage() {
     teacherByClassroom.set(enrollment.classroom_id, [...(teacherByClassroom.get(enrollment.classroom_id) ?? []), teacher.display_name]);
   }
   return <div>
-    <PageTitle eyebrow="Admin" title="引き継ぎ" description="生徒のつまずきや安全上の確認事項を、担当できる先生と一緒に確認します。" />
+    <PageTitle title="引き継ぎ" description="生徒のつまずきや安全上の確認事項を、担当できる先生と一緒に確認します。" />
     <Panel title="未対応の引き継ぎ">
       {escalations.data?.length ? <div className="space-y-4">{escalations.data.map((item) => <article key={item.id} className="rounded-2xl border border-slate-200 p-5"><div className="flex flex-wrap items-center gap-2"><StatusPill tone={item.priority === 'urgent' || item.priority === 'high' ? 'rose' : 'amber'}>{item.priority}</StatusPill><StatusPill tone="slate">{item.kind}</StatusPill><span className="text-xs text-slate-500">{formatDateTime(item.created_at)}</span></div><h2 className="mt-3 font-bold">{item.title}</h2><dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-slate-500">生徒</dt><dd className="font-bold">{item.student_id ? userById.get(item.student_id)?.display_name ?? '登録ユーザー' : '未指定'}</dd></div><div><dt className="text-slate-500">クラス</dt><dd className="font-bold">{item.classroom_id ? classroomById.get(item.classroom_id) ?? '登録クラス' : '未指定'}</dd></div><div><dt className="text-slate-500">担当できる先生</dt><dd className="font-bold">{item.classroom_id ? teacherByClassroom.get(item.classroom_id)?.join('、') || '担当未設定' : 'クラス未指定'}</dd></div></dl></article>)}</div> : <EmptyState>未対応の引き継ぎはありません。</EmptyState>}
     </Panel>
