@@ -19,7 +19,8 @@
     "db:worker": "tsx scripts/configure-worker.ts",
     "db:reset-chats": "tsx scripts/reset-chats.ts",
     "guide:capture": "tsx scripts/capture-guide.ts",
-    "check:guardrail": "tsx scripts/check-guardrail.ts"
+    "check:guardrail": "tsx scripts/check-guardrail.ts",
+    "check:injection": "tsx scripts/check-injection.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.53",

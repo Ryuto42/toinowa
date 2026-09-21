@@ -65,6 +65,28 @@ const rules: Array<{ category: string; risk: Exclude<SafetyRisk, 'none'>; patter
   },
 ];
 
+/**
+ * Base64 らしき塊を復号して、中身をもう一度検査する。
+ *
+ * 長さだけで弾くと、短い指示文（44文字程度）が素通りする。
+ * かといって閾値を下げると、ハッシュやIDを巻き込んで誤検知する。
+ * 復号して読めば、中身が命令かどうかで判断できる。
+ * 入れ子の攻撃を追いかけると際限がないので、1段だけ剥がす。
+ */
+function decodedPayloads(text: string): string[] {
+  const out: string[] = [];
+  for (const chunk of text.match(/[A-Za-z0-9+/]{24,}={0,2}/g) ?? []) {
+    try {
+      const decoded = Buffer.from(chunk, 'base64').toString('utf8');
+      // 復号できたことにして文字化けを流すと、記号だらけの文字列で誤検知する。
+      if (decoded.length >= 8 && !/\uFFFD/u.test(decoded)) out.push(decoded);
+    } catch {
+      // 復号できないものは、ただの英数字の並び。
+    }
+  }
+  return out;
+}
+
 function maxRisk(a: SafetyRisk, b: SafetyRisk): SafetyRisk {
   const order: SafetyRisk[] = ['none', 'low', 'medium', 'high'];
   return order[Math.max(order.indexOf(a), order.indexOf(b))];
@@ -80,8 +102,12 @@ export function inspectInput(input: string): InputInspection {
   const categories: string[] = [];
   const matched: string[] = [];
 
+  const decoded = decodedPayloads(inspected);
+
   for (const rule of rules) {
-    const match = inspected.match(rule.pattern) ?? compactJapanese.match(rule.pattern);
+    const match = inspected.match(rule.pattern)
+      ?? compactJapanese.match(rule.pattern)
+      ?? decoded.map((payload) => payload.match(rule.pattern)).find(Boolean) ?? null;
     if (!match) continue;
     risk = maxRisk(risk, rule.risk);
     categories.push(rule.category);

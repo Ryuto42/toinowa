@@ -4,12 +4,18 @@ import { ApiInputError, json, routeError, traceIdFrom } from '@/lib/api/http';
 import { documentImagesSchema, hasImageSignature } from '@/lib/materials/images';
 import { callModel } from '@/lib/orcarouter/call';
 import { preCheck, postCheck } from '@/lib/security/guard';
+import { assertAiRateLimit } from '@/lib/api/rate-limit';
 
 export const maxDuration = 60;
 const output = z.object({ text: z.string().min(1).max(20000), uncertainties: z.array(z.string().max(200)).max(12) });
 export async function POST(request: Request) {
   try {
     const context = await requireRole('teacher', 'admin');
+    // 画像の読み取りは1回が重い。連打と暴走を、費用に届く前に止める。
+    await assertAiRateLimit({
+      tenantId: context.tenantId, userId: context.userId, limit: 12,
+      message: '資料の読み取りが集中しています。少し待ってからもう一度お試しください。',
+    });
     const reader = request.body?.getReader();
     if (!reader) throw new ApiInputError('画像が必要です');
     const chunks: Uint8Array[] = [];

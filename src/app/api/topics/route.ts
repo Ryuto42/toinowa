@@ -8,6 +8,7 @@ import { topicStudentContext } from '@/lib/materials/student-context';
 import { json, parseJson, routeError, traceIdFrom, ApiInputError } from '@/lib/api/http';
 import { preCheck } from '@/lib/security/guard';
 import { recordAudit } from '@/lib/security/audit';
+import { assertAiRateLimit } from '@/lib/api/rate-limit';
 
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('propose'), classroomId: z.uuid(), studentId: z.uuid().optional(), title: z.string().trim().max(200).default(''), content: z.string().trim().max(20000).default('') }).refine(value => Boolean(value.title || value.content), 'テーマか学んだ内容を入力してください'),
@@ -37,6 +38,11 @@ export async function POST(request: Request) {
     const content = body.content ? preCheck(body.content).masked.text : '';
     const traceId = traceIdFrom(request);
     if (body.action === 'propose') {
+      // AIを呼ぶのは propose だけ。publish は保存のみなので数えない。
+      await assertAiRateLimit({
+        tenantId: context.tenantId, userId: context.userId, limit: 20,
+        message: 'お題の作成が集中しています。少し待ってからもう一度お試しください。',
+      });
       const history = body.studentId ? await topicStudentContext(context, body.studentId, body.classroomId) : null;
       const proposal = await topicAgent.run({ content, theme: body.title ? preCheck(body.title).masked.text : '', subject: classroom.data.subject ?? '', grade: classroom.data.grade ?? '', studentContext: history?.text ?? '' }, { tenantId: context.tenantId, userId: context.userId, studentId: body.studentId, traceId, modelClass: 'standard' });
       return json({ proposal: proposal.data, history: { conversationsUsed: history?.conversationsUsed ?? 0, feedbackUsed: history?.feedbackUsed ?? 0 } });
