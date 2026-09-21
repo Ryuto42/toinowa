@@ -24,6 +24,9 @@ export class SchemaRepairFailed extends Error {
 
 /** Guardrails / Firewall / 自前Safety層による遮断 */
 export class SafetyBlocked extends Error {
+  /** 記録と要フォローの起票が済んだか。経路が重なっても二重に残さないための印。 */
+  reported = false;
+
   constructor(
     readonly source: 'orca_guardrail' | 'orca_firewall' | 'app_rule' | 'app_classifier',
     readonly rule: string,

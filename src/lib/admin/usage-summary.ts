@@ -29,17 +29,18 @@ export function usageFeature(requestType: string): { feature: string; location: 
   const features: Record<string, [string, string]> = {
     analyze_exam_profile: ['模試からのプロフィール提案', '管理者：ユーザー登録・編集'],
     extract_exam: ['模試の読み取り', '管理者：ユーザー登録・編集'],
-    extract_lesson: ['授業資料の読み取り', '先生：説明ワーク作成'],
-    propose_explanation_work: ['お題の自動作成', '先生：説明ワーク作成'],
+    extract_lesson: ['授業資料の読み取り', '先生：課題作成'],
+    propose_explanation_work: ['お題の自動作成', '先生：課題作成'],
     analyze_lesson: ['授業の分析', '先生：授業資料'],
     student_tutorial: ['初回チャットの練習', '生徒：自己紹介チュートリアル'],
-    learning_support: ['生徒との対話', '生徒：説明ワーク'],
+    learning_support: ['生徒との対話', '生徒：課題'],
     assess_answer: ['最終フィードバック', '対話完了後の自動処理'],
     build_learning_plan: ['学習計画・次回の提案', '授業記録・模試・対話完了後の個別計画'],
     teacher_insight: ['クラスの分析', '先生：クラスの状況'],
     summarize_conversation: ['対話履歴の要約', '長い対話の自動処理'],
     ai_text_judge: ['回答の整合性チェック', '生徒の説明の分析'],
     safety_classify: ['安全性チェック', '入力の安全性判定'],
+    voice_transcribe: ['声での説明の書き起こし', '生徒：課題（音声入力）'],
   };
   const value = features[requestType];
   return value ? { feature: value[0], location: value[1] } : { feature: requestType === 'unknown' ? '機能未記録' : requestType, location: '自動処理' };

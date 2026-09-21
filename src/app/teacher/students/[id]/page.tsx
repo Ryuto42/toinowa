@@ -90,7 +90,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
 
     <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <Panel title="いまの理解度" description={`${current.length}概念の最新評価から算出`}>
-        <ScoreRing value={average} caption={average === null ? '説明ワークの提出を待っています。' : `完了 ${progressCounts.completed}件 / 取り組み中 ${progressCounts.inProgress}件`} />
+        <ScoreRing value={average} caption={average === null ? '課題の提出を待っています。' : `完了 ${progressCounts.completed}件 / 取り組み中 ${progressCounts.inProgress}件`} />
         <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-[#f3f7f7] p-3">
             <p className="text-xs text-[#8a9ab2]">学習継続</p>
@@ -121,7 +121,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     </div> : null}
 
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
-      <Panel title="提出ごとの分析" description="行を選ぶと、その説明ワークの詳しい分析を開きます">
+      <Panel title="提出ごとの分析" description="行を選ぶと、その課題の詳しい分析を開きます">
         {rows.length ? <div className="divide-y divide-slate-100">{rows.map((row) => {
           const score = row.override_score ?? row.score;
           return <Link key={row.id} href={`/teacher/students/${id}/assessments/${row.id}`}

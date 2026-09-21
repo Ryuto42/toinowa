@@ -46,12 +46,12 @@ export function ConceptChatLauncher({
           });
           const result = await response.json().catch(() => ({})) as ConversationResponse;
           if (!response.ok || !result.conversation?.id) {
-            throw new Error(result.message ?? 'AIワークを開始できませんでした。');
+            throw new Error(result.message ?? '課題を開始できませんでした。');
           }
           const messageResponse = await fetch('/api/conversations/' + result.conversation.id + '/messages');
           const messageResult = await messageResponse.json().catch(() => ({})) as { messages?: ChatMessage[]; message?: string };
           if (!messageResponse.ok) {
-            throw new Error(messageResult.message ?? 'AIワークの問いを読み込めませんでした。');
+            throw new Error(messageResult.message ?? '課題の問いを読み込めませんでした。');
           }
           return {
             conversationId: result.conversation.id,
@@ -69,7 +69,7 @@ export function ConceptChatLauncher({
         setCompleted(result.completed);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'AIワークを読み込めませんでした。');
+        if (!cancelled) setError(reason instanceof Error ? reason.message : '課題を読み込めませんでした。');
       });
     return () => { cancelled = true; };
   }, [assignmentId, conceptId, lessonId, retryCount]);

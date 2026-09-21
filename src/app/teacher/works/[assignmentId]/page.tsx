@@ -92,9 +92,9 @@ export default async function WorkAnalysisPage({ params }: PageProps<'/teacher/w
     .sort((a, b) => b.count - a.count).map((entry) => entry.item);
 
   return <div>
-    <p className="mb-3 text-sm"><Link href="/teacher/assignments" className="font-bold text-[#237d75]">‹ 説明ワーク一覧へ戻る</Link></p>
+    <p className="mb-3 text-sm"><Link href="/teacher/assignments" className="font-bold text-[#237d75]">‹ 課題一覧へ戻る</Link></p>
     <PageTitle
-      title={work.lessons?.title ?? '概念説明ワーク'}
+      title={work.lessons?.title ?? '課題'}
       description={`${work.classrooms?.name ?? 'クラス'} · ${work.student_id ? '個別配信' : 'クラス全員'} · Lv.${question.data?.difficulty ?? 2} · 期限 ${formatDate(work.due_at)}`}
     />
 

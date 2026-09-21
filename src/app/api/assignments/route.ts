@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     const questionCheck = await db.from('questions').select('id,format').eq('tenant_id', context.tenantId).in('id', body.questionIds);
     if (questionCheck.error) throw new Error(questionCheck.error.message);
     const validIds = new Set((questionCheck.data ?? []).filter((question) => question.format === 'explain').map((question) => question.id));
-    if (validIds.size !== body.questionIds.length) throw new Error('概念説明ワークに使える説明形式のテーマだけを選択してください');
+    if (validIds.size !== body.questionIds.length) throw new Error('課題に使える説明形式のテーマだけを選択してください');
     const { data, error } = await db.from('assignments').insert({
       tenant_id: context.tenantId,
       lesson_id: body.lessonId,

@@ -89,6 +89,7 @@ export function InterventionList({ initial, studentBase = '/teacher/students' }:
     const occurrences = Number(payload.occurrences ?? 1);
     const likelihood = typeof payload.likelihood === 'number' ? payload.likelihood : null;
     const excerpt = typeof payload.excerpt === 'string' ? payload.excerpt : '';
+    const matched = asStrings(payload.matched);
     const suspectedAi = item.kind === 'ai_suspected';
 
     return <article key={item.id} className="rounded-xl border border-slate-200 p-4">
@@ -149,7 +150,7 @@ export function InterventionList({ initial, studentBase = '/teacher/students' }:
         </div>
       </div>
 
-      {reasons.length || humanSignals.length || excerpt ? <details className="mt-3">
+      {reasons.length || humanSignals.length || excerpt || matched.length ? <details className="mt-3">
         <summary className="cursor-pointer text-sm font-semibold text-[#237d75]">根拠を見る</summary>
         <div className="mt-3 space-y-3 text-sm">
           {reasons.length ? <div>
@@ -164,6 +165,10 @@ export function InterventionList({ initial, studentBase = '/teacher/students' }:
             <ul className="mt-1 list-disc space-y-1 pl-5 leading-6 text-slate-600">
               {humanSignals.map((signal, index) => <li key={index}>{signal}</li>)}
             </ul>
+          </div> : null}
+          {matched.length ? <div>
+            <p className="font-bold text-slate-700">検知した表現</p>
+            <p className="mt-1 rounded-lg bg-rose-50 p-3 leading-6 text-rose-800">{matched.join(' / ')}</p>
           </div> : null}
           {excerpt ? <div>
             <p className="font-bold text-slate-700">提出された説明の冒頭</p>

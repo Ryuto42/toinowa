@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { LogoutButton } from '@/components/logout-button';
 
 export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart' | 'handoff' | 'settings' | 'key' | 'bell';
@@ -10,7 +11,38 @@ export interface SidebarNavItem {
   href: string;
   label: string;
   icon?: NavIconName;
+  /** まだ確認していない件数。0 のときは出さない。 */
   badge?: number;
+  /** バッジを消すためのキー。開いた時点でサーバーへ既読を送る。 */
+  badgeKey?: string;
+}
+
+/**
+ * 開いているタブのバッジは、その場で消す。
+ *
+ * サーバーの既読を待って次の遷移で消すと、
+ * 「見ているのに未確認と言われる」状態が1画面ぶん残る。
+ * 表示は現在地から導き、既読の保存が終わってからサーバーの件数を取り直す。
+ */
+function useSeenBadges(items: SidebarNavItem[], activeHref: string | null, persist: boolean) {
+  const router = useRouter();
+  const active = items.find((item) => item.href === activeHref);
+  const activeKey = active?.badgeKey;
+  const hasBadge = Boolean(active?.badge);
+
+  useEffect(() => {
+    // サイドバーと下部タブは同時に描画される。保存は片方だけに任せ、二重送信を避ける。
+    if (!persist || !activeKey || !hasBadge) return;
+    let cancelled = false;
+    void fetch('/api/nav-seen', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ key: activeKey }),
+    }).then(() => { if (!cancelled) router.refresh(); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [activeKey, hasBadge, persist, router]);
+
+  return (item: SidebarNavItem) => (item.href === activeHref ? 0 : item.badge ?? 0);
 }
 
 function NavIcon({ name }: { name: NavIconName }) {
@@ -33,16 +65,19 @@ function NavIcon({ name }: { name: NavIconName }) {
 export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavItem[]; homeHref: string; userName: string }) {
   const pathname = usePathname();
   const initial = userName.trim().charAt(0) || 'U';
+  const activeHref = items.find((item) => pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`)))?.href ?? null;
+  const badgeOf = useSeenBadges(items, activeHref, true);
   return <>
     <nav aria-label="メインナビゲーション" className="space-y-1.5">
       {items.map((item) => {
-        const active = pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`));
+        const active = item.href === activeHref;
+        const badge = badgeOf(item);
         // 現在地の切り替えも動きでつなぐ。瞬時に入れ替わると、どこからどこへ移ったのかが残らない。
         return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined}
           className={`nav-item group flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-semibold ${active ? 'bg-white text-slate-900 shadow-[0_8px_22px_-18px_rgba(15,23,42,0.45)]' : 'text-[#527b78] shadow-none hover:bg-white/70 hover:text-[#006f68]'}`}>
           <span className={`transition-colors duration-300 ${active ? 'text-[#008477]' : 'text-[#6f9792]'}`}><NavIcon name={item.icon ?? 'dashboard'} /></span>
           <span className="flex-1">{item.label}</span>
-          {item.badge ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">{item.badge}</span> : null}
+          {badge ? <span aria-label={`未確認 ${badge}件`} className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold text-white">{badge}</span> : null}
         </Link>;
       })}
     </nav>
@@ -57,6 +92,8 @@ export function SidebarNav({ items, homeHref, userName }: { items: SidebarNavIte
 /** スマホでは左のサイドバーが出せないため、下部タブとして同じ導線を出す。 */
 export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHref: string }) {
   const pathname = usePathname();
+  const activeHref = items.find((item) => pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`)))?.href ?? null;
+  const badgeOf = useSeenBadges(items, activeHref, false);
   return <nav
     data-shell-mobile-nav
     aria-label="メインナビゲーション"
@@ -64,7 +101,8 @@ export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHr
   >
     <ul className="flex items-stretch">
       {items.map((item) => {
-        const active = pathname === item.href || (item.href !== homeHref && pathname.startsWith(`${item.href}/`));
+        const active = item.href === activeHref;
+        const badge = badgeOf(item);
         return <li key={item.href} className="flex-1">
           <Link
             href={item.href}
@@ -73,7 +111,7 @@ export function MobileNav({ items, homeHref }: { items: SidebarNavItem[]; homeHr
           >
             <NavIcon name={item.icon ?? 'dashboard'} />
             <span className="text-center">{item.label}</span>
-            {item.badge ? <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold text-white">{item.badge}</span> : null}
+            {badge ? <span aria-label={`未確認 ${badge}件`} className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold text-white">{badge}</span> : null}
           </Link>
         </li>;
       })}

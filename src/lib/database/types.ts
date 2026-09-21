@@ -236,6 +236,7 @@ export interface Database {
           created_at: string;
           actor_id: string | null;
           cached_input_tokens: number;
+          audio_input_tokens: number;
         };
         Insert: {
           id?: string;
@@ -264,6 +265,7 @@ export interface Database {
           created_at?: string;
           actor_id?: string | null;
           cached_input_tokens?: number;
+          audio_input_tokens?: number;
         };
         Update: {
           id?: string;
@@ -292,6 +294,7 @@ export interface Database {
           created_at?: string;
           actor_id?: string | null;
           cached_input_tokens?: number;
+          audio_input_tokens?: number;
         };
         Relationships: [
           {
@@ -2129,6 +2132,42 @@ export interface Database {
             columns: ['tenant_id'];
             isOneToOne: false;
             referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      nav_seen: {
+        Row: {
+          tenant_id: string;
+          user_id: string;
+          nav_key: string;
+          seen_at: string;
+        };
+        Insert: {
+          tenant_id: string;
+          user_id: string;
+          nav_key: string;
+          seen_at?: string;
+        };
+        Update: {
+          tenant_id?: string;
+          user_id?: string;
+          nav_key?: string;
+          seen_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'nav_seen_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'nav_seen_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
             referencedColumns: ['id'];
           },
         ];

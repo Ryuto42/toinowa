@@ -283,7 +283,7 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 id={headingId} className="text-xl font-bold">{target?.status === 'draft' ? 'AIの提案を確認して配信' : '説明ワークを編集'}</h2>
+          <h2 id={headingId} className="text-xl font-bold">{target?.status === 'draft' ? 'AIの提案を確認して配信' : '課題を編集'}</h2>
           <p className="mt-1 text-sm text-slate-500">
             {target ? `${target.classroomName} · ${target.targetName}` : ''}
           </p>

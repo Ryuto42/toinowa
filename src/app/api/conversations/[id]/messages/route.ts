@@ -12,7 +12,10 @@ import { after } from 'next/server';
 import { adminDb } from '@/lib/database/admin';
 import { recordAnswerIntegrity } from '@/lib/integrity/record';
 import { classroomOfStudent, raiseEscalation } from '@/lib/interventions/raise';
+import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
+import { WELLBEING_TITLES, detectWellbeing } from '@/lib/security/wellbeing';
+import { recordGuardEvent } from '@/lib/security/audit';
 import { classForDifficulty } from '@/lib/orcarouter/selection';
 import { learningSupportAgent } from '@/lib/agents/catalog';
 
@@ -59,21 +62,18 @@ export async function GET(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);
@@ -124,6 +124,34 @@ export async function POST(request: Request, route: Context) {
       channelMessageId: body.channelMessageId,
     });
     const traceId = traceIdFrom(request);
+    // つらい相談は遮断しない。返信はそのまま続けたうえで、先生の要フォローに上げる。
+    if (context.role === 'student') {
+      const signal = detectWellbeing(body.content);
+      if (signal) {
+        const { tenantId, userId } = context;
+        after(async () => {
+          recordGuardEvent({
+            tenantId,
+            studentId: userId,
+            conversationId,
+            source: 'app_rule',
+            category: signal.category,
+            rule: 'wellbeing_keyword',
+            matchedExcerpt: signal.matched.join(' / '),
+          });
+          await raiseEscalation({
+            tenantId,
+            studentId: userId,
+            classroomId: await classroomOfStudent(tenantId, userId),
+            kind: 'distress',
+            priority: 'urgent',
+            title: WELLBEING_TITLES[signal.category],
+            payload: { category: signal.category, matched: signal.matched },
+            dedupeHours: 6,
+          });
+        });
+      }
+    }
     if (conversation.purpose === 'tutorial') {
       const finishRequested = body.content === TUTORIAL_STOP_MESSAGE;
       let message = TUTORIAL_FINISH;
@@ -169,6 +197,8 @@ export async function POST(request: Request, route: Context) {
           typingMs: body.telemetry?.typingMs ?? null,
           keystrokes: body.telemetry?.keystrokes ?? null,
           pasteCount: body.telemetry?.pasteCount ?? null,
+          voiceChunks: body.telemetry?.voiceChunks ?? null,
+          voiceHesitation: body.telemetry?.voiceHesitation ?? null,
         },
       }));
     }
@@ -187,7 +217,10 @@ export async function POST(request: Request, route: Context) {
       const difficulty = question?.data?.difficulty ?? 2;
       const result = await learningSupportAgent.run({
         studentMessage: body.content,
-        context: `お題: ${question?.data?.body ?? ''}\n${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
+        context: `お題: ${question?.data?.body ?? ''}\n${
+          // 音声は書き言葉にならない。言い回しの粗さを理由に減点させない。
+          body.spoken ? '※この発言は音声入力です。話し言葉であることや聞き取りの揺れを理由に減点しないでください。\n' : ''
+        }${buildConversationContext(conversation.summary, fullMessages, 8000)}`,
         hintLevel: decision.intent === 'hint' ? 1 : 0,
         studentTurn,
         maxTurns: MAX_EXPLANATION_TURNS,
@@ -224,21 +257,18 @@ export async function POST(request: Request, route: Context) {
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
+    // モデル呼び出しの中で遮断されたぶんは call.ts が記録済み。
+    // ここで拾うのは、呼び出し前の preCheck で止めた入力。
     if (error instanceof SafetyBlocked) {
       const context = await requireAuth().catch(() => null);
-      if (context?.role === 'student') {
-        after(async () => {
-          await raiseEscalation({
-            tenantId: context.tenantId,
-            studentId: context.userId,
-            classroomId: await classroomOfStudent(context.tenantId, context.userId),
-            kind: 'safety',
-            priority: 'urgent',
-            title: '安全性チェックで生徒の入力を遮断しました',
-            payload: { source: error.source, rule: error.rule, blockedTools: error.blockedTools },
-            dedupeHours: 6,
-          });
-        });
+      if (context) {
+        const { tenantId, role, userId } = context;
+        after(() => reportSafetyBlock({
+          error,
+          tenantId,
+          studentId: role === 'student' ? userId : null,
+          escalate: role === 'student',
+        }));
       }
     }
     return routeError(error);

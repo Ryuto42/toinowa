@@ -6,7 +6,8 @@ import { formatUsd, formatDateTime } from '@/lib/shared/format';
 import { DataTable } from '@/components/data-table';
 import type { summarizeUsage } from '@/lib/admin/usage-summary';
 
-interface Usage { recent: Array<{ id: string; requestType: string; userName: string; model: string | null; costUsd: number; createdAt: string; status: string }>; budget: { limitUsd: number; spentUsd: number }; unpricedRuns: number; grouped: ReturnType<typeof summarizeUsage>; summary: { requests: number; costUsd: number; tokens: number; inputTokens: number; cachedTokens: number }; truncated: boolean; updatedAt: string }
+interface Usage { recent: Array<{ id: string; requestType: string; userName: string; model: string | null; costUsd: number; createdAt: string; status: string }>; budget: { limitUsd: number; spentUsd: number }; unpricedRuns: number; estimatedRuns: number; grouped: ReturnType<typeof summarizeUsage>; summary: { requests: number; costUsd: number; tokens: number; inputTokens: number; cachedTokens: number }; truncated: boolean; updatedAt: string }
+
 /** 本日の予算の使用割合。バーだと残りが読み取りにくいので、円で「残り」を面で見せる。 */
 function BudgetDonut({ spent, limit }: { spent: number; limit: number }) {
   const ratio = limit > 0 ? Math.min(spent / limit, 1) : 0;
@@ -104,6 +105,6 @@ export function UsageMonitor({ modelStatus }: { modelStatus?: React.ReactNode })
         { key: 'failures', label: '要確認', align: 'right', hideOnMobile: true, sortBy: row => row.failures, render: row => row.failures },
         { key: 'lastUsed', label: '直近の利用', align: 'right', sortBy: row => row.lastUsed, render: row => <span className="whitespace-nowrap">{formatDateTime(row.lastUsed)}</span> },
       ]}
-    /></div><details className="mt-5 rounded-xl bg-white p-4"><summary className="cursor-pointer font-bold">直近30件の実行履歴</summary><ul className="mt-3 divide-y">{data.recent.map(run => <li key={run.id} className="py-3 text-sm"><Link className="font-bold text-emerald-800 underline" href={`/admin/usage/runs/${run.id}`}>{usageFeature(run.requestType).feature}</Link><p className="mt-1">{run.userName} ・ {formatDateTime(run.createdAt)} ・ {formatUsd(run.costUsd)}</p><p className="text-xs text-slate-500">{usageFeature(run.requestType).location} ・ {run.model ?? 'モデル未到達'} ・ {run.status}</p></li>)}</ul></details><p className="mt-3 text-xs text-slate-500">利用者・機能・モデルごとの実行記録を集計。費用は取得できた応答分の合計です。代替・修復前の費用も含み、行のモデル名は最終応答のモデルです。タイムアウト中の課金などは取得できず、請求確定額とは異なる場合があります。</p></> : <p className="mt-5">読み込み中…</p>}
+    /></div><details className="mt-5 rounded-xl bg-white p-4"><summary className="cursor-pointer font-bold">直近30件の実行履歴</summary><ul className="mt-3 divide-y">{data.recent.map(run => <li key={run.id} className="py-3 text-sm"><Link className="font-bold text-emerald-800 underline" href={`/admin/usage/runs/${run.id}`}>{usageFeature(run.requestType).feature}</Link><p className="mt-1">{run.userName} ・ {formatDateTime(run.createdAt)} ・ {formatUsd(run.costUsd)}</p><p className="text-xs text-slate-500">{usageFeature(run.requestType).location} ・ {run.model ?? 'モデル未到達'} ・ {run.status}</p></li>)}</ul></details><p className="mt-3 text-xs text-slate-500">利用者・機能・モデルごとの実行記録を集計。費用は取得できた応答分の合計に、ゲートウェイが金額を返さない応答（音声入力など）のカタログ単価からの推定を加えた額です。代替・修復前の費用も含み、行のモデル名は最終応答のモデルです。タイムアウト中の課金などは取得できず、請求確定額とは異なる場合があります。</p></> : <p className="mt-5">読み込み中…</p>}
   </div>;
 }

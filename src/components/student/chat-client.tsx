@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ConversationFeedback } from './feedback-card';
 import { useEffect, useRef, useState } from 'react';
 import { useWorkTelemetry } from './use-work-telemetry';
+import { VoiceInput } from './voice-input';
 
 export interface ChatMessage {
   id: string;
@@ -28,6 +29,11 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const [completed, setCompleted] = useState(initialCompleted);
   const [error, setError] = useState('');
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  // 話している最中の書き起こし。まだ送っていないので、見た目だけ吹き出しに出す。
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceDraft, setVoiceDraft] = useState('');
+  // 送るときの本文は ref から読む。更新関数の中で送ると二重送信になりうる。
+  const voiceDraftRef = useRef('');
   // 直前の1往復だけ取り消せる。取り消した直後は、さらに前へは戻せない。
   const [canUndo, setCanUndo] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -40,15 +46,21 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   useEffect(() => {
     const log = messageLog.current;
     if (log && followLatest.current) log.scrollTop = log.scrollHeight;
-  }, [messages, busy, completed]);
+  }, [messages, busy, completed, voiceDraft]);
 
   async function send(event: { preventDefault: () => void }) {
     event.preventDefault();
     const content = input.trim();
+    if (!content) return;
+    setInput('');
+    await sendText(content);
+  }
+
+  async function sendText(raw: string, spoken = false) {
+    const content = raw.trim();
     if (!content || busy || undoing || completed) return;
     followLatest.current = true;
     const measured = telemetry.consume();
-    setInput('');
     setBusy(true);
     setError('');
     sequence.current += 1;
@@ -69,6 +81,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           stream: true,
           ...(assignmentId ? { assignmentId } : {}),
           ...(questionId ? { questionId } : {}),
+          ...(spoken ? { spoken: true } : {}),
           telemetry: measured,
         }),
       });
@@ -150,19 +163,33 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       {messages.length === 0 ? <div className="mx-auto max-w-md py-20 text-center"><p className="text-lg font-bold">AIへの説明を始めましょう</p><p className="mt-2 text-sm leading-6 text-slate-500">授業で学んだ概念を、何も知らないAIに教えてください。</p></div> : null}
       {messages.map((message) => {
         const isStudent = message.actor === 'student';
-        return <div key={message.id} className={isStudent ? 'flex justify-end' : 'flex justify-start'}>
+        return <div key={message.id} className={`chat-bubble-in ${isStudent ? 'flex justify-end' : 'flex justify-start'}`}>
           <div className="min-w-0 max-w-[88%] break-words">
             <p className={isStudent ? 'mb-1 text-right text-xs font-bold text-emerald-700' : 'mb-1 text-xs font-bold text-slate-500'}>{isStudent ? 'あなた' : 'AI'}</p>
-            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'space-y-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : isStudent ? message.content_redacted : message.content_redacted.split(/\r?\n(?:[ \t]*\r?\n)+/u).map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{paragraph}</p>)}</div>
+            <div className={isStudent ? 'whitespace-pre-wrap rounded-2xl rounded-tr-md bg-emerald-700 px-4 py-3 text-sm leading-7 text-white' : 'space-y-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-800'}>{message.id === streamingId && !message.content_redacted ? <ThinkingIndicator /> : isStudent ? message.content_redacted : message.content_redacted.split(/\r?\n(?:[ \t]*\r?\n)+/u).map((paragraph, index) => <p key={index} className="chat-line-in whitespace-pre-wrap">{paragraph}</p>)}</div>
           </div>
         </div>;
       })}
+      {/* まだ送っていない、話している最中の吹き出し。
+          送信済みと同じ見た目にすると取り違えるので、点線の枠で区別する。 */}
+      {speaking ? <div className="chat-bubble-in flex justify-end">
+        <div className="min-w-0 max-w-[88%] break-words">
+          <p className="mb-1 flex items-center justify-end gap-1.5 text-right text-xs font-bold text-emerald-700">
+            <span aria-hidden="true" className="inline-block h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+            あなた（話しています）
+          </p>
+          <div role="status" aria-live="polite" className="whitespace-pre-wrap rounded-2xl rounded-tr-md border-2 border-dashed border-emerald-400 bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-950">
+            {voiceDraft || <span className="text-emerald-700/70">聞いています…</span>}
+          </div>
+        </div>
+      </div> : null}
       {busy && !streamingId ? <div role="status" aria-live="polite" className="flex justify-start"><div className="min-w-0 max-w-[88%] break-words"><p className="mb-1 text-xs font-bold text-slate-500">AI</p><div className="flex items-center gap-2 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 text-sm text-slate-600"><Spinner />考えています…</div></div></div> : null}
-      {completed ? tutorial ? <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-950"><p className="font-bold">はじめての練習、できました！</p><p className="mt-2 leading-7">自分の言葉で伝えて、AIの質問に答える。宿題でも同じようにやり取りしてみよう。先生から届いたお題は「AIワーク」で確認できます。</p></div> : <ConversationFeedback conversationId={conversationId} /> : null}
+      {completed ? tutorial ? <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-950"><p className="font-bold">はじめての練習、できました！</p><p className="mt-2 leading-7">自分の言葉で伝えて、AIの質問に答える。宿題でも同じようにやり取りしてみよう。先生から届いたお題は「課題」で確認できます。</p></div> : <ConversationFeedback conversationId={conversationId} /> : null}
     </div>
-    {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">AIワークへ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
+    {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">課題へ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
       {canUndo ? <div className="flex justify-end"><button type="button" onClick={undo} disabled={undoing || busy} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-600 underline disabled:opacity-50">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button></div> : null}
-      <form onSubmit={event => void send(event)} className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
+      <div className="flex items-center gap-2">
+      <form onSubmit={event => void send(event)} className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
@@ -176,7 +203,35 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           {busy ? <><Spinner /><span>考え中</span></> : <><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></>}
         </button>
       </form>
-      <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
+      {/* 話した端から対話の中に出していく。
+          送るのは話し終わったときで、経路は手で打った場合とまったく同じ。 */}
+      <VoiceInput
+        conversationId={conversationId}
+        disabled={busy || undoing}
+        // 直前のAIの発言を渡す。お題の用語が入っているので、同音異義語の直しがここで効く。
+        topic={[...messages].reverse().find((item) => item.actor === 'agent')?.content_redacted.slice(0, 500)}
+        previousText={() => voiceDraftRef.current}
+        onStart={() => {
+          followLatest.current = true;
+          voiceDraftRef.current = '';
+          setVoiceDraft('');
+          setSpeaking(true);
+        }}
+        onText={(text) => {
+          voiceDraftRef.current = (voiceDraftRef.current ? `${voiceDraftRef.current} ${text}` : text).slice(0, 8000);
+          setVoiceDraft(voiceDraftRef.current);
+        }}
+        onHesitation={telemetry.onHesitation}
+        onStop={() => {
+          const spoken = voiceDraftRef.current;
+          voiceDraftRef.current = '';
+          setVoiceDraft('');
+          setSpeaking(false);
+          void sendText(spoken, true);
+        }}
+      />
+      </div>
+      <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。マイクを押すと声で説明できます（話し終わってもう一度押すと送信）。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
     </div>}
     {error ? <p role="alert" className="max-h-16 shrink-0 overflow-y-auto text-sm text-rose-700">{error}</p> : null}
   </div>;

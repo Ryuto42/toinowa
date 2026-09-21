@@ -152,7 +152,7 @@ export function HandoffList({ initial, mode, names, linkStudents = true, student
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">説明ワーク</dt>
+              <dt className="text-slate-500">課題</dt>
               <dd className="font-bold tabular-nums">
                 完了 {snapshot.works?.completed ?? 0} / 取り組み中 {snapshot.works?.inProgress ?? 0}
               </dd>

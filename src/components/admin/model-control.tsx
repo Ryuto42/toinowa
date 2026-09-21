@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 
-export interface ModelRow { model: string; paused: boolean; used: number }
+export interface ModelRow { model: string; paused: boolean; used: number; pausable: boolean }
 
 /**
  * モデルの稼働状況をまとめ、ポップアップで一時停止・再開を行う。
@@ -60,6 +60,8 @@ export function ModelControl({ models, tierLabel, primary }: {
   }
 
   const pausedCount = rows.filter((row) => row.paused).length;
+  // 自動選択で解決された先は設定に無く、停止操作もできない。数え方を分けないと実態がぼやける。
+  const autoCount = rows.filter((row) => !row.pausable).length;
 
   return <div className="h-full rounded-2xl border border-[#e3eaee] bg-white p-5">
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -70,6 +72,7 @@ export function ModelControl({ models, tierLabel, primary }: {
             ? <><span className="font-bold text-rose-700">{pausedCount}件を一時停止中</span>・稼働 {rows.length - pausedCount}件</>
             : <>{rows.length}件すべて稼働中</>}
           {' · '}{tierLabel}
+          {autoCount ? <>{' · '}自動選択で解決 {autoCount}件</> : null}
         </p>
       </div>
       <button type="button" onClick={open} aria-haspopup="dialog"
@@ -116,15 +119,17 @@ export function ModelControl({ models, tierLabel, primary }: {
             <p className="truncate font-mono text-xs font-bold">{row.model}</p>
             <p className="mt-1 text-xs text-slate-500">
               <span className={row.paused ? 'font-bold text-rose-700' : 'font-bold text-emerald-700'}>
-                {row.paused ? '一時停止中' : '稼働中'}
+                {row.paused ? '一時停止中' : row.pausable ? '稼働中' : 'ルーターが選択'}
               </span>
               {' · '}直近1時間 {row.used}件
             </p>
           </div>
-          <button type="button" disabled={busy !== null} onClick={() => toggle(row.model, row.paused)}
-            className={`shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold text-white transition disabled:opacity-50 ${row.paused ? 'bg-emerald-700' : 'bg-slate-700'}`}>
-            {busy === row.model ? '切替中…' : row.paused ? '再開する' : '一時停止する'}
-          </button>
+          {row.pausable
+            ? <button type="button" disabled={busy !== null} onClick={() => toggle(row.model, row.paused)}
+                className={`shrink-0 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-bold text-white transition disabled:opacity-50 ${row.paused ? 'bg-emerald-700' : 'bg-slate-700'}`}>
+                {busy === row.model ? '切替中…' : row.paused ? '再開する' : '一時停止する'}
+              </button>
+            : <span className="shrink-0 whitespace-nowrap rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500">自動選択の結果</span>}
         </li>)}
       </ul>
 

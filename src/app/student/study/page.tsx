@@ -32,7 +32,7 @@ export default async function StudentStudyPage() {
   items.sort((a, b) => order[a.state] - order[b.state]);
 
   return <div>
-    <PageTitle title="AIワーク" description="AIに説明することで、理解があいまいなところを見つけます。" />
+    <PageTitle title="課題" description="AIに説明することで、理解があいまいなところを見つけます。" />
     <TutorialEntry studentId={context.userId} tenantId={context.tenantId} />
     <Panel title="説明するテーマ">
       {items.length ? <div className="divide-y divide-slate-100">{items.map(({ task, state }) => {
@@ -41,7 +41,7 @@ export default async function StudentStudyPage() {
         return <article key={task.id} className="grid gap-3 py-4 first:pt-0 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-bold">{task.lessons?.title ?? '概念説明ワーク'}</h2>
+              <h2 className="font-bold">{task.lessons?.title ?? '課題'}</h2>
               {subject ? <StatusPill tone="blue">{subject}</StatusPill> : null}
               <StatusPill tone={view.tone}>{view.label}</StatusPill>
             </div>
@@ -54,7 +54,7 @@ export default async function StudentStudyPage() {
             {view.cta}
           </Link>
         </article>;
-      })}</div> : <EmptyState>配信された説明ワークはありません</EmptyState>}
+      })}</div> : <EmptyState>配信された課題はありません</EmptyState>}
     </Panel>
   </div>;
 }
