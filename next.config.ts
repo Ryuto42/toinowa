@@ -7,8 +7,9 @@ import type { NextConfig } from "next";
  * 参照元の漏れは塞いでおく。CSP は Next.js のインラインスクリプトが必要なため
  * script-src に 'unsafe-inline' を許すが、frame-ancestors と form-action は厳しくする。
  *
- * 'unsafe-eval' は開発時のみ。HMR が eval を使う一方、本番で必要なのは
- * pdf.js だけだったので `isEvalSupported: false`（document-reader.tsx）で外した。
+ * 'unsafe-eval' は開発時のみ。HMR が eval を使う。
+ * 本番で唯一の候補だった pdf.js は v6 で eval を使わなくなっており
+ * （build/pdf.mjs・pdf.worker.mjs に new Function / eval なし）、実際に不要だった。
  */
 const dev = process.env.NODE_ENV !== 'production';
 

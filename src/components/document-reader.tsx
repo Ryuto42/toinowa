@@ -7,8 +7,7 @@ async function imageData(file: File): Promise<string[]> {
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
     const pdfjs = await import('pdfjs-dist');
     pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-    // eval を使わせない。本番 CSP から 'unsafe-eval' を外すための条件。
-    const loading = pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false });
+    const loading = pdfjs.getDocument({ data: await file.arrayBuffer() });
     const document = await loading.promise;
     try {
       if (document.numPages > 8) throw new Error('PDFは8ページ以内に分けてください。');
