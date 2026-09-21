@@ -25,7 +25,7 @@ const RESERVED = new Set([
 const MAX_PER_ADDRESS = 3;
 const MAX_PER_EMAIL = 2;
 
-export const codeSchema = z
+const codeSchema = z
   .string()
   .trim()
   .toLowerCase()

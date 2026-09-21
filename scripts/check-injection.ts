@@ -50,12 +50,13 @@ const outputs: Array<{ name: string; text: string; shouldBlock: boolean }> = [
 
 function main(): void {
   let failed = 0;
-  console.log('■ 層1: 入力検査（攻撃を止められるか）');
+  console.log('■ 層1: 入力検査（既知の入力を検出できるか。highは拒否、mediumは注意として通過）');
   for (const item of attacks) {
     const result = inspectInput(item.text);
-    const blocked = result.risk === 'high' || result.risk === 'medium';
-    if (!blocked) failed += 1;
-    console.log(`  ${blocked ? '遮断' : '通過(!)'}  ${item.name.padEnd(22)} ${result.categories.join(',') || '-'}`);
+    const detected = result.risk === 'high' || result.risk === 'medium';
+    if (!detected) failed += 1;
+    const action = result.risk === 'high' ? '拒否' : result.risk === 'medium' ? '注意・通過' : '未検出(!)';
+    console.log(`  ${action}  ${item.name.padEnd(22)} ${result.categories.join(',') || '-'}`);
   }
 
   console.log('\n■ 層1: 誤検知（正当な説明を止めていないか）');

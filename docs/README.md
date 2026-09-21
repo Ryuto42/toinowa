@@ -5,6 +5,8 @@
 | 文書 | 内容 |
 |---|---|
 | [evidence.md](evidence.md) | 5つの評価項目に対する共通の根拠、実測・実装・未検証の区別 |
+| [qiita-article-v2.md](qiita-article-v2.md) | レビューを反映した別版の記事案。元のqiita-article.mdは維持 |
+| [submission-fixes-2026-09-22.md](submission-fixes-2026-09-22.md) | 提出前の優先問題の説明、修正結果、未実施の確認 |
 | [presentation-brief.md](presentation-brief.md) | 提出条件、記事・展示・4分ピッチの構成と素材 |
 | [user-guide.md](user-guide.md) | 先生・生徒・管理者の使い方 |
 | [feature-guide.md](feature-guide.md) | 機能の仕様、モデル設定、検証コマンド |
