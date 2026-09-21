@@ -5,8 +5,9 @@ export async function TutorialEntry({ studentId, tenantId }: { studentId:string;
   if(result.error) throw new Error(result.error.message);
   if(result.data?.state==='completed') return null;
   return <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-    <h2 className="text-lg font-bold text-emerald-950">好きなことをAIに教えてみよう</h2>
-    <p className="mt-2 text-sm leading-7 text-slate-700">このアプリでは、あなたがAIに教える側になります。まずは好きなことで練習しましょう。正解も点数もありません。</p>
+    <p className="mb-2 text-xs font-bold text-emerald-700">はじめての方へ</p>
+    <h2 className="text-lg font-bold text-emerald-950">まずは、好きなことをAIに教えてみよう</h2>
+    <p className="mt-2 text-sm leading-7 text-slate-700">このアプリでは、あなたがAIに教える側になります。まずは簡単なやり取りで練習してみましょう。正解も点数もありません。</p>
     <Link href="/student/tutorial" className="mt-3 inline-block rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white">練習をはじめる</Link>
   </section>;
 }

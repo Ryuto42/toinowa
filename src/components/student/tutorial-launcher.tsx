@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { ChatClient, type ChatMessage } from './chat-client';
-type Result = { conversation: { id:string; state:string }; messages:ChatMessage[] };
+type Result = { conversation: { id:string; state:string; undo_blocked_message_id?:string|null }; messages:ChatMessage[] };
 export function TutorialLauncher() {
   const request = useRef<Promise<Result> | null>(null);
   const [result,setResult] = useState<Result | null>(null);
@@ -19,5 +19,5 @@ export function TutorialLauncher() {
   },[attempt]);
   if(error) return <div role="alert" className="rounded-xl bg-rose-50 p-4 text-sm"><p>{error}</p><button onClick={()=>{request.current=null;setError('');setAttempt(n=>n+1);}} className="mt-2 font-bold underline">もう一度読み込む</button></div>;
   if(!result) return <p role="status" className="p-6 text-sm text-slate-500">はじめの案内を読み込んでいます…</p>;
-  return <ChatClient key={result.conversation.id} conversationId={result.conversation.id} initialMessages={result.messages} initialCompleted={result.conversation.state==='completed'} tutorial />;
+  return <ChatClient key={result.conversation.id} conversationId={result.conversation.id} initialMessages={result.messages} initialCompleted={result.conversation.state==='completed'} initialUndoBlockedMessageId={result.conversation.undo_blocked_message_id} tutorial />;
 }

@@ -17,8 +17,20 @@ describe('4〜6往復のチュートリアル', () => {
   it('終了希望は最小回数に優先する',()=>{
     expect(composeTutorialReply({...reply,readyToFinish:false,stopRequested:true},1,'elementary').conversationCompleted).toBe(true);
   });
-  it('早すぎる終了判断で問いが空でも、終了せず言い換えの練習へつなぐ',()=>{
+  it('早すぎる終了判断で問いが空でも、要約を強制せず会話を続ける',()=>{
     const result=composeTutorialReply({...reply,question:''},3,'senior');
-    expect(result.conversationCompleted).toBe(false);expect(result.message).toContain('一言で言い直す');
+    expect(result.conversationCompleted).toBe(false);expect(result.message).toContain('？');
+    expect(result.message).not.toMatch(/一言|言い直|まとめ/);
+  });
+  it.each(['elementary','senior'] as const)('%s: 受け止め欄に質問がある場合、2往復続いても余分な問いを足さない',audience=>{
+    const reflections=['音楽がお好きなんですね。どんな音楽を聴くことが多いですか？','ヨルシカをよく聴くんですね。どんなところが好きですか？'];
+    for(const [index,reflection] of reflections.entries()) {
+      const result=composeTutorialReply({...reply,reflection,question:'',readyToFinish:false},index+1,audience);
+      expect(result).toEqual({message:reflection,conversationCompleted:false});
+    }
+  });
+  it('早すぎる終了判断でも、受け止め内にある質問をそのまま使う',()=>{
+    const reflection='音楽が好きなんですね。いつ聴くことが多いですか？';
+    expect(composeTutorialReply({...reply,reflection,question:'  '},1,'general')).toEqual({message:reflection,conversationCompleted:false});
   });
 });

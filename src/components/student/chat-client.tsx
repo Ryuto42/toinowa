@@ -5,6 +5,7 @@ import { ConversationFeedback } from './feedback-card';
 import { useEffect, useRef, useState } from 'react';
 import { useWorkTelemetry } from './use-work-telemetry';
 import { VoiceInput } from './voice-input';
+import { canUndoSavedExchange } from '@/lib/conversation/undo';
 
 export interface ChatMessage {
   id: string;
@@ -17,12 +18,13 @@ interface ChatClientProps {
   conversationId: string;
   initialMessages: ChatMessage[];
   initialCompleted?: boolean;
+  initialUndoBlockedMessageId?: string | null;
   tutorial?: boolean;
   assignmentId?: string;
   questionId?: string;
 }
 
-export function ChatClient({ conversationId, initialMessages, initialCompleted = false, assignmentId, questionId, tutorial = false }: ChatClientProps) {
+export function ChatClient({ conversationId, initialMessages, initialCompleted = false, initialUndoBlockedMessageId, assignmentId, questionId, tutorial = false }: ChatClientProps) {
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   // 送るときの本文は ref から読む。更新関数の中で送ると二重送信になりうる。
   const voiceDraftRef = useRef('');
   // 直前の1往復だけ取り消せる。取り消した直後は、さらに前へは戻せない。
-  const [canUndo, setCanUndo] = useState(false);
+  const [canUndo, setCanUndo] = useState(() => canUndoSavedExchange(initialMessages, initialCompleted, initialUndoBlockedMessageId));
   const [undoing, setUndoing] = useState(false);
   const sequence = useRef(Math.max(0, ...initialMessages.map((message) => message.seq)));
   // 取り組みの様子を裏で記録する（生徒には見せない）
@@ -159,7 +161,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   }
 
   return <div className="flex min-h-0 flex-1 flex-col gap-3">
-    <div ref={messageLog} role="log" aria-label="対話の履歴" aria-live="polite" onScroll={event => { const log = event.currentTarget; followLatest.current = log.scrollHeight - log.scrollTop - log.clientHeight < 80; }} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+    <div ref={messageLog} role="log" aria-label="対話の履歴" aria-live="polite" onScroll={event => { const log = event.currentTarget; followLatest.current = log.scrollHeight - log.scrollTop - log.clientHeight < 80; }} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 pb-8 sm:p-6 sm:pb-8">
       {messages.length === 0 ? <div className="mx-auto max-w-md py-20 text-center"><p className="text-lg font-bold">AIへの説明を始めましょう</p><p className="mt-2 text-sm leading-6 text-slate-500">授業で学んだ概念を、何も知らないAIに教えてください。</p></div> : null}
       {messages.map((message) => {
         const isStudent = message.actor === 'student';
@@ -187,9 +189,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       {completed ? tutorial ? <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-950"><p className="font-bold">はじめての練習、できました！</p><p className="mt-2 leading-7">自分の言葉で伝えて、AIの質問に答える。宿題でも同じようにやり取りしてみよう。先生から届いたお題は「課題」で確認できます。</p></div> : <ConversationFeedback conversationId={conversationId} /> : null}
     </div>
     {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">課題へ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
-      {canUndo ? <div className="flex justify-end"><button type="button" onClick={undo} disabled={undoing || busy} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-600 underline disabled:opacity-50">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button></div> : null}
       <div className="flex items-center gap-2">
-      <form onSubmit={event => void send(event)} className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
+      <form onSubmit={event => void send(event)} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
+        {canUndo ? <button type="button" onClick={undo} disabled={undoing || busy} className="chat-undo-button absolute bottom-full right-3 z-10 min-h-6 rounded-t-md border border-b-0 border-slate-200 bg-white px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:text-slate-400">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button> : null}
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();

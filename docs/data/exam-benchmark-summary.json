@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "measuredDate": "2026-09-21",
+  "sources": {
+    "baseline": {
+      "path": "benchmark-data/exams/runs/aggregate.json",
+      "sha256": "52d60b59748aa6e48a86d9271ad84e8e60fadd32424d085042e038964033a6be"
+    },
+    "latest": {
+      "path": "benchmark-data/exams/runs-evidence-v3/scores.json",
+      "sha256": "ee92d7d068580653d4bbe061e3c1ad9947dfdfb122e843c2d6601b64904b31c4"
+    },
+    "protocol": {
+      "path": "benchmark-data/exams/runs-evidence-v3/protocol.json",
+      "sha256": "f3b66198f99586de11624198a7a3a409adb09dfcbefd88551b5a1d918850b5ef"
+    },
+    "ledger": {
+      "path": "benchmark-data/exams/runs/ledger.json",
+      "sha256": "4ed3d5240a2b160fd669bc3e90010db37ec580ef70dfab5e72e548b7c8edc673"
+    }
+  },
+  "scope": {
+    "baseline": "Two real exams, three paper pages, each under three acquisition conditions. Nine inputs per model and 450 selected numeric fields per model. Not nine independent exams.",
+    "latest": "Targeted in-sample diagnostic comparison, 87 frozen numeric fields per model. Not a replacement for the nine-input benchmark. Same table-evidence prompt/schema/normalized image; one call per model per page, no quality retries. Compare missing/incorrect values, automatic-application gate and source-table attribution. Retain failures. Shared $2 ledger reserves $0.25 before each sequential call.",
+    "supplemental": "C_scan was tested with Flash only; it is not part of the Flash/Pro paired comparison.",
+    "validation": "Verifier rules were refined offline using these same outputs. This is not held-out evaluation. Numeric agreement does not verify all source headings or educational effectiveness."
+  },
+  "baseline": [
+    {
+      "model": "gemini-2.5-flash",
+      "inputs": 9,
+      "correct": 399,
+      "total": 450,
+      "wrong": 21,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 30,
+      "knownCostUsd": 0.097298,
+      "meanElapsedMs": 20533.11111111111
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "inputs": 9,
+      "correct": 325,
+      "total": 450,
+      "wrong": 21,
+      "missing": 83,
+      "ambiguous": 21,
+      "unusable": 0,
+      "knownCostUsd": 0.005744,
+      "meanElapsedMs": 12227.666666666666
+    },
+    {
+      "model": "gpt-4o-mini-2024-07-18",
+      "inputs": 9,
+      "correct": 31,
+      "total": 450,
+      "wrong": 46,
+      "missing": 358,
+      "ambiguous": 15,
+      "unusable": 0,
+      "knownCostUsd": 0.039648,
+      "meanElapsedMs": 3628.8888888888887
+    }
+  ],
+  "latest": [
+    {
+      "case": "A_scan",
+      "model": "gemini-2.5-flash",
+      "supplemental": false,
+      "correct": 57,
+      "total": 57,
+      "wrong": 0,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 0,
+      "valid": true,
+      "reviewRequired": false,
+      "acceptedCorrect": 57,
+      "acceptedWrong": 0,
+      "elapsedMs": 28558,
+      "knownCostUsd": 0.016112
+    },
+    {
+      "case": "A_scan",
+      "model": "gemini-2.5-pro",
+      "supplemental": false,
+      "correct": 57,
+      "total": 57,
+      "wrong": 0,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 0,
+      "valid": true,
+      "reviewRequired": false,
+      "acceptedCorrect": 57,
+      "acceptedWrong": 0,
+      "elapsedMs": 54801,
+      "knownCostUsd": 0.110792
+    },
+    {
+      "case": "B_scan",
+      "model": "gemini-2.5-flash",
+      "supplemental": false,
+      "correct": 30,
+      "total": 30,
+      "wrong": 0,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 0,
+      "valid": true,
+      "reviewRequired": false,
+      "acceptedCorrect": 30,
+      "acceptedWrong": 0,
+      "elapsedMs": 15975,
+      "knownCostUsd": 0.009134
+    },
+    {
+      "case": "B_scan",
+      "model": "gemini-2.5-pro",
+      "supplemental": false,
+      "correct": 0,
+      "total": 30,
+      "wrong": 0,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 30,
+      "valid": false,
+      "reviewRequired": true,
+      "acceptedCorrect": 0,
+      "acceptedWrong": 0,
+      "elapsedMs": 60018,
+      "knownCostUsd": null
+    },
+    {
+      "case": "C_scan",
+      "model": "gemini-2.5-flash",
+      "supplemental": true,
+      "correct": 63,
+      "total": 63,
+      "wrong": 0,
+      "missing": 0,
+      "ambiguous": 0,
+      "unusable": 0,
+      "valid": true,
+      "reviewRequired": true,
+      "acceptedCorrect": 0,
+      "acceptedWrong": 0,
+      "elapsedMs": 19081,
+      "knownCostUsd": 0.01085
+    }
+  ],
+  "budget": {
+    "callsAcrossAllProtocols": 66,
+    "knownCostUsd": 0.470756,
+    "unknownCostCalls": 5,
+    "reservedPerUnknownCallUsd": 0.25,
+    "managementAmountUsd": 1.720756,
+    "limitUsd": 2,
+    "note": "Management amount includes reserves; it is not the final billed amount. Other team experiments and application usage are separate."
+  }
+}

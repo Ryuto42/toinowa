@@ -96,7 +96,7 @@ v2のB_scan・Flash回答を再利用し、追加API費用なしで比較した�
 | 模試専用モデル・60秒期限 | `src/lib/orcarouter/selection.ts`, `call.ts` |
 | 承認・修正・権限確認 | `src/app/api/admin/exam-analyses/[id]/route.ts` |
 | 原資料との比較画面 | `src/components/admin/exam-review.tsx` |
-| 承認待ちを自動反映させない状態 | `supabase/migrations/0051_exam_review.sql`（設定済みDBへ適用済み） |
+| 承認待ちを自動反映させない状態 | `supabase/migrations/0053_exam_review.sql`（当時は0051として適用。統合時に0053へ改番） |
 | 数値・表区分・重複の回帰試験 | `tests/features/exam-verification.test.ts` |
 | 再開・上限・承認前の未反映 | `tests/features/exam-worker.test.ts`, `exam-review.test.ts`, `exam-analysis.db.test.ts` |
 | 架空データによる実ブラウザ・DB反映試験 | `scripts/benchmarks/check-exam-review-ui.mts` |

@@ -1017,6 +1017,7 @@ export interface Database {
           summary: string | null;
           summarized_through_seq: number;
           message_count: number;
+          undo_blocked_message_id: string | null;
           started_at: string;
           completed_at: string | null;
           purpose: string;
@@ -1033,6 +1034,7 @@ export interface Database {
           summary?: string | null;
           summarized_through_seq?: number;
           message_count?: number;
+          undo_blocked_message_id?: string | null;
           started_at?: string;
           completed_at?: string | null;
           purpose?: string;
@@ -1049,6 +1051,7 @@ export interface Database {
           summary?: string | null;
           summarized_through_seq?: number;
           message_count?: number;
+          undo_blocked_message_id?: string | null;
           started_at?: string;
           completed_at?: string | null;
           purpose?: string;

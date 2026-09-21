@@ -59,9 +59,9 @@ describe('初回の練習API',()=>{
   });
   it('3往復目でAIが終了を選んでも、受け止めと次の問いを返す',async()=>{
     mocks.list.mockResolvedValue(Array.from({length:3},(_,i)=>({actor:'student',content_redacted:'古文の単語がわからない',seq:i+1})));
-    mocks.tutorial.mockResolvedValue({data:{reflection:'言葉の意味で読むのが難しくなるんだね。',question:'今の困りごとを一言で伝えるとどうなる？',readyToFinish:true,stopRequested:false},meta:{runId:'run'}});
+    mocks.tutorial.mockResolvedValue({data:{reflection:'言葉の意味で読むのが難しくなるんだね。',question:'最近の授業では、どんな場面で困った？',readyToFinish:true,stopRequested:false},meta:{runId:'run'}});
     const response=await reply(new Request('http://local/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:'古文の単語がわからない',stream:false})}),{params:Promise.resolve({id})});
-    expect(await response.json()).toMatchObject({conversationCompleted:false,message:expect.stringContaining('一言で')});
+    expect(await response.json()).toMatchObject({conversationCompleted:false,message:expect.stringContaining('どんな場面で困った？')});
     expect(mocks.complete).not.toHaveBeenCalled();
   });
   it('本人が疲れたと伝えたときは、4往復未満でも終了できる',async()=>{
@@ -69,6 +69,13 @@ describe('初回の練習API',()=>{
     const response=await reply(new Request('http://local/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:'疲れたので終わりたいです',stream:false})}),{params:Promise.resolve({id})});
     expect(await response.json()).toMatchObject({conversationCompleted:true});
     expect(mocks.complete).toHaveBeenCalledOnce();
+  });
+  it('AIが受け止め欄に質問を書いても、要約の要求を追加して保存しない',async()=>{
+    const reflection='音楽がお好きなんですね。どんな音楽を聴くことが多いですか？';
+    mocks.tutorial.mockResolvedValue({data:{reflection,question:'',readyToFinish:false,stopRequested:false},meta:{runId:'run'}});
+    const response=await reply(new Request('http://local/messages',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:'最近は音楽が好きです',stream:false})}),{params:Promise.resolve({id})});
+    expect(await response.json()).toMatchObject({message:reflection,conversationCompleted:false});
+    expect(mocks.complete).not.toHaveBeenCalled();
   });
   it.each([3, 4])('%i回では内容に応じてもう一度答えられる',async(turns)=>{
     mocks.list.mockResolvedValue(Array.from({length:turns},(_,i)=>({actor:'student',content_redacted:'数学の文章題で困っています',seq:i+1})));
