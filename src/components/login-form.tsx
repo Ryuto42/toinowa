@@ -2,6 +2,9 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { Toast } from '@/components/toast';
+import Link from 'next/link';
+import { BrandMark } from '@/components/brand-mark';
+import { BRAND } from '@/lib/shared/branding';
 
 /** 自分のロールで開ける行き先だけを通す。管理者は先生の画面まで入れる。 */
 function allowedNext(next: string | undefined, role: unknown): string | undefined {
@@ -72,6 +75,9 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
     {notice ? <Toast message={notice} onClose={() => setNotice(null)} /> : null}
     <section className="w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white px-7 py-9 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.4)] sm:px-12 sm:py-12">
       <div className="text-center">
+        <Link href="/" className="mb-5 inline-flex items-center gap-2 text-xl font-bold tracking-tight text-[#17233d]">
+          <BrandMark size={48} />{BRAND.shortName}
+        </Link>
         <p className="text-sm font-bold text-emerald-700">ログイン</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">学習画面に入る</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">所属先から案内された情報を入力してください。</p>

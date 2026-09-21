@@ -168,7 +168,6 @@ MIT。`LICENSE` と `package.json` の `license` に記載した。
 |---|---|
 | 統合 | `exam-model-benchmark.md` ＋ `-results.md` → 1ファイル（設計と結果） |
 | 改名 | `m0-spike-results.md` → `orcarouter-findings.md` |
-| 移動 | 設計書をリポジトリ直下から `docs/design.md` へ。実装と一致しない旨を冒頭に明記 |
 | 移動 | 実測の生データ2件を `docs/data/` へ |
 | 追加 | `docs/README.md`（文書の索引） |
 

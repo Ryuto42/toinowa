@@ -66,3 +66,6 @@ next-env.d.ts
 # 一時出力
 /tmp/
 *.local.json
+
+# 生成物の作業ディレクトリ
+/output/

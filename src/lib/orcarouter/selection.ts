@@ -1,13 +1,13 @@
-export type ModelClass = 'economy' | 'standard' | 'advanced' | 'vision' | 'audio';
+export type ModelClass = 'economy' | 'standard' | 'advanced' | 'vision' | 'audio' | 'exam';
 
-export function classForDifficulty(difficulty: number): Exclude<ModelClass, 'vision' | 'audio'> {
+export function classForDifficulty(difficulty: number): Exclude<ModelClass, 'vision' | 'audio' | 'exam'> {
   if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5) throw new Error('難易度は1〜5です');
   return difficulty <= 2 ? 'economy' : difficulty === 3 ? 'standard' : 'advanced';
 }
 
 export function modelsForClass(kind: ModelClass, config: {
   AI_ECONOMY_MODEL?: string; AI_STANDARD_MODEL?: string; AI_ADVANCED_MODEL?: string; AI_VISION_MODEL?: string;
-  AI_AUDIO_MODEL?: string; AI_AUDIO_STANDARD_MODEL?: string; AI_AUDIO_ADVANCED_MODEL?: string;
+  AI_AUDIO_MODEL?: string; AI_AUDIO_STANDARD_MODEL?: string; AI_AUDIO_ADVANCED_MODEL?: string; AI_EXAM_MODEL?: string;
 }): string[] {
   const economy = config.AI_ECONOMY_MODEL ?? 'google/gemini-2.5-flash-lite';
   const standard = config.AI_STANDARD_MODEL ?? 'google/gemini-2.5-flash';
@@ -30,6 +30,9 @@ export function modelsForClass(kind: ModelClass, config: {
     // mini は設問別結果を科目全体へ要約して必要項目を358件落とすので、2段目に置かない。
     // docs/exam-model-benchmark.md
     vision: [vision, 'google/gemini-2.5-flash-lite', 'openai/gpt-4o-mini'],
+    // 模試の専用経路。ページ単位の再試行は永続ジョブ側の責務にする。
+    // 検証していない低品質な代替へ黙って落ちない。
+    exam: [config.AI_EXAM_MODEL ?? 'google/gemini-2.5-flash'],
     audio: [audio, audioStandard, audioAdvanced],
   };
   return [...new Set(chains[kind])];

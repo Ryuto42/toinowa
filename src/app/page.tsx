@@ -3,10 +3,7 @@ import { redirect } from 'next/navigation';
 import { BRAND } from '@/lib/shared/branding';
 import { roleFromClaims } from '@/lib/auth/claims';
 import { createClient } from '@/lib/database/server';
-
-function BrandMark() {
-  return <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#087c73] text-xs font-bold text-white">{BRAND.shortName.charAt(0) || 'S'}</span>;
-}
+import { BrandMark } from '@/components/brand-mark';
 
 const subjects = ['国語', '英語', '数学', '理科', '社会'];
 

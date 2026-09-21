@@ -10,6 +10,7 @@ vi.mock('@/lib/database/admin', () => ({ adminDb: () => ({ rpc: mocks.rpc, from:
 vi.mock('@/lib/jobs/default-handlers', () => ({}));
 vi.mock('@/lib/jobs/plan-handler', () => ({}));
 vi.mock('@/lib/jobs/exam-handler', () => ({}));
+vi.mock('@/lib/jobs/queue', () => ({ triggerWorkerTick: vi.fn() }));
 import { runWorkerTick, clearJobHandlersForTests, registerJobHandler } from '@/lib/jobs/worker';
 const job = { id: 'job1', tenant_id: 'school1', kind: 'test', lease_token: 'lease1', attempt: 0, max_attempts: 5, state: {} } as JobRow;
 beforeEach(() => { vi.restoreAllMocks(); mocks.rpc.mockReset(); mocks.query.update.mockClear(); clearJobHandlersForTests(); });

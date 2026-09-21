@@ -1,5 +1,10 @@
 # 模試読み取りモデルの比較実験
 
+**続きの記録:** 検証・復旧の本体実装と Flash／Pro の比較・採用判断は
+[exam-reading-reliability.md](exam-reading-reliability.md)、
+途中の追加検証（構造化抽出v2）は [exam-model-benchmark-improvement.md](exam-model-benchmark-improvement.md)。
+元の正解表と初回採点はこの文書に残し、追加実験は別記録に分けている。
+
 目的は、費用対効果と信頼性を実測で説明できるモデル選定。
 単に最安・平均精度で選ばず、点数・偏差値の取り違え、読めない値の捏造、失敗時の挙動を確認する。
 

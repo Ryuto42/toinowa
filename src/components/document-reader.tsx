@@ -49,11 +49,13 @@ export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, o
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [uncertainties, setUncertainties] = useState<string[]>([]);
+  const [reviewId, setReviewId] = useState<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   async function read(file: File) {
     if (busy) return;
     const id = crypto.randomUUID();
+    setReviewId(null);
     const snapshot = baseline ?? { learningGoal: '', weakAreas: '', examResults: '', dailyTimeLimitMin: null };
     setBusy(true); onBusyChange?.(true); setStatus(purpose === 'exam' ? 'ファイルをアップロードしています。登録はそのまま進められます。' : '授業資料を読み取っています。読み取り完了まで、この画面を開いておいてください。'); setUncertainties([]);
     try {
@@ -80,10 +82,16 @@ export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, o
         if (!poll.ok) throw new Error('分析状況を取得できません。登録後は画面下の分析状況から確認できます。');
         const current = await poll.json();
         if (current.status === 'failed') throw new Error(current.error_message);
+        if (current.status === 'review_required') {
+          setReviewId(id);
+          setUncertainties(current.result?.uncertainties ?? []);
+          setStatus('読み取り結果に確認が必要です。まだ生徒の情報には反映していません。登録はそのまま進められます。');
+        }
         if (current.status === 'completed') {
+          setReviewId(null);
           onAnalyzed?.(id, current.result, snapshot);
           setUncertainties(current.result.uncertainties ?? []);
-          setStatus('分析結果を反映しました。目標・苦手範囲・学習時間はAIの提案です。手入力で変更した項目は保持します。');
+          setStatus('分析結果を反映しました。目標・苦手範囲・学習時間は模試をもとにした提案です。手入力で変更した項目は保持します。');
           break;
         }
       }
@@ -97,6 +105,7 @@ export function DocumentReader({ purpose, onRead, baseline, onAnalysisStarted, o
     <p className="mt-1 text-xs leading-6 text-slate-600">PDF（8ページ以内）・JPEG・PNG・WebP／15MB以内。選択後、自動で分析します。画像をOrcaRouterへ送信するため、不要な氏名・連絡先は除いてください。</p>
     <input aria-label="読み取る資料" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void read(file); }} className="mt-3 max-w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:font-bold file:text-white hover:file:bg-emerald-800 disabled:opacity-50" />
     {status ? <p role="status" className="mt-3 text-sm leading-6">{status}</p> : null}
+    {reviewId ? <a className="mt-3 inline-block font-bold text-emerald-800 underline" href={`/admin/exam-analyses/${reviewId}`} target="_blank" rel="noreferrer">元の資料と読み取り結果を確認する（別のタブ）</a> : null}
     {uncertainties.length ? <ul className="mt-2 list-disc pl-5 text-sm text-amber-800">{uncertainties.map((item, index) => <li key={index}>{item}</li>)}</ul> : null}
   </div>;
 }

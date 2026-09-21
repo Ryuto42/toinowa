@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/database/admin';
 import type { Json } from '@/lib/database/types';
 import type { JobRow, JobStepResult } from './types';
 import { jobHandler } from './registry';
+import { triggerWorkerTick } from './queue';
 import './default-handlers';
 import './plan-handler';
 import './exam-handler';
@@ -131,6 +132,7 @@ export async function runWorkerTick(options: {
       }
       const next = await handler(job);
       await completeStep(job, next);
+      if (job.kind === 'analyze_exam' && next.nextStep && !next.runAfter) triggerWorkerTick();
       result.succeeded += next.nextStep === null ? 1 : 0;
     } catch (error) {
       result[await retryOrDeadLetter(job, error)] += 1;

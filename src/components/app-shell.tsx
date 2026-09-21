@@ -5,22 +5,10 @@ import { LogoutButton } from '@/components/logout-button';
 import { FlashNotice } from '@/components/flash-notice';
 import { PageTransition } from '@/components/page-transition';
 import { ROLE_THEME, type AppRole } from '@/components/role-theme';
+// ロゴはログイン画面・トップページと同じものを使う。ここだけ別の印にしない。
+import { BrandMark } from '@/components/brand-mark';
 
 export type NavItem = SidebarNavItem;
-
-/**
- * ブランドマーク。
- *
- * サービス名を並べて書くと、同じ「ト」が2つ続いて見た目が重くなるので、
- * マークだけを置き、隣にはいま何として見ているのかを出す。
- * サービス名はタブのタイトル・ログイン画面・トップページに出る。
- *
- * ここはロールで色を変えない。サービスの印としていつも同じ色にしておき、
- * ロールの見分けは下のユーザーアバターで付ける。
- */
-function BrandMark() {
-  return <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#087c73] text-lg font-bold text-white shadow-sm">{BRAND.shortName.charAt(0) || 'S'}</span>;
-}
 
 export function AppShell(props: {
   role: AppRole;
