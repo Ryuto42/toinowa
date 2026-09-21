@@ -1,5 +1,5 @@
 import { applyExamAnalysis } from '@/lib/materials/apply-exam-analysis';
-import { generateStudentCredentials, studentLoginIdSchema } from '@/lib/auth/student-credentials';
+import { generateStudentCredentials } from '@/lib/auth/student-credentials';
 import { studentIntakeSchema } from '@/lib/plans/schema';
 import { enqueueJob, triggerWorkerTick } from '@/lib/jobs/queue';
 import { preCheck } from '@/lib/security/guard';
@@ -14,11 +14,10 @@ const createUserSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   email: z.email().optional(),
   role: z.enum(['student', 'teacher', 'admin']),
-  loginIdentifier: z.string().trim().min(1).max(120).optional(),
   intake: studentIntakeSchema.optional(),
   examAnalysisId: z.uuid().optional(),
   teacherIds: z.array(z.uuid()).max(30).default([]),
-}).refine(value => value.role !== 'student' || Boolean(value.intake && value.loginIdentifier), '生徒のログインID・学年を入力してください').refine(value => value.role === 'student' || Boolean(value.email), '先生・管理者のメールアドレスを入力してください');
+}).refine(value => value.role !== 'student' || Boolean(value.intake), '生徒の学年を入力してください').refine(value => value.role === 'student' || Boolean(value.email), '先生・管理者のメールアドレスを入力してください');
 
 export async function GET() {
   try {
@@ -38,14 +37,6 @@ export async function POST(request: Request) {
     const body = await parseJson(request, createUserSchema);
     const db = adminDb();
     const credentials = generateStudentCredentials();
-    const parsedId = body.role === 'student' ? studentLoginIdSchema.safeParse(body.loginIdentifier) : null;
-    if (parsedId && !parsedId.success) throw new ApiInputError(parsedId.error.issues[0].message);
-    const loginIdentifier = parsedId?.success ? parsedId.data : null;
-    if (loginIdentifier) {
-      const duplicate = await db.from('users').select('id').eq('tenant_id', context.tenantId).eq('login_identifier', loginIdentifier).maybeSingle();
-      if (duplicate.error) throw new Error(duplicate.error.message);
-      if (duplicate.data) throw new ApiInputError('このログインIDは既に使われています');
-    }
     const codes = await (await createClient()).from('school_codes').select('code').eq('tenant_id', context.tenantId).eq('active', true).order('code').limit(1);
     if (codes?.error) throw new Error(codes.error.message);
     if (credentials && !codes?.data?.length) throw new ApiInputError('有効な所属コードを設定してからユーザーを登録してください');
@@ -58,11 +49,13 @@ export async function POST(request: Request) {
       if (body.intake.examResults) body.intake.examResults = preCheck(body.intake.examResults).masked.text;
       if (body.intake.weakAreas) body.intake.weakAreas = preCheck(body.intake.weakAreas).masked.text;
     }
-    const { data: created, error: authError } = await db.auth.admin.createUser({ email: body.role === 'student' ? credentials.authEmail : body.email!, password: credentials.initialPassword, email_confirm: true, user_metadata: { tenant_id: context.tenantId, login_identifier: loginIdentifier } });
+    const { data: created, error: authError } = await db.auth.admin.createUser({ email: body.role === 'student' ? credentials.authEmail : body.email!, password: credentials.initialPassword, email_confirm: true, user_metadata: { tenant_id: context.tenantId } });
     if (authError || !created.user) throw new Error(authError?.message ?? 'auth user create failed');
     authUserId = created.user.id;
-    const { error: userError } = await db.from('users').insert({ id: authUserId, tenant_id: context.tenantId, role: body.role, display_name: body.displayName, email: body.role === 'student' ? null : body.email!, login_identifier: loginIdentifier, must_change_password: true, status: 'active' });
+    const { data: registered, error: userError } = await db.from('users').insert({ id: authUserId, tenant_id: context.tenantId, role: body.role, display_name: body.displayName, email: body.role === 'student' ? null : body.email!, must_change_password: true, status: 'active' }).select('login_identifier').single();
     if (userError) throw new Error(userError.message);
+    const loginIdentifier = registered.login_identifier;
+    if (body.role === 'student' && !loginIdentifier) throw new Error('ログインIDを発行できませんでした');
     if (body.role === 'student') {
       const { error: profileError } = await db.from('student_profiles').insert({ user_id: authUserId, tenant_id: context.tenantId, grade: body.intake!.grade, learning_goal: body.intake!.learningGoal, exam_results: body.intake!.examResults, weak_areas: body.intake!.weakAreas, daily_time_limit_min: body.intake!.dailyTimeLimitMin });
       if (profileError) throw new Error(profileError.message);

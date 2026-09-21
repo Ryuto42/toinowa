@@ -53,7 +53,6 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
         displayName: form.get('displayName'),
         email: role === 'student' ? undefined : form.get('email'),
         role: form.get('role'),
-        loginIdentifier: form.get('loginIdentifier') || undefined,
         ...(role === 'student' ? { teacherIds: form.getAll('teacherIds'), examAnalysisId: profile.getAnalysisId(), intake: { ...profile.intake, grade: form.get('grade'), classroomId: form.get('classroomId') || undefined } } : {}),
       }),
     });
@@ -84,8 +83,7 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
       <label className="text-sm font-bold">氏名<RequiredMark /><input name="displayName" required className={fieldClass} placeholder="山田 花子" /></label>
       <label className="text-sm font-bold">ロール<RequiredMark /><select name="role" value={role} onChange={event => setRole(event.target.value)} className={fieldClass}><option value="student">生徒</option><option value="teacher">先生</option><option value="admin">管理者</option></select></label>
       {role === 'student' ? <>
-        <label className="text-sm font-bold">ログインID<RequiredMark /><input name="loginIdentifier" required minLength={3} maxLength={40} pattern="[A-Za-z0-9][A-Za-z0-9._\-]{2,39}" className={fieldClass} placeholder="student02" autoCapitalize="none" autoComplete="off" /><span className="mt-1 block text-xs font-normal text-slate-500">3〜40文字の半角英数字・ピリオド・ハイフン・アンダースコア</span></label>
-        <p className="self-center text-sm leading-6 text-slate-600">メールアドレスは不要です。初期パスワードは自動生成し、登録後に表示します。</p>
+        <p className="rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-950 sm:col-span-2">ログインIDは student1、student2… の連番で自動発行します。メールアドレスの入力も不要です。登録後にログインIDと初期パスワードをまとめてコピーできます。</p>
       </> : <>
         <label className="text-sm font-bold">メールアドレス<RequiredMark /><input name="email" required type="email" className={fieldClass} placeholder="user@example.com" autoComplete="email" /></label>
         <p className="self-center text-sm text-slate-600">初期パスワードは自動発行します。登録後にコピーできます。</p>
