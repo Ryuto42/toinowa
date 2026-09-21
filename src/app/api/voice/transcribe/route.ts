@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/guard';
 import { ForbiddenError } from '@/lib/auth/errors';
 import { json, parseJson, routeError, traceIdFrom } from '@/lib/api/http';
-import { adminDb } from '@/lib/database/admin';
+import { assertAiRateLimit } from '@/lib/api/rate-limit';
 import { preCheck } from '@/lib/security/guard';
 import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
@@ -40,14 +40,11 @@ export async function POST(request: Request) {
     }
 
     // 音声は1回ごとに課金される。予算ガードの手前に、回数そのものの蓋を置く。
-    const since = new Date(new Date().getTime() - 60_000).toISOString();
-    const { count } = await adminDb().from('agent_runs')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', context.tenantId).eq('actor_id', context.userId)
-      .eq('agent_name', 'voice-input').gte('created_at', since);
-    if ((count ?? 0) >= MAX_CHUNKS_PER_MINUTE) {
-      return json({ message: '音声入力が混み合っています。少し待ってからもう一度お試しください。' }, { status: 429 });
-    }
+    await assertAiRateLimit({
+      tenantId: context.tenantId, userId: context.userId,
+      requestType: 'voice_transcribe', limit: MAX_CHUNKS_PER_MINUTE,
+      message: '音声入力が混み合っています。少し待ってからもう一度お試しください。',
+    });
 
     const traceId = traceIdFrom(request);
     const result = await transcribeChunk({

@@ -9,6 +9,10 @@ export interface OutputCheckResult {
   matched: string[];
 }
 
+/** system文の照合に使う窓。短くすると普通の言い回しに当たり、長くすると部分的な写しを逃す。 */
+const WINDOW = 40;
+const STEP = 10;
+
 const secretPatterns: Array<{ flag: string; pattern: RegExp }> = [
   { flag: 'api_key', pattern: /\bsk-[A-Za-z0-9_-]{16,}\b/g },
   { flag: 'jwt', pattern: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g },
@@ -43,11 +47,19 @@ export function checkModelOutput(
     }
   }
 
-  const fragments = (options.systemFragments ?? []).flatMap(fragment => [fragment, ...fragment.split(/[。\n]/u).filter(part => part.length >= 60)]).map(fragment => fragment.normalize('NFKC'));
-  for (const fragment of fragments) {
-    if (fragment.length >= 12 && text.includes(fragment)) {
+  // system文の漏えいは、文の区切りで割って照合するだけでは足りない。
+  // 途中で切れた抜粋（先頭80文字だけ、など）はどの区切りとも一致せず素通りする。
+  // 固定長の窓をずらしながら当てる。1か所でも一致すれば写している。
+  for (const raw of options.systemFragments ?? []) {
+    const fragment = raw.normalize('NFKC').replace(/\s+/gu, ' ').trim();
+    if (fragment.length < WINDOW) continue;
+    const haystack = text.replace(/\s+/gu, ' ');
+    for (let at = 0; at + WINDOW <= fragment.length; at += STEP) {
+      const window = fragment.slice(at, at + WINDOW);
+      if (!haystack.includes(window)) continue;
       flags.push('system_prompt_leak');
-      matched.push(fragment.slice(0, 80));
+      matched.push(window.slice(0, 80));
+      break;
     }
   }
 
