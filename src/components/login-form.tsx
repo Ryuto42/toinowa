@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { Toast } from '@/components/toast';
 
 /** 自分のロールで開ける行き先だけを通す。管理者は先生の画面まで入れる。 */
 function allowedNext(next: string | undefined, role: unknown): string | undefined {
@@ -18,14 +19,8 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState(initialNotice ?? (loggedOut ? 'ログアウトしました' : ''));
+  const [notice, setNotice] = useState<string | null>(initialNotice ?? (loggedOut ? 'ログアウトしました' : null));
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(''), 4500);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -41,7 +36,7 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
     event.preventDefault();
     setBusy(true);
     setError('');
-    setNotice('');
+    setNotice(null);
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -74,7 +69,7 @@ export function LoginForm({ loggedOut, next, notice: initialNotice }: { loggedOu
   }
 
   return <main className="relative flex min-h-screen items-center justify-center bg-[#f3f7f5] px-4 py-8 text-slate-950 sm:px-6 sm:py-14">
-    {notice ? <div role="status" aria-live="polite" className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-5 py-4 text-sm font-bold text-emerald-800 shadow-[0_18px_45px_-18px_rgba(15,23,42,0.45)]"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✓</span>{notice}</div> : null}
+    {notice ? <Toast message={notice} onClose={() => setNotice(null)} /> : null}
     <section className="w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white px-7 py-9 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.4)] sm:px-12 sm:py-12">
       <div className="text-center">
         <p className="text-sm font-bold text-emerald-700">ログイン</p>

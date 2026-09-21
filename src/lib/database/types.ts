@@ -235,6 +235,7 @@ export interface Database {
           conversation_id: string | null;
           created_at: string;
           actor_id: string | null;
+          cached_input_tokens: number;
         };
         Insert: {
           id?: string;
@@ -262,6 +263,7 @@ export interface Database {
           conversation_id?: string | null;
           created_at?: string;
           actor_id?: string | null;
+          cached_input_tokens?: number;
         };
         Update: {
           id?: string;
@@ -289,6 +291,7 @@ export interface Database {
           conversation_id?: string | null;
           created_at?: string;
           actor_id?: string | null;
+          cached_input_tokens?: number;
         };
         Relationships: [
           {
@@ -2853,6 +2856,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+      login_attempt_count: {
+        Args: {
+          p_key: string;
+        };
+        Returns: number;
+      };
       manage_resource: {
         Args: {
           p_tenant: string;
@@ -2906,6 +2915,13 @@ export interface Database {
           p_due: string;
         };
         Returns: string;
+      };
+      register_login_attempt: {
+        Args: {
+          p_key: string;
+          p_success: boolean;
+        };
+        Returns: number;
       };
       retry_lesson_preparation: {
         Args: {
@@ -2968,6 +2984,13 @@ export interface Database {
       today_ai_spend: {
         Args: {
           p_tenant: string;
+        };
+        Returns: number;
+      };
+      today_student_ai_spend: {
+        Args: {
+          p_tenant: string;
+          p_student: string;
         };
         Returns: number;
       };

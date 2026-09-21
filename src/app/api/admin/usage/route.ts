@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const rows: UsageRun[] = [];
     let truncated = false;
     for (let offset = 0; offset < 10000; offset += 1000) {
-      const result = await db.from('agent_runs').select('id,request_type,actor_id,student_id,status,resolved_model,input_tokens,output_tokens,estimated_cost_usd,fallback_count,created_at,safety_result')
+      const result = await db.from('agent_runs').select('id,request_type,actor_id,student_id,status,resolved_model,input_tokens,output_tokens,cached_input_tokens,estimated_cost_usd,fallback_count,created_at,safety_result')
         .eq('tenant_id', context.tenantId).gte('created_at', since).lte('created_at', until).order('created_at', { ascending: false }).order('id').range(offset, offset + 999);
       if (result.error) throw new Error(result.error.message);
       rows.push(...(result.data ?? []));
@@ -39,6 +39,6 @@ export async function GET(request: Request) {
       const observation = row.safety_result as { unpricedAttempts?: number } | null;
       return (observation?.unpricedAttempts ?? 0) > 0 || ((row.input_tokens ?? 0) + (row.output_tokens ?? 0) > 0 && observation?.unpricedAttempts === undefined && !Number(row.estimated_cost_usd));
     }).length;
-    return json({ recent: rows.slice(0, 30).map(row => ({ id: row.id, requestType: row.request_type, userName: names[row.actor_id ?? row.student_id ?? ''] ?? 'システム処理', model: row.resolved_model, costUsd: row.estimated_cost_usd, createdAt: row.created_at, status: row.status })), budget, unpricedRuns, grouped, summary: { requests: rows.length, costUsd: grouped.reduce((n,r) => n+r.costUsd,0), tokens: grouped.reduce((n,r) => n+r.tokens,0) }, truncated, updatedAt: until });
+    return json({ recent: rows.slice(0, 30).map(row => ({ id: row.id, requestType: row.request_type, userName: names[row.actor_id ?? row.student_id ?? ''] ?? 'システム処理', model: row.resolved_model, costUsd: row.estimated_cost_usd, createdAt: row.created_at, status: row.status })), budget, unpricedRuns, grouped, summary: { requests: rows.length, costUsd: grouped.reduce((n,r) => n+r.costUsd,0), tokens: grouped.reduce((n,r) => n+r.tokens,0), inputTokens: rows.reduce((n,r) => n+(r.input_tokens ?? 0),0), cachedTokens: rows.reduce((n,r) => n+((r as { cached_input_tokens?: number }).cached_input_tokens ?? 0),0) }, truncated, updatedAt: until });
   } catch (error) { return routeError(error); }
 }

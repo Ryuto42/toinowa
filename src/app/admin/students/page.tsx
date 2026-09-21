@@ -79,7 +79,7 @@ export default async function AdminStudentsPage() {
   const pending = rows.reduce((sum, row) => sum + row.inProgress + row.notStarted, 0);
 
   return <div>
-    <PageTitle title="生徒の学習状況" description="学校のすべての生徒について、担当・提出状況・理解度をまとめて確認します。" />
+    <PageTitle title="生徒" description="学校のすべての生徒について、担当・提出状況・理解度をまとめて確認します。" />
 
     <div className="mb-6 grid gap-4 sm:grid-cols-4">
       <MetricCard label="在籍生徒" value={rows.length} />

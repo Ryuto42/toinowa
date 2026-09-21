@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
 import { DataTable } from '@/components/data-table';
-import { IconButton, IconLink } from '@/components/icon';
+import { Icon, IconButton, IconLink } from '@/components/icon';
+import { DateTimeField } from '@/components/date-time-field';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { formatDateTime } from '@/lib/shared/format';
 
 export interface PublishedWork {
@@ -58,8 +60,9 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
   const [dueAt, setDueAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
-  const [batchStatus, setBatchStatus] = useState('');
+  const [rowStatus, setRowStatus] = useState<{ id: string; message: string } | null>(null);
+  const [removing, setRemoving] = useState<PublishedWork | null>(null);
+  const [removeError, setRemoveError] = useState('');
   const [refreshTokens, setRefreshTokens] = useState<string[]>([]);
   const refreshing = works.some(work => refreshTokens.includes(`${work.assignmentId}:${work.revision}`));
 
@@ -116,27 +119,41 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
     }
   }
 
-  const chosen = works.filter(work => work.status === 'draft' && selected.includes(`${work.assignmentId}:${work.revision}`));
-  async function publishSelected() {
-    if (busy || refreshing || !chosen.length) return;
-    setBusy(true); setBatchStatus('確認した課題を配信しています…');
+  /** 1件だけを承認して配信する。まとめて出すより、1件ずつ内容を見て判断してもらう。 */
+  async function publishOne(work: PublishedWork) {
+    if (busy || refreshing) return;
+    if (!work.dueAt) { setRowStatus({ id: work.assignmentId, message: '先に期限を設定してください' }); return; }
+    setBusy(true); setRowStatus({ id: work.assignmentId, message: '配信しています…' });
     try {
-      const response = await fetch('/api/topics/review', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ publish: true, items: chosen.map(work => ({ id: work.assignmentId, revision: work.revision, title: work.title, body: work.body, content: work.content, difficulty: work.difficulty, dueAt: work.dueAt ? new Date(work.dueAt).toISOString() : null })) }) });
+      const response = await fetch('/api/topics/review', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ publish: true, items: [{ id: work.assignmentId, revision: work.revision, title: work.title, body: work.body, content: work.content, difficulty: work.difficulty, dueAt: new Date(work.dueAt).toISOString() }] }),
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? '配信できませんでした');
-      setRefreshTokens(chosen.map(work => `${work.assignmentId}:${work.revision}`));
-      setSelected([]); setBatchStatus(`${result.count}件を承認して配信しました。`); router.refresh();
-    } catch(error) { setBatchStatus(error instanceof Error ? error.message : '通信に失敗しました'); }
-    finally { setBusy(false); }
+      setRefreshTokens([`${work.assignmentId}:${work.revision}`]);
+      setRowStatus(null); router.refresh();
+    } catch (error) {
+      setRowStatus({ id: work.assignmentId, message: error instanceof Error ? error.message : '通信に失敗しました' });
+    } finally { setBusy(false); }
+  }
+
+  async function remove() {
+    const work = removing;
+    if (!work || busy) return;
+    setBusy(true); setRemoveError('');
+    try {
+      const response = await fetch(`/api/topics/${work.assignmentId}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? '取り下げられませんでした');
+      setRemoving(null); router.refresh();
+    } catch (error) {
+      setRemoveError(error instanceof Error ? error.message : '通信に失敗しました');
+    } finally { setBusy(false); }
   }
 
   return <>
     {refreshing ? <p role="status" className="mb-3 text-sm text-emerald-800">保存した内容を表示に反映しています… <button type="button" onClick={() => router.refresh()} className="underline">表示を再取得</button></p> : null}
-    {works.some(work => work.status === 'draft') ? <div className="mb-5 rounded-xl bg-emerald-50 p-4">
-      <p className="text-sm leading-7 text-emerald-950">お題・提案理由・期限を確認し、問題がない課題にチェックを入れてください。必要な課題だけ編集できます。</p>
-      <button type="button" disabled={busy || refreshing || !chosen.length} onClick={publishSelected} className="mt-3 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">確認した{chosen.length}件を承認して配信</button>
-      {batchStatus ? <p role="status" className="mt-2 text-sm">{batchStatus}</p> : null}
-    </div> : null}
     {variant === 'table' ? <DataTable
       rows={works}
       getKey={work => work.assignmentId}
@@ -160,50 +177,96 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
         { key: 'status', label: '状態', sortBy: work => STATUS_LABELS[work.status] ?? work.status, render: work => <StatusPill tone={work.status === 'published' ? 'emerald' : work.status === 'completed' ? 'amber' : 'blue'}>{STATUS_LABELS[work.status] ?? work.status}</StatusPill> },
         { key: 'actions', label: '操作', align: 'right', render: work => <span className="flex items-center justify-end gap-1 whitespace-nowrap">
           <IconButton icon="edit" label={`${work.title}を編集`} disabled={busy || refreshing || !work.questionId} onClick={() => open(work)} />
+          <IconButton icon="delete" label={`${work.title}を取り下げる`} tone="danger" disabled={busy || refreshing} onClick={() => { setRemoveError(''); setRemoving(work); }} />
           <IconLink icon="insights" label={`${work.title}の分析を見る`} href={`/teacher/works/${work.assignmentId}`} />
         </span> },
       ]}
-    /> : <div className="divide-y divide-slate-100">
-      {works.map((work) => <div
-        key={work.assignmentId}
-        className="flex flex-col gap-2 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="min-w-0 flex-1"><button
-          type="button"
-          onClick={() => open(work)}
-          disabled={busy || refreshing || !work.questionId}
-          aria-haspopup="dialog"
-          className="min-w-0 flex-1 rounded-lg px-1 py-1 text-left transition hover:bg-slate-50/80 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <p className="font-bold">{work.title}</p>
-          <p className="mt-1 text-sm text-slate-500">
-            {work.classroomName} · {work.targetName} · Lv.{work.difficulty} · 期限 {formatDateTime(work.dueAt)}
-          </p>
-        </button>
-        {work.status === 'draft' ? <div className="mt-3 space-y-3 px-1 text-sm leading-7">
-          <p className="whitespace-pre-wrap font-medium text-slate-800">{work.body}</p>
-          <p className="text-xs text-slate-500">{work.sourceLabel ?? 'AIからの課題案'}{work.minutes ? ` · 目安 ${work.minutes}分` : ''}</p>
-          {work.rationale ? <div className="rounded-xl bg-slate-50 p-3"><p className="font-bold text-slate-700">この課題を選んだ理由・計画の変更</p>{work.revision > 0 ? <p className="mt-1 text-xs text-slate-500">先生が編集済みです。以下はAIが最初に提案したときの理由です。</p> : null}<p className="mt-1 whitespace-pre-wrap text-slate-600">{work.rationale}</p></div> : null}
-          {work.reviewNotes?.length ? <ul className="list-disc rounded-xl bg-amber-50 py-3 pl-7 pr-3 text-amber-900">{work.reviewNotes.map((note,index) => <li key={index}>{note}</li>)}</ul> : null}
-          {work.studentId ? <Link href={`/teacher/students/${work.studentId}#learning-plan`} className="inline-block font-bold text-emerald-800 underline">根拠となる評価と学習計画を見る</Link> : null}
-          <label className="flex items-center gap-2 font-bold text-emerald-900"><input type="checkbox" disabled={busy || refreshing || !work.dueAt || !work.questionId} checked={selected.includes(`${work.assignmentId}:${work.revision}`)} onChange={event => { const key = `${work.assignmentId}:${work.revision}`; setSelected(values => event.target.checked ? [...values,key] : values.filter(value => value !== key)); }} className="h-4 w-4 accent-emerald-700" />内容・期限を確認しました{!work.dueAt ? '（先に期限を設定してください）' : ''}</label>
-        </div> : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <StatusPill tone={work.status === 'published' ? 'emerald' : work.status === 'draft' ? 'blue' : 'amber'}>
-            {work.status === 'published' ? '公開中' : work.status === 'draft' ? '先生の確認待ち' : work.status === 'completed' ? '完了' : work.status}
-          </StatusPill>
-          <button type="button" onClick={() => open(work)} disabled={busy || refreshing || !work.questionId}
-            className="text-sm font-bold text-[#237d75] disabled:opacity-40">
-            {work.status === 'draft' ? '確認・編集' : '編集'}
-          </button>
-          {work.status === 'draft' ? null : <Link href={`/teacher/works/${work.assignmentId}`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-700">
-            分析を見る
-          </Link>}
-        </div>
-      </div>)}
+    /> : <div className="space-y-4">
+      {works.map((work) => {
+        const status = rowStatus?.id === work.assignmentId ? rowStatus.message : '';
+        const draft = work.status === 'draft';
+        return <article key={work.assignmentId} className="rounded-2xl border border-[#e3eaee] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <StatusPill tone={draft ? 'blue' : work.status === 'published' ? 'emerald' : 'amber'}>
+                  {STATUS_LABELS[work.status] ?? work.status}
+                </StatusPill>
+                <span className="rounded-full bg-[#f3f7f7] px-2.5 py-1 font-bold text-[#52637d]">Lv.{work.difficulty}</span>
+                {work.minutes ? <span className="inline-flex items-center gap-1 text-slate-500">
+                  <Icon name="schedule" className="text-[16px]" />目安 {work.minutes}分
+                </span> : null}
+              </div>
+              <h3 className="mt-2 text-lg font-bold">{work.title}</h3>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+                <span className="inline-flex items-center gap-1">
+                  <Icon name={work.studentId ? 'person' : 'group'} className="text-[18px]" />
+                  {work.classroomName} · {work.targetName}
+                </span>
+                <span className={`inline-flex items-center gap-1 ${work.dueAt ? '' : 'font-bold text-rose-600'}`}>
+                  <Icon name="event" className="text-[18px]" />
+                  {work.dueAt ? `期限 ${formatDateTime(work.dueAt)}` : '期限が未設定'}
+                </span>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <div className="flex items-center gap-1">
+                <IconButton icon="edit" label={`${work.title}を編集`}
+                  disabled={busy || refreshing || !work.questionId} onClick={() => open(work)} />
+                <IconButton icon="delete" label={`${work.title}を取り下げる`} tone="danger"
+                  disabled={busy || refreshing} onClick={() => { setRemoveError(''); setRemoving(work); }} />
+                {!draft ? <IconLink icon="insights" label={`${work.title}の分析を見る`} href={`/teacher/works/${work.assignmentId}`} /> : null}
+              </div>
+              {draft ? <button type="button" onClick={() => publishOne(work)}
+                disabled={busy || refreshing || !work.questionId}
+                className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50">
+                <Icon name="check_circle" className="text-[20px]" />確認して配信
+              </button> : null}
+            </div>
+          </div>
+
+          {draft ? <>
+            <p className="mt-4 whitespace-pre-wrap rounded-xl bg-[#f7faf9] p-4 text-sm leading-7 text-slate-800">{work.body}</p>
+            <p className="mt-2 text-xs text-slate-500">{work.sourceLabel ?? 'AIからの課題案'}</p>
+
+            {work.rationale ? <details className="mt-3">
+              <summary className="inline-flex cursor-pointer items-center gap-1 text-sm font-bold text-[#237d75]">
+                <Icon name="lightbulb" className="text-[18px]" />この課題を選んだ理由
+              </summary>
+              {work.revision > 0 ? <p className="mt-2 text-xs text-slate-500">先生が編集済みです。以下はAIが最初に提案したときの理由です。</p> : null}
+              <p className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-7 text-slate-600">{work.rationale}</p>
+            </details> : null}
+
+            {work.reviewNotes?.length ? <ul className="mt-3 list-disc rounded-xl bg-amber-50 py-3 pl-7 pr-3 text-sm leading-7 text-amber-900">
+              {work.reviewNotes.map((note, index) => <li key={index}>{note}</li>)}
+            </ul> : null}
+
+            {work.studentId ? <Link href={`/teacher/students/${work.studentId}#learning-plan`}
+              className="mt-3 inline-block text-sm font-bold text-emerald-800 underline">根拠となる評価と学習計画を見る</Link> : null}
+
+            {!work.dueAt || status ? <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+              {!work.dueAt ? <span className="text-xs text-rose-700">配信するには編集から期限を設定してください</span> : null}
+              {status ? <span role="status" className="text-sm text-slate-600">{status}</span> : null}
+            </div> : null}
+          </> : status ? <p role="status" className="mt-3 text-sm text-slate-600">{status}</p> : null}
+        </article>;
+      })}
     </div>}
+
+    <ConfirmDialog
+      open={!!removing}
+      title="この課題を取り下げますか"
+      description={removing ? <>
+        <p className="font-bold text-[#17233d]">{removing.title}</p>
+        <p className="mt-1">{removing.classroomName} · {removing.targetName}</p>
+        <p className="mt-2">一覧から消えて、生徒にも表示されなくなります。提出済みの説明や評価は残ります。</p>
+      </> : null}
+      confirmLabel="取り下げる"
+      busy={busy}
+      error={removeError}
+      onCancel={() => { if (!busy) { setRemoving(null); setRemoveError(''); } }}
+      onConfirm={remove}
+    />
 
     <dialog
       ref={dialogRef}
@@ -249,10 +312,9 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
                 <option key={label} value={index + 1}>Lv.{index + 1} {label}</option>)}
             </select>
           </label>
-          <label className="text-sm font-bold">宿題の期限
-            <input type="datetime-local" disabled={busy} className={field} value={dueAt}
-              onChange={event => setDueAt(event.target.value)} />
-          </label>
+          <div className="text-sm font-bold">宿題の期限
+            <DateTimeField disabled={busy} value={dueAt} onChange={setDueAt} />
+          </div>
         </div>
         <label className="block text-sm font-bold">AIが参考にする授業内容
           <textarea aria-label="AIが参考にする授業内容" disabled={busy} className={field} rows={5} maxLength={20000} value={content}

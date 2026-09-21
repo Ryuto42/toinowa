@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentReader } from '@/components/document-reader';
+import { DateTimeField } from '@/components/date-time-field';
 
-export function PreparationForm({ classrooms, students, onDone }: { classrooms: Array<{ id: string; name: string }>; students: Array<{ id:string; name:string; classroomId:string }>; onDone?: () => void }) {
+export function PreparationForm({ classrooms, students, onDone, onContextChange }: { classrooms: Array<{ id: string; name: string }>; students: Array<{ id:string; name:string; classroomId:string }>; onDone?: () => void; onContextChange?: (context: { classroomId: string; studentId: string | null; dueAt: string }) => void }) {
   const router = useRouter();
   const [mode,setMode] = useState<'student'|'classroom'>(students.length ? 'student' : 'classroom');
   const [classroomId, setClassroomId] = useState(students.length === 1 ? students[0].classroomId : !students.length && classrooms.length === 1 ? classrooms[0].id : '');
@@ -35,6 +36,10 @@ export function PreparationForm({ classrooms, students, onDone }: { classrooms: 
     } catch(error) { setStatus(error instanceof Error ? error.message : '通信に失敗しました。同じ内容で再送できます。'); }
     finally { setBusy(false); }
   }
+  // 下の「手動で設定する」も同じ相手・期限に出すので、選択内容を親へ渡す。
+  const studentId = mode === 'student' ? students.find(s => s.classroomId === classroomId)?.id ?? null : null;
+  useEffect(() => { onContextChange?.({ classroomId, studentId, dueAt }); }, [classroomId, studentId, dueAt, onContextChange]);
+
   const ready = !busy && !reading && !!classroomId && !!dueAt && !!(memo.trim() || material.trim()) && memo.length + material.length <= 19980;
 
   return <form onSubmit={submit} className="space-y-6">
@@ -62,9 +67,9 @@ export function PreparationForm({ classrooms, students, onDone }: { classrooms: 
           {(mode==='student' ? students.map(s=>({id:s.classroomId,name:s.name})) : classrooms).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
-      <label className={label}>期限<span className="ml-1 text-xs text-rose-700">必須</span>
-        <input required type="datetime-local" disabled={busy} className={field} value={dueAt} onChange={event => { setDueAt(event.target.value); changed(); }} />
-      </label>
+      <div className={label}>期限<span className="ml-1 text-xs text-rose-700">必須</span>
+        <DateTimeField required disabled={busy} value={dueAt} onChange={next => { setDueAt(next); changed(); }} />
+      </div>
     </div>
 
     <label className={label}>授業メモ<span className="ml-2 text-xs font-normal text-slate-500">資料だけでも可</span>
@@ -94,7 +99,6 @@ export function PreparationForm({ classrooms, students, onDone }: { classrooms: 
 }
 
 export function PreparationRefresh({ active }: { active: boolean }) { return <Refresh active={active} />; }
-import { useEffect } from 'react';
 function Refresh({ active }: { active: boolean }) {
   const router = useRouter();
   useEffect(() => { if (!active) return; const timer = setInterval(() => { if(document.visibilityState === 'visible') router.refresh(); }, 5000); return () => clearInterval(timer); }, [active,router]);

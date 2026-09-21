@@ -1,7 +1,7 @@
 export interface UsageRun {
   id?: string; request_type?: string;
   actor_id?: string | null; student_id?: string | null; resolved_model: string | null;
-  input_tokens: number | null; output_tokens: number | null; estimated_cost_usd: number | null;
+  input_tokens: number | null; output_tokens: number | null; cached_input_tokens?: number | null; estimated_cost_usd: number | null;
   safety_result?: unknown;
   status: string; fallback_count: number; created_at: string;
 }
