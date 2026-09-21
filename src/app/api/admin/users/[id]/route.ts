@@ -7,6 +7,40 @@ import { userUpdateSchema } from '@/lib/auth/user-update';
 import { json, parseJson, routeError, uuidParam, ApiInputError } from '@/lib/api/http';
 import type { Json } from '@/lib/database/types';
 type Context = { params: Promise<{ id: string }> };
+
+/** 編集ポップアップが開いたときに、その1人分だけを読む。 */
+export async function GET(_request: Request, route: Context) {
+  try {
+    const context = await requireRole('admin');
+    const id = uuidParam((await route.params).id);
+    const db = adminDb();
+    const user = await db.from('users').select('id,display_name,email,login_identifier,role,status,archived_at')
+      .eq('tenant_id', context.tenantId).eq('id', id).maybeSingle();
+    if (user.error) throw new Error(user.error.message);
+    if (!user.data) return json({ message: 'ユーザーが見つかりません' }, { status: 404 });
+    if (user.data.role !== 'student') return json({ user: user.data, profile: null, teachers: [], assigned: [] });
+
+    const [profile, teachers, personal] = await Promise.all([
+      db.from('student_profiles').select('grade,learning_goal,exam_results,weak_areas,daily_time_limit_min')
+        .eq('tenant_id', context.tenantId).eq('user_id', id).maybeSingle(),
+      db.from('users').select('id,display_name').eq('tenant_id', context.tenantId).in('role', ['teacher', 'admin']).eq('status', 'active'),
+      db.from('classrooms').select('id').eq('tenant_id', context.tenantId).eq('individual_student_id', id).maybeSingle(),
+    ]);
+    const assigned = personal.data
+      ? await db.from('enrollments').select('user_id').eq('classroom_id', personal.data.id).eq('role', 'teacher').eq('active', true)
+      : { data: [], error: null };
+    for (const result of [profile, teachers, personal, assigned]) if (result.error) throw new Error(result.error.message);
+    return json({
+      user: user.data,
+      profile: profile.data ?? null,
+      teachers: (teachers.data ?? []).map((row) => ({ id: row.id, name: row.display_name })),
+      assigned: (assigned.data ?? []).map((row) => row.user_id),
+    });
+  } catch (error) {
+    return routeError(error);
+  }
+}
+
 export async function PATCH(request: Request, route: Context) {
   try {
     const context = await requireRole('admin');

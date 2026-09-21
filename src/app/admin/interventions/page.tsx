@@ -31,7 +31,7 @@ export default async function AdminInterventionsPage() {
       <MetricCard label="学習停滞" value={byKind('stalled')}
         tone="slate" note="未着手・途中で停止" />
     </div>
-    <Panel title="未対応">
+    <Panel>
       {rows.length ? <InterventionList initial={rows} studentBase="/admin/students" /> : <EmptyState>いま要フォローの生徒はいません</EmptyState>}
     </Panel>
   </div>;

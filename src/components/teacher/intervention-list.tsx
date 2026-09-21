@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { DataTable } from '@/components/data-table';
 
 export interface Escalation {
   id: string;
@@ -61,9 +62,27 @@ export function InterventionList({ initial, studentBase = '/teacher/students' }:
     }
   }
 
-  return <div className="space-y-3">
-    {error ? <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
-    {items.map((item) => {
+  const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+  return <div>
+    {error ? <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+    <DataTable
+      rows={items}
+      getKey={(item) => item.id}
+      searchIn={(item) => `${item.title} ${item.users?.display_name ?? ''} ${KIND_LABELS[item.kind] ?? item.kind}`}
+      searchPlaceholder="内容・生徒名で検索"
+      empty="いま要フォローの生徒はいません"
+      initialSort={{ key: 'priority' }}
+      filters={[
+        { key: 'kind', label: '種類', options: [...new Set(items.map((item) => item.kind))].map((kind) => ({ value: kind, label: KIND_LABELS[kind] ?? kind })), match: (item, value) => item.kind === value },
+        { key: 'priority', label: '優先度', options: Object.keys(PRIORITY_ORDER).map((value) => ({ value, label: PRIORITY_LABELS[value] ?? value })), match: (item, value) => item.priority === value },
+      ]}
+      columns={[
+        { key: 'priority', label: '優先度', sortBy: (item) => PRIORITY_ORDER[item.priority] ?? 9, render: () => null },
+        { key: 'created', label: '検知した日時', sortBy: (item) => item.created_at, render: () => null },
+        { key: 'student', label: '生徒名', sortBy: (item) => item.users?.display_name ?? null, render: () => null },
+      ]}
+      renderCard={(item) => {
     const payload = asRecord(item.payload);
     const reasons = asStrings(payload.reasons);
     const humanSignals = asStrings(payload.humanSignals);
@@ -156,5 +175,7 @@ export function InterventionList({ initial, studentBase = '/teacher/students' }:
         </div>
       </details> : null}
     </article>;
-  })}</div>;
+  }}
+    />
+  </div>;
 }

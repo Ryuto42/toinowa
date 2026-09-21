@@ -95,7 +95,7 @@ export function ModelControl({ models, tierLabel, primary }: {
         if (event.clientX < rect.left || event.clientX > rect.right
           || event.clientY < rect.top || event.clientY > rect.bottom) close();
       }}
-      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
+      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id={headingId} className="text-xl font-bold">モデルの稼働</h2>

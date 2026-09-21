@@ -1,8 +1,8 @@
 import { requireRole } from '@/lib/auth/guard';
 import { createClient } from '@/lib/database/server';
 import { adminDb } from '@/lib/database/admin';
-import { TopicFormDialog } from '@/components/teacher/topic-form-dialog';
-import { PreparationForm, PreparationRefresh, RetryPreparation } from '@/components/teacher/preparation-form';
+import { CreateWorkDialog } from '@/components/teacher/create-work-dialog';
+import { PreparationRefresh, RetryPreparation } from '@/components/teacher/preparation-form';
 import { PublishedWorkList, type PublishedWork } from '@/components/teacher/published-work-list';
 import { EmptyState, PageTitle, Panel } from '@/components/dashboard';
 import { jsonItems, jsonRecord } from '@/components/teacher/analysis';
@@ -54,9 +54,13 @@ export default async function TeacherAssignmentsPage() {
   const live = works.filter(work => work.status !== 'draft');
   const pending = (jobs.data ?? []).some(row => row.status === 'queued' || row.status === 'leased');
   return <div className="space-y-6">
-    <PageTitle title="授業から宿題を準備" description="先生は授業記録を渡して確認するだけ。AIが生徒別の課題と、その先の学習計画を準備します。" />
+    <PageTitle title="授業と宿題" description="授業記録を渡すと、AIが生徒別の課題と学習計画を準備します。"
+      action={<CreateWorkDialog
+        classrooms={(classrooms.data ?? []).filter(c=>!c.individual_student_id)}
+        students={personalStudents}
+        topicClassrooms={availableClasses.map(c=>({...c,name:c.individual_student_id ? `個別指導：${students.find(s=>s.id===c.individual_student_id)?.name ?? '生徒'}` : c.name}))}
+      />} />
     <ol className="grid gap-3 text-sm sm:grid-cols-3">{['1　授業記録を渡す','2　AIが生徒別に準備する','3　先生が確認して配信'].map(text => <li key={text} className="rounded-xl bg-emerald-50 p-4 font-bold text-emerald-900">{text}</li>)}</ol>
-    <Panel title="今日の授業をAIに渡す"><PreparationForm classrooms={(classrooms.data ?? []).filter(c=>!c.individual_student_id)} students={personalStudents} /></Panel>
     {availablePreparations.length ? <Panel title="AIの準備状況" description="画面を閉じても、受け付けた授業記録から準備を続けます。">
       <div className="space-y-3">{availablePreparations.map(row => {
         const own = (jobs.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id);
@@ -68,6 +72,5 @@ export default async function TeacherAssignmentsPage() {
     </Panel> : null}
     <div id="review"><Panel title={`先生の確認待ち（${drafts.length}件）`} description="生徒にはまだ表示されていません。お題と理由を確認して、配信する課題を選びます。">{drafts.length ? <PublishedWorkList works={drafts} /> : <EmptyState>授業記録を渡すと、ここに生徒別の課題案が届きます。</EmptyState>}</Panel></div>
     <Panel title="配信済みの課題" description="提出後は、生徒の説明の分析から次の課題案と学習計画を更新します。">{live.length ? <PublishedWorkList works={live} variant="table" /> : <EmptyState>承認して配信した課題がここに表示されます。</EmptyState>}</Panel>
-    <details className="rounded-xl border border-slate-200 p-5"><summary className="cursor-pointer text-sm font-bold text-slate-600">特定のテーマ・お題を指定したいとき</summary><div className="mt-4"><TopicFormDialog classrooms={availableClasses.map(c=>({...c,name:c.individual_student_id ? `個別指導：${students.find(s=>s.id===c.individual_student_id)?.name ?? '生徒'}` : c.name}))} students={students} /></div></details>
   </div>;
 }

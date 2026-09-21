@@ -27,6 +27,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="ja"
       className="h-full antialiased"
     >
+      <head>
+        {/* Material Symbols（Google Fonts）。使うアイコンだけを指定して読み込み量を抑える。 */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* App Router では <head> に置くのが正しい。pages/_document を前提にした規則なので無効化する。
+            display=block は、フォント読み込み前に「edit」などの文字が見えてしまうのを防ぐため。 */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font, @next/next/google-font-display */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0&icon_names=archive,delete,edit,insights,swap_horiz,unarchive,visibility&display=block"
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

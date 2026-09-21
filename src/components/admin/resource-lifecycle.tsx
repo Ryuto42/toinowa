@@ -1,9 +1,11 @@
 'use client';
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { IconButton } from '@/components/icon';
+import { isBackdropClick } from '@/components/dialog-backdrop';
 type Preview = { name: string; archivedAt: string | null; fingerprint: string; runningJobs: number; counts: Record<string,number> };
 const labels: Record<string,string> = {lessons:'授業・課題の内容',assignments:'配信・下書き課題',conversations:'対話',messages:'対話メッセージ',assessments:'評価',plans:'学習計画',preparations:'授業記録',exams:'模試の分析',jobs:'関連する非同期処理'};
-export function ResourceLifecycle({ kind, id, archived }: { kind:'student'|'classroom'; id:string; archived:boolean }) {
+export function ResourceLifecycle({ kind, id, archived, compact = false }: { kind:'student'|'classroom'; id:string; archived:boolean; compact?:boolean }) {
   const router=useRouter();
   const dialog=useRef<HTMLDialogElement>(null);
   const heading=useId();
@@ -36,9 +38,17 @@ export function ResourceLifecycle({ kind, id, archived }: { kind:'student'|'clas
     finally { setBusy(false); }
   }
   const title=action==='delete' ? '完全削除' : action==='restore' ? '復元' : 'アーカイブ';
-  return <div className="mt-4 rounded-xl border border-slate-200 p-4">
-    <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-600">{archived ? 'アーカイブ中' : '利用終了時の管理'}</span>{archived ? <><button type="button" disabled={busy} onClick={()=>open('restore')} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm font-bold text-emerald-800">復元する</button><button type="button" disabled={busy} onClick={()=>open('delete')} className="rounded-lg border border-rose-700 px-3 py-2 text-sm font-bold text-rose-700">完全削除する</button></> : <button type="button" disabled={busy} onClick={()=>open('archive')} className="rounded-lg border border-slate-400 px-3 py-2 text-sm">アーカイブする</button>}</div>
-    <dialog ref={dialog} aria-labelledby={heading} onCancel={e=>{if(busy)e.preventDefault();}} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-2xl border-0 bg-white p-6 shadow-2xl backdrop:bg-slate-950/40">
+  // 一覧の行では操作をアイコンに寄せる。説明はツールチップと読み上げラベルに持たせる。
+  const controls = archived
+    ? <>
+        <IconButton icon="unarchive" label="復元する" disabled={busy} onClick={()=>open('restore')} />
+        <IconButton icon="delete" label="完全削除する" tone="danger" disabled={busy} onClick={()=>open('delete')} />
+      </>
+    : <IconButton icon="archive" label="アーカイブする" disabled={busy} onClick={()=>open('archive')} />;
+
+  return <div className={compact ? 'inline-flex items-center gap-1' : 'mt-4 rounded-xl border border-slate-200 p-4'}>
+    {compact ? controls : <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-slate-600">{archived ? 'アーカイブ中' : '利用終了時の管理'}</span>{controls}</div>}
+    <dialog ref={dialog} aria-labelledby={heading} onCancel={e=>{if(busy)e.preventDefault();}} onClick={event=>{ if(!busy && isBackdropClick(event)) dialog.current?.close(); }} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-2xl border-0 bg-white p-6 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40">
       <h2 id={heading} className="text-xl font-bold">{title}の確認</h2>
       {preview ? <><p className="mt-4 font-bold">{preview.name}</p><p className="mt-3 text-sm leading-7">{action==='delete' ? kind==='student' ? '生徒のアカウント・模試情報・個別の学習履歴を完全に削除します。元に戻せません。集合授業の共有記録と他の生徒のデータは残ります。' : 'このクラスの授業記録・課題・対話・評価・学習計画を完全に削除します。元に戻せません。在籍者のアカウントと別のクラスや個別指導の履歴は残ります。' : action==='archive' ? kind==='student' ? 'ログインと新しい学習を停止し、履歴は残します。後から復元できます。' : 'このクラスの新しい課題作成・配信・対話を停止し、履歴は残します。後から復元できます。' : '登録情報と履歴を使って利用を再開します。停止したAI作業は自動では再開しません。必要な授業記録を改めて渡してください。'}</p>
       {action!=='restore' ? <><p className="mt-4 text-sm font-bold">{action==='delete' ? '削除するデータ' : '保持する学習データ'}</p><dl className="mt-2 grid grid-cols-2 gap-2 text-sm">{Object.entries(labels).map(([key,label])=><div key={key} className="flex justify-between gap-2 rounded-lg bg-slate-50 p-2"><dt>{label}</dt><dd className="shrink-0 whitespace-nowrap">{preview.counts[key] ?? 0}件</dd></div>)}</dl></> : null}

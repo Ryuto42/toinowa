@@ -88,7 +88,7 @@ export default async function AdminStudentsPage() {
       <MetricCard label="要フォロー" value={rows.reduce((sum, row) => sum + row.openFollowUps, 0)} tone="slate" />
     </div>
 
-    <Panel title="生徒一覧">
+    <Panel>
       {rows.length ? <StudentsOverviewTable rows={rows} /> : <EmptyState>生徒が登録されていません</EmptyState>}
     </Panel>
   </div>;

@@ -3,20 +3,20 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentReader } from '@/components/document-reader';
 
-export function PreparationForm({ classrooms, students }: { classrooms: Array<{ id: string; name: string }>; students: Array<{ id:string; name:string; classroomId:string }> }) {
+export function PreparationForm({ classrooms, students, onDone }: { classrooms: Array<{ id: string; name: string }>; students: Array<{ id:string; name:string; classroomId:string }>; onDone?: () => void }) {
   const router = useRouter();
   const [mode,setMode] = useState<'student'|'classroom'>(students.length ? 'student' : 'classroom');
   const [classroomId, setClassroomId] = useState(students.length === 1 ? students[0].classroomId : !students.length && classrooms.length === 1 ? classrooms[0].id : '');
   const [memo, setMemo] = useState('');
   const [material, setMaterial] = useState('');
-  const [title, setTitle] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
   const [status, setStatus] = useState('');
   const [requestId, setRequestId] = useState('');
   const [readerKey, setReaderKey] = useState(0);
-  const field = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm';
+  const field = 'mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100';
+  const label = 'block text-sm font-bold text-slate-700';
   function changed() { setRequestId(''); setStatus(''); }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -25,29 +25,70 @@ export function PreparationForm({ classrooms, students }: { classrooms: Array<{ 
     const id = requestId || crypto.randomUUID(); setRequestId(id);
     try {
       const content = [memo.trim(), material.trim()].filter(Boolean).join('\n\n【授業資料】\n');
-      const response = await fetch('/api/lesson-preparations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, classroomId, content, title: title.trim() || content.split('\n')[0].slice(0, 80), dueAt: new Date(dueAt).toISOString() }) });
+      const response = await fetch('/api/lesson-preparations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, classroomId, content, title: content.split('\n')[0].slice(0, 80), dueAt: new Date(dueAt).toISOString() }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? '受け付けられませんでした');
-      setStatus('受け付けました。生徒別の課題と学習計画を準備しています。別の画面へ移動しても処理は続きます。');
-      setMemo(''); setMaterial(''); setTitle(''); setRequestId(''); setReaderKey(value => value + 1);
+      setStatus('受け付けました。準備の進み具合は画面で確認できます。');
+      setMemo(''); setMaterial(''); setRequestId(''); setReaderKey(value => value + 1);
       router.refresh();
+      onDone?.();
     } catch(error) { setStatus(error instanceof Error ? error.message : '通信に失敗しました。同じ内容で再送できます。'); }
     finally { setBusy(false); }
   }
-  return <form onSubmit={submit} className="space-y-5">
-    <p className="text-sm leading-7 text-slate-600">授業の記録を一度渡すと、模試・過去の説明・フィードバックを参考に、選択した生徒の課題と学習計画を準備します。お題や難易度の設計はAIに任せられます。</p>
-    <fieldset className="flex flex-wrap gap-4 text-sm" disabled={busy}><legend className="mb-2 font-bold">授業記録を渡す対象</legend>{([{value:'student',label:'生徒を選ぶ（個別指導）'},{value:'classroom',label:'クラスを選ぶ（一括）'}] as const).map(option=><label key={option.value} className="flex items-center gap-2"><input type="radio" name="targetMode" checked={mode===option.value} onChange={()=>{setMode(option.value);setClassroomId('');changed();}} />{option.label}</label>)}</fieldset>
-    {mode==='student' && !students.length ? <p className="text-sm text-amber-800">個別指導の担当生徒がいません。管理者がユーザー編集で担当の先生を設定すると表示されます。</p> : null}
+  const ready = !busy && !reading && !!classroomId && !!dueAt && !!(memo.trim() || material.trim()) && memo.length + material.length <= 19980;
+
+  return <form onSubmit={submit} className="space-y-6">
+    <fieldset disabled={busy}>
+      <legend className={label}>渡す相手</legend>
+      {/* 生徒とクラスは配信のされ方が変わる。どちらを選んでいるか一目で分かる形にする。 */}
+      <div className="mt-2 inline-flex rounded-xl border border-slate-300 p-1">
+        {([{value:'student',label:'生徒ごと'},{value:'classroom',label:'クラス一括'}] as const).map(option =>
+          <label key={option.value} className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-bold transition ${mode===option.value ? 'bg-emerald-700 text-white' : 'text-slate-600'}`}>
+            <input type="radio" name="targetMode" className="sr-only" checked={mode===option.value}
+              onChange={()=>{setMode(option.value);setClassroomId('');changed();}} />
+            {option.label}
+          </label>)}
+      </div>
+    </fieldset>
+
+    {mode==='student' && !students.length
+      ? <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">担当の生徒がいません。管理者に担当の設定を依頼してください。</p>
+      : null}
+
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="text-sm font-bold">{mode==='student' ? '対象生徒' : '対象クラス'} <span className="text-xs text-rose-700">必須</span><select required disabled={busy} className={field} value={classroomId} onChange={event => { setClassroomId(event.target.value); changed(); }}><option value="">選択してください</option>{(mode==='student' ? students.map(s=>({id:s.classroomId,name:s.name})) : classrooms).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="text-sm font-bold">宿題の期限 <span className="text-xs text-rose-700">必須</span><input required type="datetime-local" disabled={busy} className={field} value={dueAt} onChange={event => { setDueAt(event.target.value); changed(); }} /></label>
+      <label className={label}>{mode==='student' ? '生徒' : 'クラス'}<span className="ml-1 text-xs text-rose-700">必須</span>
+        <select required disabled={busy} className={field} value={classroomId} onChange={event => { setClassroomId(event.target.value); changed(); }}>
+          <option value="">選択してください</option>
+          {(mode==='student' ? students.map(s=>({id:s.classroomId,name:s.name})) : classrooms).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+      </label>
+      <label className={label}>期限<span className="ml-1 text-xs text-rose-700">必須</span>
+        <input required type="datetime-local" disabled={busy} className={field} value={dueAt} onChange={event => { setDueAt(event.target.value); changed(); }} />
+      </label>
     </div>
-    <label className="block text-sm font-bold">授業メモ <span className="text-xs font-normal text-slate-500">資料だけでも大丈夫です</span><textarea disabled={busy} className={field} rows={4} maxLength={16000} value={memo} onChange={event => { setMemo(event.target.value); changed(); }} placeholder="例：今日は一次関数の傾きと切片を学習。式からグラフを描く練習をした。文章題はまだ扱っていない。" /></label>
-    <fieldset className="min-w-0" disabled={busy}><DocumentReader key={readerKey} purpose="lesson" onBusyChange={setReading} onRead={text => { setMaterial(text); changed(); }} /></fieldset>
-    {material ? <details className="rounded-xl bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-bold">読み取った授業資料を確認・修正</summary><textarea aria-label="読み取った授業資料" value={material} maxLength={20000} onChange={event => { setMaterial(event.target.value); changed(); }} disabled={busy} rows={6} className={field} /></details> : null}
-    <details><summary className="cursor-pointer text-sm text-slate-600">授業に名前を付ける（任意）</summary><input aria-label="授業の名前" disabled={busy} className={field} maxLength={200} value={title} onChange={event => { setTitle(event.target.value); changed(); }} placeholder="未入力なら授業記録の冒頭を使います" /></details>
-    <button disabled={busy || reading || !classroomId || !dueAt || !(memo.trim() || material.trim()) || memo.length + material.length > 19980} className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white disabled:opacity-50">{reading ? '授業資料を読み取り中…' : busy ? '受付中…' : '授業記録を渡して、課題の準備を任せる'}</button>
-    <p className="text-xs leading-6 text-slate-500">メモか資料のどちらかが必要です（合計約2万文字まで）。準備完了後に先生が承認するまで、生徒には配信されません。</p>
+
+    <label className={label}>授業メモ<span className="ml-2 text-xs font-normal text-slate-500">資料だけでも可</span>
+      <textarea disabled={busy} className={field} rows={5} maxLength={16000} value={memo}
+        onChange={event => { setMemo(event.target.value); changed(); }}
+        placeholder="例：一次関数の傾きと切片。式からグラフを描く練習まで。文章題は未実施。" />
+    </label>
+
+    <fieldset className="min-w-0" disabled={busy}>
+      <DocumentReader key={readerKey} purpose="lesson" onBusyChange={setReading} onRead={text => { setMaterial(text); changed(); }} />
+    </fieldset>
+
+    {material ? <details className="rounded-xl bg-slate-50 p-4">
+      <summary className="cursor-pointer text-sm font-bold">読み取った資料を確認・修正</summary>
+      <textarea aria-label="読み取った授業資料" value={material} maxLength={20000}
+        onChange={event => { setMaterial(event.target.value); changed(); }} disabled={busy} rows={6} className={field} />
+    </details> : null}
+
+    <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 pt-5">
+      <button disabled={!ready} className="rounded-xl bg-emerald-700 px-6 py-3 font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50">
+        {reading ? '資料を読み取り中…' : busy ? '受付中…' : 'AIに準備を任せる'}
+      </button>
+      <p className="text-xs leading-6 text-slate-500">配信前に先生が確認します。合計2万文字まで。</p>
+    </div>
     {status ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-900">{status}</p> : null}
   </form>;
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
 import { DataTable } from '@/components/data-table';
+import { IconButton, IconLink } from '@/components/icon';
 import { formatDateTime } from '@/lib/shared/format';
 
 export interface PublishedWork {
@@ -157,10 +158,9 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
         { key: 'difficulty', label: '難易度', hideOnMobile: true, align: 'right', sortBy: work => work.difficulty, render: work => `Lv.${work.difficulty}` },
         { key: 'due', label: '期限', hideOnMobile: true, align: 'right', sortBy: work => work.dueAt, render: work => <span className="whitespace-nowrap">{formatDateTime(work.dueAt)}</span> },
         { key: 'status', label: '状態', sortBy: work => STATUS_LABELS[work.status] ?? work.status, render: work => <StatusPill tone={work.status === 'published' ? 'emerald' : work.status === 'completed' ? 'amber' : 'blue'}>{STATUS_LABELS[work.status] ?? work.status}</StatusPill> },
-        { key: 'actions', label: '操作', align: 'right', render: work => <span className="flex items-center justify-end gap-3 whitespace-nowrap">
-          <button type="button" onClick={() => open(work)} disabled={busy || refreshing || !work.questionId}
-            className="text-sm font-bold text-[#237d75] disabled:opacity-40">編集</button>
-          <Link href={`/teacher/works/${work.assignmentId}`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-bold text-slate-700">分析を見る</Link>
+        { key: 'actions', label: '操作', align: 'right', render: work => <span className="flex items-center justify-end gap-1 whitespace-nowrap">
+          <IconButton icon="edit" label={`${work.title}を編集`} disabled={busy || refreshing || !work.questionId} onClick={() => open(work)} />
+          <IconLink icon="insights" label={`${work.title}の分析を見る`} href={`/teacher/works/${work.assignmentId}`} />
         </span> },
       ]}
     /> : <div className="divide-y divide-slate-100">
@@ -216,7 +216,7 @@ export function PublishedWorkList({ works, variant = 'review' }: { works: Publis
         if (event.clientX < rect.left || event.clientX > rect.right
           || event.clientY < rect.top || event.clientY > rect.bottom) close();
       }}
-      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7"
+      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7"
     >
       <div className="flex items-start justify-between gap-4">
         <div>

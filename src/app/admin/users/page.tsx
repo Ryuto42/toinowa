@@ -10,5 +10,5 @@ export default async function UsersPage() {
   if (error) throw new Error(error.message);
   const classrooms = await (await createClient()).from('classrooms').select('id,name').eq('tenant_id', context.tenantId).is('individual_student_id', null).is('archived_at', null).order('name');
   if (classrooms.error) throw new Error(classrooms.error.message);
-  return <div><PageTitle title="ユーザー管理" description="生徒・先生・管理者の追加と、アクセス状態の変更を行います。" /><UserForm classrooms={classrooms.data ?? []} teachers={(data ?? []).filter(user => user.role !== 'student' && user.status === 'active').map(user => ({ id: user.id, name: user.display_name }))} /><Panel title="登録済みユーザー"><UserList key={(data ?? []).map(user => `${user.id}:${user.status}:${user.archived_at}`).join(',')} initial={data ?? []} /></Panel></div>;
+  return <div><PageTitle title="ユーザー管理" description="生徒・先生・管理者の追加と、アクセス状態の変更を行います。" action={<UserForm classrooms={classrooms.data ?? []} teachers={(data ?? []).filter(user => user.role !== 'student' && user.status === 'active').map(user => ({ id: user.id, name: user.display_name }))} />} /><Panel><UserList key={(data ?? []).map(user => `${user.id}:${user.status}:${user.archived_at}`).join(',')} initial={data ?? []} /></Panel></div>;
 }

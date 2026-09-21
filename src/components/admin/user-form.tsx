@@ -78,13 +78,13 @@ export function UserForm({ classrooms, teachers }: { classrooms: Array<{ id: str
     } catch { setStatus('通信に失敗しました。もう一度お試しください。'); } finally { setBusy(false); }
   }
 
-  return <div className="mb-6">
+  return <div>
     <button type="button" onClick={open} aria-haspopup="dialog" className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800">ユーザーを追加する</button>
     <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreScroll} onCancel={event => { if (busy || credentials) event.preventDefault(); }} onClick={event => {
       if (event.target !== event.currentTarget || busy || credentials) return;
       const rect = event.currentTarget.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) close();
-    }} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
+    }} className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7">
     <div className="flex items-center justify-between gap-4"><h2 id={headingId} className="text-xl font-bold">{credentials ? '登録が完了しました' : 'ユーザーを追加'}</h2><button type="button" aria-label="ユーザー追加を閉じる" disabled={busy || credentials !== null} onClick={close} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 disabled:opacity-40">閉じる</button></div>
     {credentials ? <CredentialsReceipt credentials={credentials} onClose={close} /> : null}
     <form onSubmit={submit} className={credentials ? 'hidden' : 'mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2'}>

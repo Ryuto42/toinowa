@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { StatusPill } from '@/components/dashboard';
 import { DataTable } from '@/components/data-table';
+import { IconButton } from '@/components/icon';
+import { isBackdropClick } from '@/components/dialog-backdrop';
 
 export interface ClassroomRow {
   id: string;
@@ -42,7 +44,7 @@ function useDialog() {
   };
 }
 
-const dialogClass = 'm-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7';
+const dialogClass = 'm-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border-0 bg-white p-5 text-left text-slate-900 shadow-2xl backdrop:bg-slate-950/40 sm:p-7';
 
 export function ClassroomManager({ classrooms, members }: { classrooms: ClassroomRow[]; members: MemberOption[] }) {
   const router = useRouter();
@@ -54,9 +56,7 @@ export function ClassroomManager({ classrooms, members }: { classrooms: Classroo
   const rows = classrooms.filter((classroom) => showArchived || !classroom.archived_at);
   const teacherNames = (classroom: ClassroomRow) => classroom.teacherIds.map((id) => nameById.get(id) ?? '（不明）');
 
-  return <div className="space-y-6">
-    <div className="flex justify-end"><CreateClassroom onDone={() => router.refresh()} /></div>
-    <DataTable
+  return <DataTable
       rows={rows}
       getKey={(classroom) => classroom.id}
       searchIn={(classroom) => `${classroom.name} ${classroom.subject} ${classroom.grade ?? ''} ${teacherNames(classroom).join(' ')}`}
@@ -95,11 +95,13 @@ export function ClassroomManager({ classrooms, members }: { classrooms: Classroo
         { key: 'actions', label: '操作', align: 'right', render: (classroom) => <ClassroomActions
           classroom={classroom} teachers={teachers} students={students} onDone={() => router.refresh()} /> },
       ]}
-    />
-  </div>;
+    />;
 }
 
-function CreateClassroom({ onDone }: { onDone: () => void }) {
+/** ページ見出しの操作ボタンとして使う。作成後は一覧を読み直す。 */
+export function CreateClassroom() {
+  const router = useRouter();
+  const onDone = () => router.refresh();
   const { ref: dialogRef, open: openDialog, close: closeDialog, restore: restoreDialog } = useDialog();
   const headingId = useId();
   const [busy, setBusy] = useState(false);
@@ -204,14 +206,13 @@ function ClassroomActions({ classroom, teachers, students, onDone }: {
     } finally { setBusy(false); }
   }
 
-  return <span className="flex flex-wrap items-center justify-end gap-2">
-    <button type="button" disabled={!!classroom.archived_at} onClick={openEditor} aria-haspopup="dialog"
-      className="whitespace-nowrap rounded-xl border border-emerald-700 px-3 py-1.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-40">
-      担当・在籍を編集
-    </button>
-    <ResourceLifecycle kind="classroom" id={classroom.id} archived={!!classroom.archived_at} />
+  return <span className="flex items-center justify-end gap-1">
+    <IconButton icon="edit" label={`${classroom.name}の担当・在籍を編集`}
+      disabled={!!classroom.archived_at} onClick={openEditor} />
+    <ResourceLifecycle kind="classroom" id={classroom.id} archived={!!classroom.archived_at} compact />
     <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreDialog}
-      onCancel={(e) => { if (busy) e.preventDefault(); }} className={dialogClass}>
+      onCancel={(e) => { if (busy) e.preventDefault(); }}
+      onClick={(e) => { if (!busy && isBackdropClick(e)) closeDialog(); }} className={dialogClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id={headingId} className="text-xl font-bold">{classroom.name} の担当・在籍</h2>

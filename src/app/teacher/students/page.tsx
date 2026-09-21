@@ -23,7 +23,7 @@ export default async function TeacherStudentsPage() {
 
   return <div>
     <PageTitle title="生徒" description="個別に担当する生徒と、担当クラスの生徒が表示されます。" />
-    <Panel title="在籍生徒">
+    <Panel>
       {list.length
         ? <StudentsTable rows={list} />
         : <EmptyState>担当の生徒はいません。管理者に担当の設定を依頼してください。</EmptyState>}
