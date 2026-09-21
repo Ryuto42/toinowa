@@ -1,0 +1,28 @@
+Generation method: built-in image_gen tool
+
+Initial generation prompt:
+Use case: logo-brand.
+Asset type: one polished 4 by 4 contact sheet showing SIXTEEN DISTINCT alternative app icon concepts for トイノワ / Toinowa, a friendly Japanese learning service. Students explain to AI, AI asks questions, and understanding connects back to teachers.
+Primary request: user wants to explore a wide variety after seeing a teal and purple circular speech bubble logo. Make 16 fresh concepts, simple, stylish, cute, approachable, centered on rings/circles/dialogue. Do NOT reuse the previous teal-purple pairing. Each concept should be genuinely different in silhouette and visual idea, not just recolors.
+Layout: a square presentation sheet, exactly 4 columns and 4 rows, all 16 cells equal size, generous whitespace, clean warm white background. Each cell contains ONE flat vector-like standalone symbol of consistent visual scale (around 60% of cell width), and a small dark gray two-digit number centered underneath: first row 01 02 03 04, second 05 06 07 08, third 09 10 11 12, fourth 13 14 15 16. Numbers must be correct and legible. No other text. Very subtle thin neutral separators between cells, no raised cards or mockups.
+Specific concepts, left to right, top to bottom:
+01: single-color rich cobalt blue almost circular speech-bubble ring, chunky rounded contour, one tiny rounded tail, beautifully simple.
+02: single-color terracotta open organic ring, softer imperfect circular contour and very rounded endpoints, warm and approachable.
+03: deep navy ring with one small apricot dot nestled at its opening, a quiet moment of discovery.
+04: monochrome charcoal two rounded dialogue arcs facing each other and forming a clean circle, large open center.
+05: coral and soft peach two friendly curved speech shapes together forming one ring, clearly distinct from 04.
+06: petrol blue and pale sky blue two smoothly interwoven loops, airy circular negative space, no complicated knot.
+07: a single-color muted violet circular ribbon gently folded once, elegant broad flat shape, no gradient or shading.
+08: mustard golden yellow single thick ring with a small white speech-bubble silhouette cut cleanly into the contour, clever negative space.
+09: forest green and warm cream simple round loop with a subtly upturned lower inner edge suggesting a gentle smile, NO eyes.
+10: vivid periwinkle single-color rounded question-mark gesture wrapping into a nearly closed circle, one detached circular dot, polished original silhouette.
+11: brick red three plump curved segments surrounding a circular opening, implying learner, teacher, AI, avoid generic recycling arrows.
+12: ink blue and powder blue one broad near-circle with a tiny circular satellite dot above its opening, calm and modern.
+13: monochrome warm brown rounded lowercase-q-inspired ring with a short soft diagonal tail, no literal typeset letter.
+14: salmon pink soft donut-like circular speech form with a small offset opening and chubby pill-shaped terminals, no excessive lobes.
+15: olive green two broad nested concentric open arcs with offset gaps, sense of growing understanding, extremely simple.
+16: bright medium blue and pale aqua two balanced rounded petal-like forms enclosing a circular opening, hint of mutual conversation, no flower decoration.
+Art direction: cohesive level of sophistication but meaningful variety. Japanese contemporary service branding, cute through geometry and softness, professional enough for teachers and inviting for students. Every mark should work at small app-icon size. Solid flat colors, crisp edges, big clean negative spaces. At most two colors per mark. No gradients, shadows, textures, 3D, faces, eyes, robots, books, graduation caps, sparkles, ornamental elements, arrows, wordmarks, service names, watermarks. No green-and-purple combinations. Keep rings recognizable; avoid complex abstract corporate knots. Render all 16 with equal care, complete and uncropped.
+
+Presentation cleanup edit prompt:
+Edit this 4x4 comparison sheet. Preserve all sixteen icon designs, colors, positions, numbers 01–16, and the exact grid arrangement. ONLY clean the presentation: replace ALL black/transparent-looking background regions and stray edge speckles with a completely opaque solid warm white (#FAFAF7) background across the entire sheet, including the holes inside each ring. Make all icon edges clean and smooth. Remove stray colored pixels. Keep small labels 01–16 in legible dark charcoal. Very fine light gray grid separators. This is an OPAQUE WHITE PAPER PRESENTATION BOARD, not isolated transparent icon assets. Render white paper as an integral visible part of the image. Do not cut out or remove any background. No transparency anywhere. No new elements. No changes to icon silhouettes or palettes.

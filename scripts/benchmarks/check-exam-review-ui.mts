@@ -1,0 +1,68 @@
+// Synthetic, isolated tenant. No model call. Always deletes its own test data.
+import { config } from 'dotenv';
+import { Client } from 'pg';
+import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { chromium } from 'playwright-core';
+import { mkdir, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+config({path:'.env.local',quiet:true});
+const base='http://localhost:3101';
+const db=new Client({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+const admin=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SECRET_KEY!,{auth:{persistSession:false,autoRefreshToken:false}});
+let tenant:string|undefined,actor:string|undefined,student:string|undefined;
+const browser=await chromium.launch({channel:'chrome'});
+await db.connect();
+try{
+ const context=await browser.newContext({viewport:{width:1440,height:1050},locale:'ja-JP'});
+ const page=await context.newPage();
+ await page.setContent('<html lang="ja"><body style="font:24px sans-serif;padding:40px;background:white;width:900px"><h1>模試の確認画面テスト用資料</h1><p>架空の数値・実在する生徒の情報は含みません</p><table cellpadding="20" border="1" style="border-collapse:collapse;width:85%"><tr><th>科目</th><th>得点</th><th>満点</th><th>全国偏差値</th></tr><tr><td>数学</td><td>60</td><td>100</td><td>55</td></tr></table></body></html>');
+ const source='data:image/png;base64,'+(await page.screenshot({clip:{x:0,y:0,width:1000,height:400}})).toString('base64');
+ tenant=(await db.query("insert into tenants(name,ai_budget_limit_usd) values('画面検証用（終了後削除）',0) returning id")).rows[0].id;
+ const email=`exam-review-${crypto.randomUUID()}@example.invalid`,password=crypto.randomUUID()+'aA!7';
+ const created=await admin.auth.admin.createUser({email,password,email_confirm:true});
+ if(created.error||!created.data.user)throw Error('Synthetic admin creation failed');actor=created.data.user.id;
+ await db.query("insert into users(id,tenant_id,role,display_name,must_change_password) values($1,$2,'admin','確認担当（画面検証）',false)",[actor,tenant]);
+ student=crypto.randomUUID();
+ await db.query("insert into auth.users(id,instance_id,aud,role,email) values($1,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',$2)",[student,`${student}@example.invalid`]);
+ await db.query("insert into users(id,tenant_id,role,display_name) values($1,$2,'student','確認用生徒（架空）')",[student,tenant]);
+ const analysis=crypto.randomUUID();
+ const result={text:'数学 / 得点60/100 / 全国偏差値55',learningGoal:'考え方を自分の言葉で説明する',weakAreas:'',dailyTimeLimitMin:20,rationale:'模試をもとにした初期提案です。',uncertainties:['比較集団の見出しを確認してください。'],reviewRequired:true,reviewReasons:['数学: 全国偏差値の列が不明'],extraction:{version:3,pages:[]}};
+ await db.query("insert into exam_analyses(id,tenant_id,created_by,student_id,status,images,result) values($1,$2,$3,$4,'review_required',$5,$6)",[analysis,tenant,actor,student,JSON.stringify([source]),JSON.stringify(result)]);
+ await db.query("insert into student_profiles(user_id,tenant_id,exam_analysis_id) values($1,$2,$3)",[student,tenant,analysis]);
+ const cookies:{name:string;value:string}[]=[];
+ const client=createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,{cookies:{getAll:()=>cookies,setAll:(values)=>{cookies.splice(0,cookies.length,...values.map(({name,value})=>({name,value})));}}});
+ const signed=await client.auth.signInWithPassword({email,password});if(signed.error)throw Error('Synthetic admin sign-in failed');
+ await context.addCookies(cookies.map(c=>({...c,domain:'localhost',path:'/',sameSite:'Lax' as const})));
+ await page.goto(base+'/admin/exam-analyses/'+analysis,{waitUntil:'networkidle'});
+ await page.getByRole('heading',{name:'模試の読み取り結果を確認'}).waitFor();
+ await page.addStyleTag({content:'nextjs-portal { display: none !important; }'});
+ const approve=page.getByRole('button',{name:'確認した内容を反映する'});
+ assert(await approve.isDisabled());
+ await mkdir('docs/assets/exam-review',{recursive:true});
+ await page.screenshot({path:'docs/assets/exam-review/desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+ await page.screenshot({path:'docs/assets/exam-review/mobile.png',fullPage:true});
+ await page.getByLabel('成績の読み取り結果',{exact:true}).fill('数学 / 得点60/100 / 全国偏差値55（原資料と照合済み）');
+ assert.equal((await db.query('select exam_results from student_profiles where user_id=$1',[student])).rows[0].exam_results,'');
+ await page.getByRole('checkbox').check();
+ await approve.click();
+ await page.getByText('確認済みの結果を保存しました。登録済みの生徒には、手入力の変更を保持して反映します。').waitFor();
+ const saved=(await db.query('select status,images,result from exam_analyses where id=$1',[analysis])).rows[0];
+ assert.equal(saved.status,'completed');assert.equal(saved.images,null);assert.equal(saved.result.reviewedBy,actor);
+ assert.match((await db.query('select exam_results from student_profiles where user_id=$1',[student])).rows[0].exam_results,/原資料と照合済み/);
+ await page.getByRole('button',{name:'生徒への反映を再試行する'}).click();
+ await page.getByText('確認済みの結果を保存しました。登録済みの生徒には、手入力の変更を保持して反映します。').waitFor();
+ await page.goto(base+'/admin/users',{waitUntil:'networkidle'});
+ await page.getByRole('heading',{name:'模試の分析状況'}).waitFor();
+ await writeFile('benchmark-data/exams/runs-evidence-v3/ui-check.json',JSON.stringify({at:new Date().toISOString(),syntheticOnly:true,checks:['desktop render','mobile no horizontal overflow','explicit confirmation required','profile unchanged before approval','approved edit applied','source image deleted after approval','saved application retry','status list visible'],screenshots:['docs/assets/exam-review/desktop.png','docs/assets/exam-review/mobile.png']},null,2));
+ console.log('Exam review UI and database application checks passed (synthetic data; no AI calls).');
+}finally{
+ await browser.close();
+ if(tenant){await db.query('delete from exam_analyses where tenant_id=$1',[tenant]);await db.query('delete from student_profiles where tenant_id=$1',[tenant]);}
+ if(actor)await admin.auth.admin.deleteUser(actor);
+ if(student)await db.query('delete from auth.users where id=$1',[student]);
+ if(tenant)await db.query('delete from tenants where id=$1',[tenant]);
+ await db.end();
+}

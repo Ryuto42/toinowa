@@ -18,5 +18,5 @@ export async function applyExamAnalysis(tenantId: string, analysisId: string) {
     const job = await enqueueJob({ tenantId, kind: 'build_learning_plan', idempotencyKey: `exam-plan:${analysisId}:${classroomId}`, payload: { studentId: applied.data, requestedBy: analysis.data.created_by, classroomId }, traceId: crypto.randomUUID() });
     if (!job) throw new Error('学習計画を予約できませんでした');
   }
-  triggerWorkerTick();
+  if (contexts.length) triggerWorkerTick();
 }

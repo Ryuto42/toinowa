@@ -72,6 +72,20 @@ describe('callModel', () => {
     expect(mocks.create.mock.calls[0][0].model).toBe('google/gemini-2.5-flash-lite');
   });
 
+  it('模試だけ60秒待ち、失敗時はジョブに返して別モデルに切り替えない', async () => {
+    mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status:504 }) });
+    await expect(callModel({ router:'curriculum', modelClass:'exam', agentName:'lesson-analysis', requestType:'extract_exam', messages:[{ role:'user', content:'test' }], trace })).rejects.toMatchObject({ status:504 });
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create.mock.calls[0][0].model).toBe('google/gemini-2.5-flash');
+    expect(mocks.create.mock.calls[0][1].timeout).toBe(60000);
+  });
+
+  it('模試のJSON失敗を内部で再課金して修復せずジョブへ返す', async () => {
+    mocks.create.mockReturnValueOnce(queuedResponse(okResponse('invalid json')));
+    await expect(callModel({ router:'curriculum', modelClass:'exam', agentName:'lesson-analysis', requestType:'extract_exam', schema:z.object({ answer:z.string() }), messages:[{ role:'user', content:'test' }], trace })).rejects.toThrow('構造化出力');
+    expect(mocks.create).toHaveBeenCalledOnce();
+  });
+
   it('用途別モデルが遅い場合は同じルーターを再試行せず別モデルに切り替える', async () => {
     mocks.create.mockReturnValueOnce({ withResponse: vi.fn().mockRejectedValue({ status: 504 }) })
       .mockReturnValueOnce(queuedResponse(okResponse('recovered')));

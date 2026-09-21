@@ -53,6 +53,17 @@ run('background exam analysis persistence (no AI calls)', () => {
       expect((await db.query("select has_function_privilege($1,'public.apply_exam_analysis(uuid,uuid)','execute') as allowed",[role])).rows[0].allowed).toBe(false);
     }
   });
+  it('review-required results cannot auto-apply even when attached after registration', async () => {
+    const id=crypto.randomUUID(), before=await profile();
+    await db.query('select queue_exam_analysis($1,$2,$3,$4,$5)',[tenant,admin,id,'[]',JSON.stringify({learningGoal:before.learning_goal,weakAreas:before.weak_areas,examResults:before.exam_results,dailyTimeLimitMin:before.daily_time_limit_min})]);
+    await db.query("update exam_analyses set status='review_required',result=$2 where id=$1",[id,JSON.stringify({...output,text:'unconfirmed'})]);
+    await db.query('select attach_exam_analysis($1,$2,$3,$4)',[tenant,admin,student,id]);
+    expect((await db.query('select apply_exam_analysis($1,$2) as student',[tenant,id])).rows[0].student).toBeNull();
+    expect((await profile()).exam_results).toBe(before.exam_results);
+    await db.query("update exam_analyses set status='completed',result=$2 where id=$1",[id,JSON.stringify({...output,text:'confirmed'})]);
+    expect((await db.query('select apply_exam_analysis($1,$2) as student',[tenant,id])).rows[0].student).toBe(student);
+    expect((await profile()).exam_results).toBe('confirmed');
+  });
   it('can prepare a reset for another user and lock competing operations', async () => {
     const revision = await db.query('select begin_password_reset($1,$2,$3) as revision',[tenant,admin,student]);
     expect(revision.rows[0].revision).toBeGreaterThan(0);

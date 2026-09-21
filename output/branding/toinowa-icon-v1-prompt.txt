@@ -1,0 +1,9 @@
+Generation method: built-in image_gen tool
+
+Use case: logo-brand.
+Asset type: a single finished square app icon for the Japanese learning service トイノワ (Toinowa).
+Primary request: create a simple, stylish, cute and approachable icon centered on the idea of a ring / circle of dialogue. Students explain concepts to AI, AI asks thoughtful questions, and insights connect back to teachers and the next learning cycle.
+Design: one distinctive, beautifully balanced circular emblem made from two softly rounded, gently organic curved forms that flow together into an almost closed ring. Subtle conversation-bubble character in the shape, with one tiny integrated rounded speech-tail if it improves the silhouette. The large clear circular negative space must remain the focus. Friendly plump forms, sophisticated simplicity, tasteful Japanese contemporary brand design. Not a literal diagram. Prioritize an immediately recognizable silhouette at 32 pixels.
+Palette: established app colors, deep teal green (#087C73) as the dominant ring and soft lavender (#A79DF3) as the smaller complementary section. Warm near-white (#FAF9F6) full-bleed square background.
+Composition: exactly one icon, centered, generous even padding, emblem occupying about 62 percent of the square. Flat vector-like solid colors, perfectly crisp smooth edges, optical balance.
+Constraints: no text, no letters, no wordmark, no watermark, no mockup, no presentation board, no multiple variants, no gradients, no shadows, no 3D, no texture. No eyes or face, no robot, no book, no graduation cap, no arrows, no tiny decorations. Cute through rounded shape alone. This must feel like a considered original service identity, calm and inviting.

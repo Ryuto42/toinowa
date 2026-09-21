@@ -286,7 +286,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
     let messages = opts.messages;
 
     // 構造化出力の修復は「そのモデルの中で」1回だけ
-    for (let repair = 0; repair <= (opts.schema ? 1 : 0); repair++) {
+    for (let repair = 0; repair <= (opts.schema && opts.modelClass !== 'exam' ? 1 : 0); repair++) {
       if (attempts.length) {
         try { await assertBudget(opts.trace.tenantId, costUsd, opts.trace.studentId); } catch (error) {
           if (error instanceof BudgetExceeded && opts.degrade) return finish(opts.degrade() as Out, { degraded: true });
@@ -294,7 +294,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
           throw error;
         }
       }
-      const remainingMs = 45_000 - (performance.now() - t0);
+      const remainingMs = (opts.modelClass === 'exam' ? 65_000 : 45_000) - (performance.now() - t0);
       if (remainingMs <= 0) { lastError = new Error('AI request deadline exceeded'); break ladderLoop; }
       const attemptStart = performance.now();
       let attemptRecorded = false;
@@ -325,7 +325,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
                   extra_body: { route: 'fallback', models: chain.slice(0, 5) },
                 }
               : {}),
-          } as never, { timeout: Math.min(15_000, Math.ceil(remainingMs)) })
+          } as never, { timeout: Math.min(opts.modelClass === 'exam' ? 60_000 : 15_000, Math.ceil(remainingMs)) })
           .withResponse();
 
         // ── ヘッダは .withResponse() でしか読めない ──
@@ -399,7 +399,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
         // ── 構造化出力が壊れている ──
         schemaValid = false;
         attempts[attempts.length - 1].outcome = 'schema_invalid';
-        if (repair === 1) throw new SchemaRepairFailed(z.prettifyError(parsed.error));
+        if (repair === 1 || opts.modelClass === 'exam') throw new SchemaRepairFailed(z.prettifyError(parsed.error));
 
         messages = [
           ...messages,

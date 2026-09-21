@@ -9,7 +9,7 @@ const ROUTER_LABELS: Record<string, string> = {
   studentChat: '生徒との対話', assessment: '説明の評価', curriculum: '学習計画', safety: '安全性チェック',
 };
 
-const CLASSES: ModelClass[] = ['economy', 'standard', 'advanced', 'vision'];
+const CLASSES: ModelClass[] = ['economy', 'standard', 'advanced', 'vision', 'audio', 'exam'];
 
 /**
  * ゲートウェイが返す resolved_model はベンダー接頭辞を持たず、
@@ -65,6 +65,7 @@ export async function ModelStatus() {
     primary={[
       ...Object.entries(PRIMARY[tier]).map(([key, model]) => ({ label: ROUTER_LABELS[key] ?? key, model })),
       { label: '難易度4〜5の自動選択', model: serverEnv.AI_ADVANCED_MODEL },
+      { label: '模試の読み取り', model: serverEnv.AI_EXAM_MODEL },
     ]}
   />;
 }
