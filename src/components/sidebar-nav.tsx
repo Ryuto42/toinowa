@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogoutButton } from '@/components/logout-button';
 
-export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart';
+export type NavIconName = 'dashboard' | 'book' | 'users' | 'bolt' | 'check' | 'screen' | 'home' | 'chat' | 'chart' | 'handoff';
 
 export interface SidebarNavItem {
   href: string;
@@ -19,6 +19,7 @@ function NavIcon({ name }: { name: NavIconName }) {
   if (name === 'book') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" /><path {...common} d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20M8 7h8M8 11h6" /></svg>;
   if (name === 'users') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="9" cy="8" r="3" /><path {...common} d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a2.5 2.5 0 0 1 0 5M17 14a4.5 4.5 0 0 1 3.5 4" /></svg>;
   if (name === 'bolt') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" /></svg>;
+  if (name === 'handoff') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="6.5" cy="7" r="2.5" /><circle {...common} cx="17.5" cy="7" r="2.5" /><path {...common} d="M3 19a3.5 3.5 0 0 1 7 0M14 19a3.5 3.5 0 0 1 7 0M9.5 13h5m0 0-1.8-1.8M14.5 13l-1.8 1.8" /></svg>;
   if (name === 'check') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><circle {...common} cx="12" cy="12" r="8.5" /><path {...common} d="m8.5 12 2.3 2.3 4.8-5" /></svg>;
   if (name === 'screen') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><rect {...common} x="3.5" y="4" width="17" height="12" rx="1.5" /><path {...common} d="M8 20h8M12 16v4" /></svg>;
   if (name === 'chat') return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5"><path {...common} d="M5 18.5 3.5 21l4.2-1.7A8.5 8.5 0 1 0 5 18.5Z" /><path {...common} d="M8 10h8M8 13h5" /></svg>;

@@ -9,6 +9,8 @@ import {
   DimensionBars, MisconceptionChips, PlanTimeline, ScoreRing, ScoreTrend,
   jsonItems, jsonRecord,
 } from '@/components/teacher/analysis';
+import { HandoffForm } from '@/components/teacher/handoff-form';
+import { HandoffList } from '@/components/teacher/handoff-list';
 
 const REVIEW_LABELS: Record<string, string> = {
   pending_review: '確認が必要', auto_approved: '自動分析済み', approved: '先生が確認済み',
@@ -20,7 +22,7 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
   const { id } = await params;
   await assertStudentScope(context, id);
   const db = await createClient();
-  const [user, profile, assessments, plans, reviews, escalations, progress] = await Promise.all([
+  const [user, profile, assessments, plans, reviews, escalations, progress, colleagues, handoffs] = await Promise.all([
     db.from('users').select('*').eq('id', id).maybeSingle(),
     db.from('student_profiles').select('*').eq('user_id', id).maybeSingle(),
     db.from('assessments').select('id,concept_id,score,override_score,confidence,reviewer_status,component_scores,misconceptions,created_at,concepts(name)')
@@ -29,6 +31,8 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
     db.from('review_schedules').select('*,concepts(name)').eq('student_id', id).is('fulfilled_at', null).order('due_at').limit(6),
     db.from('escalations').select('id,kind,title,priority,created_at').eq('student_id', id).in('status', ['open', 'acknowledged']).order('created_at', { ascending: false }),
     db.from('assignment_progress').select('assignment_id,status,active_seconds,completed_at').eq('student_id', id),
+    db.from('users').select('id,display_name').eq('tenant_id', context.tenantId).in('role', ['teacher', 'admin']).eq('status', 'active').order('display_name'),
+    db.from('handoffs').select('*').eq('tenant_id', context.tenantId).eq('student_id', id).order('created_at', { ascending: false }).limit(10),
   ]);
   if (!user.data) notFound();
 
@@ -67,17 +71,21 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
       description={`学年 ${profile.data?.grade ?? '未設定'}。概念ごとの理解度と、次に取り組むことをまとめています。`}
     />
 
+    <div className="mb-6">
+      <HandoffForm studentId={id} teachers={colleagues.data?.filter((row) => row.id !== context.userId) ?? []} />
+    </div>
+
     {pending.length ? <div role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
       <p className="font-bold">先生の確認が必要な分析が{pending.length}件あります</p>
       <p className="mt-1">観測が少なく、AIの確信度が低い評価です。根拠を見て必要なら点数を修正してください。</p>
     </div> : null}
 
     {escalations.data?.length ? <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4">
-      <p className="text-sm font-bold text-rose-800">対応待ちの介入が{escalations.data.length}件</p>
+      <p className="text-sm font-bold text-rose-800">要フォローの項目が{escalations.data.length}件</p>
       <ul className="mt-2 space-y-1 text-sm text-rose-900">
         {escalations.data.slice(0, 3).map((item) => <li key={item.id}>・{item.title}</li>)}
       </ul>
-      <Link href="/teacher/interventions" className="mt-2 inline-block text-sm font-bold text-rose-800 underline">介入管理で見る</Link>
+      <Link href="/teacher/interventions" className="mt-2 inline-block text-sm font-bold text-rose-800 underline">要フォロー一覧で見る</Link>
     </div> : null}
 
     <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -157,5 +165,16 @@ export default async function TeacherStudentPage({ params }: PageProps<'/teacher
         </Panel>
       </div>
     </div>
+
+    {handoffs.data?.length ? <div className="mt-6">
+      <Panel title="引き継ぎの履歴" description="この生徒を誰から誰へ、どんな申し送りで渡したかの記録です">
+        <HandoffList
+          initial={handoffs.data}
+          mode={handoffs.data.some((row) => row.to_user === context.userId && row.status === 'pending') ? 'inbox' : 'admin'}
+          names={Object.fromEntries((colleagues.data ?? []).map((row) => [row.id, row.display_name]).concat([[id, user.data.display_name]]))}
+          linkStudents={false}
+        />
+      </Panel>
+    </div> : null}
   </div>;
 }

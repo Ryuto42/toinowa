@@ -36,7 +36,7 @@ export default async function TeacherDashboardPage() {
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="平均理解度" value={average === null ? '—' : `${average}%`} note={average === null ? 'データ収集中' : `${scores.length}単元の観測データ`} />
-      <MetricCard label="要介入" value={escalations.data?.length ?? 0} tone={escalations.data?.length ? 'rose' : 'emerald'} note="緊急対応が必要な生徒" />
+      <MetricCard label="要フォロー" value={escalations.data?.length ?? 0} tone={escalations.data?.length ? 'rose' : 'emerald'} note="緊急対応が必要な生徒" />
       <MetricCard label="AI分析済み" value={analyzed.count ?? 0} tone="slate" note="説明ワークの分析件数" />
       <MetricCard label="AI費用（直近）" value={`$${cost.toFixed(4)}`} tone="slate" note="記録されたAI実行・フォールバックを含む" />
     </div>
@@ -45,8 +45,8 @@ export default async function TeacherDashboardPage() {
       <Panel title="単元別理解度" description="1クラスの観測データ">
         {latestByConcept.size ? <div className="space-y-5">{[...latestByConcept.entries()].slice(0, 8).map(([conceptId, score]) => <div key={conceptId}><div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-[#34445f]">{conceptNames.get(conceptId) ?? '学習単元'}</span><span className="text-xs text-[#8a9ab2]">最新の評価</span></div><ScoreBar value={score} /></div>)}</div> : <EmptyState><span className="text-2xl text-[#c5d3e4]">▥</span><span className="mt-2 block">評価データが入ると単元ごとの傾向を表示します</span></EmptyState>}
       </Panel>
-      <Panel title="介入候補" action={<Link href="/teacher/interventions" className="text-xs font-bold text-[#237d75]">すべて見る　›</Link>}>
-        {escalations.data?.length ? <div className="space-y-3">{escalations.data.map((item) => <Link key={item.id} href="/teacher/interventions" className="flex items-center justify-between gap-3 rounded-2xl border border-[#edf0f2] p-4 hover:border-[#b9dcd5]"><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs text-[#8a9ab2]">優先度: {item.priority}</p></div><StatusPill tone={item.priority === 'urgent' ? 'rose' : 'amber'}>{item.status === 'open' ? '未対応' : '確認中'}</StatusPill></Link>)}</div> : <EmptyState><span className="text-2xl text-[#c5d3e4]">♢</span><span className="mt-2 block">現在、介入候補はありません</span></EmptyState>}
+      <Panel title="要フォロー" action={<Link href="/teacher/interventions" className="text-xs font-bold text-[#237d75]">すべて見る　›</Link>}>
+        {escalations.data?.length ? <div className="space-y-3">{escalations.data.map((item) => <Link key={item.id} href="/teacher/interventions" className="flex items-center justify-between gap-3 rounded-2xl border border-[#edf0f2] p-4 hover:border-[#b9dcd5]"><div><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs text-[#8a9ab2]">優先度: {item.priority}</p></div><StatusPill tone={item.priority === 'urgent' ? 'rose' : 'amber'}>{item.status === 'open' ? '未対応' : '確認中'}</StatusPill></Link>)}</div> : <EmptyState><span className="text-2xl text-[#c5d3e4]">♢</span><span className="mt-2 block">いま要フォローの生徒はいません</span></EmptyState>}
       </Panel>
     </div>
   </div>;

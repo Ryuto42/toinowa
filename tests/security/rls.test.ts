@@ -24,7 +24,7 @@ run('RLS の境界', () => {
     classA: '', classB: '',
     teacherA: '', teacherB: '',
     studentA: '', studentB: '', studentOther: '',
-    assignmentA: '', assessmentA: '', conversationA: '',
+    assignmentA: '', assessmentA: '', conversationA: '', handoffA: '',
   };
 
   /** 指定したユーザーとして読む。Supabase の authenticated ロールと同じ条件にする。 */
@@ -98,6 +98,10 @@ run('RLS の境界', () => {
     ids.assessmentA = (await db.query(
       "insert into public.assessments(tenant_id,student_id,concept_id,score,confidence,is_final) values($1,$2,$3,0.8,0.7,true) returning id",
       [ids.tenantA, ids.studentA, concept])).rows[0].id;
+    // teacherA -> teacherB の引き継ぎ。当事者だけが読めることを確かめる。
+    ids.handoffA = (await db.query(
+      "insert into public.handoffs(tenant_id,student_id,from_user,to_user,note) values($1,$2,$3,$4,'申し送り') returning id",
+      [ids.tenantA, ids.studentA, ids.teacherA, ids.teacherB])).rows[0].id;
   });
 
   // 拒否されるはずの書き込みを試すとトランザクションが中断するので、
@@ -169,6 +173,25 @@ run('RLS の境界', () => {
       const visible = await countVisible(table, 'tenant_id = $1', [ids.tenantA]).catch(() => 0);
       expect(visible).toBe(0);
     }
+  });
+
+  it('引き継ぎは当事者だけが読める', async () => {
+    // 受け手はまだ担当していないので、担当クラスの条件では読めない。当事者として読める必要がある。
+    await asUser(ids.teacherB, ids.tenantA, 'teacher');
+    expect(await countVisible('handoffs', 'id = $1', [ids.handoffA])).toBe(1);
+    await asService();
+    await asUser(ids.teacherA, ids.tenantA, 'teacher');
+    expect(await countVisible('handoffs', 'id = $1', [ids.handoffA])).toBe(1);
+    await asService();
+  });
+
+  it('引き継ぎは無関係な人には見えない', async () => {
+    await asUser(ids.studentA, ids.tenantA, 'student');
+    expect(await countVisible('handoffs', 'id = $1', [ids.handoffA])).toBe(0);
+    await asService();
+    await asUser(ids.studentB, ids.tenantB, 'student');
+    expect(await countVisible('handoffs', 'id = $1', [ids.handoffA])).toBe(0);
+    await asService();
   });
 
   it('ログインしていなければ何も引けない', async () => {
