@@ -36,7 +36,7 @@ registerJobHandler('build_learning_plan', async job => {
       misconceptions: item.reviewer_status === 'overridden' ? undefined : JSON.stringify(item.misconceptions).slice(0, 600),
     }));
 
-    const result = await curriculumAgent.run({ studentId: payload.studentId, availableMinutes: value.daily_time_limit_min,
+    const result = await curriculumAgent.run({ studentId: payload.studentId, availableMinutes: value.daily_time_limit_min ?? 30,
       masterySummary: JSON.stringify({ grade: value.grade, goal: value.learning_goal?.slice(0, 1500), examResults: value.exam_results?.slice(0, 12000), weakAreas: value.weak_areas?.slice(0, 2000), recentAssessments: recentEvidence }) },
       { tenantId: job.tenant_id, traceId: job.trace_id, studentId: payload.studentId, userId: payload.requestedBy ?? null });
     if (result.meta.degraded || !result.data.tasks.length) throw new Error('学習計画を生成できませんでした。再試行します。');
@@ -44,7 +44,7 @@ registerJobHandler('build_learning_plan', async job => {
     const start = new Date().toISOString().slice(0, 10);
     const end = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
     const inserted = await db.from('learning_plans').upsert({ id: job.id, tenant_id: job.tenant_id, student_id: payload.studentId,
-      period_start: start, period_end: end, tasks: schedulePlan(tasks, value.daily_time_limit_min, start) as Json,
+      period_start: start, period_end: end, tasks: schedulePlan(tasks, value.daily_time_limit_min ?? 30, start) as Json,
       rationale: `${result.data.rationale}\n根拠: ${result.data.evidence.join(' / ')}`, status: 'active', agent_run_id: result.meta.runId }, { onConflict: 'id', ignoreDuplicates: true });
     if (inserted.error) throw new Error(inserted.error.message);
     const saved = await db.from('learning_plans').select('id,tasks,status,rationale').eq('tenant_id', job.tenant_id).eq('id', job.id).single();

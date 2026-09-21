@@ -16,15 +16,21 @@ export async function POST(request: Request) {
     const user = await db.auth.admin.getUserById(context.userId);
     if (user.error || !user.data.user.email) throw new Error('account not found');
     const verifier = createAuthClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    const lock = await db.rpc('begin_password_change', { p_tenant: context.tenantId, p_user: context.userId });
+    if (lock.error) throw new ApiInputError('パスワードを変更中です。少し待ってから再試行してください');
+    try {
     const verified = await verifier.auth.signInWithPassword({ email: user.data.user.email, password: body.currentPassword });
     if (verified.error || verified.data.user.id !== context.userId) throw new ApiInputError('現在のパスワードが正しくありません');
     // 変更成功後のみ利用制限を解除する。更新失敗時は制限を残す。
     try {
       const updated = await verifier.auth.updateUser({ password: body.password });
       if (updated.error) throw new ApiInputError('パスワードを変更できませんでした。別のパスワードで再試行してください');
-      const released = await db.from('users').update({ must_change_password: false }).eq('id', context.userId).eq('tenant_id', context.tenantId);
-      if (released.error) throw new Error(released.error.message);
+      const released = await db.from('users').update({ must_change_password: false }).eq('id', context.userId).eq('tenant_id', context.tenantId).eq('password_revision', lock.data).select('id');
+      if (released.error || !released.data?.length) throw new Error('パスワードが再発行されました。最新の初期パスワードでやり直してください');
     } finally { await verifier.auth.signOut({ scope: 'local' }); }
+    } finally {
+      await db.from('users').update({ password_operation_until: null }).eq('id', context.userId).eq('tenant_id', context.tenantId).eq('password_revision', lock.data);
+    }
     const supabase = await createClient();
     const refreshed = await supabase.auth.refreshSession();
     // 再ログインでも制限解除後のクレームを取得できる。

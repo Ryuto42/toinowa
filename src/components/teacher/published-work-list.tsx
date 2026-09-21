@@ -63,7 +63,7 @@ export function PublishedWorkList({ works }: { works: PublishedWork[] }) {
     setDueAt(toLocalInput(work.dueAt));
     setStatus('');
     previousOverflow.current = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.setProperty('overflow', 'hidden');
     dialogRef.current?.showModal();
   }
 

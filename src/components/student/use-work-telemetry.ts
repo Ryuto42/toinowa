@@ -80,7 +80,8 @@ export function useWorkTelemetry(assignmentId: string | undefined) {
   }, [assignmentId, flush]);
 
   // ── 1回答ごとの計測 ──
-  const answerStart = useRef(Date.now());
+  const answerStart = useRef(0);
+  useEffect(() => { answerStart.current = Date.now(); }, []);
   const keystrokes = useRef(0);
   const pasteCount = useRef(0);
   const typingMs = useRef(0);

@@ -67,7 +67,7 @@ export function ClassroomManager({ classrooms, members }: { classrooms: Classroo
 }
 
 function CreateClassroom({ onDone }: { onDone: () => void }) {
-  const dialog = useDialog();
+  const { ref: dialogRef, open: openDialog, close: closeDialog, restore: restoreDialog } = useDialog();
   const headingId = useId();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -86,7 +86,7 @@ function CreateClassroom({ onDone }: { onDone: () => void }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? '作成できませんでした');
       setName(''); setSubject(''); setGrade(''); setStatus('');
-      dialog.close();
+      closeDialog();
       onDone();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '通信に失敗しました');
@@ -94,14 +94,14 @@ function CreateClassroom({ onDone }: { onDone: () => void }) {
   }
 
   return <>
-    <button type="button" onClick={dialog.open} aria-haspopup="dialog"
+    <button type="button" onClick={openDialog} aria-haspopup="dialog"
       className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-800">
       クラスを追加
     </button>
-    <dialog ref={dialog.ref} aria-labelledby={headingId} onClose={dialog.restore} className={dialogClass}>
+    <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreDialog} className={dialogClass}>
       <div className="flex items-start justify-between gap-4">
         <h2 id={headingId} className="text-xl font-bold">クラスを追加</h2>
-        <button type="button" onClick={dialog.close} disabled={busy}
+        <button type="button" onClick={closeDialog} disabled={busy}
           className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 disabled:opacity-40">閉じる</button>
       </div>
       <div className="mt-6 space-y-4">
@@ -136,7 +136,7 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
   nameById: Map<string, string>;
   onDone: () => void;
 }) {
-  const dialog = useDialog();
+  const { ref: dialogRef, open: openDialog, close: closeDialog, restore: restoreDialog } = useDialog();
   const headingId = useId();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -147,7 +147,7 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
     setTeacherIds(classroom.teacherIds);
     setStudentIds(classroom.studentIds);
     setStatus('');
-    dialog.open();
+    openDialog();
   }
 
   function toggle(list: string[], setList: (v: string[]) => void, id: string) {
@@ -164,7 +164,7 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? '保存できませんでした');
-      dialog.close();
+      closeDialog();
       onDone();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '通信に失敗しました');
@@ -195,14 +195,14 @@ function ClassroomCard({ classroom, teachers, students, nameById, onDone }: {
       </button>
     </div>
 
-    <dialog ref={dialog.ref} aria-labelledby={headingId} onClose={dialog.restore}
+    <dialog ref={dialogRef} aria-labelledby={headingId} onClose={restoreDialog}
       onCancel={(e) => { if (busy) e.preventDefault(); }} className={dialogClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 id={headingId} className="text-xl font-bold">{classroom.name} の担当・在籍</h2>
           <p className="mt-1 text-sm text-slate-500">チェックを外した人は在籍が無効になります（履歴は残ります）。</p>
         </div>
-        <button type="button" onClick={dialog.close} disabled={busy}
+        <button type="button" onClick={closeDialog} disabled={busy}
           className="shrink-0 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 disabled:opacity-40">閉じる</button>
       </div>
 

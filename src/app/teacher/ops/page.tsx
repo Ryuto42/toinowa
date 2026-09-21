@@ -25,7 +25,7 @@ function percentile(values: number[], p: number): number | null {
 export default async function OpsPage() {
   const context = await requireRole('teacher', 'admin');
   const db = adminDb();
-  const since = new Date(Date.now() - 3_600_000).toISOString();
+  const since = new Date(new Date().getTime() - 3_600_000).toISOString();
   const todayStart = new Date(new Date().toDateString()).toISOString();
 
   const [recentHour, today, feed, disabled, guards] = await Promise.all([

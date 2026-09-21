@@ -1,10 +1,10 @@
 import { z } from 'zod';
 export const studentIntakeSchema = z.object({
   grade: z.string().trim().min(1).max(40),
-  learningGoal: z.string().trim().min(1).max(2000),
+  learningGoal: z.string().trim().max(2000).default(''),
   examResults: z.string().trim().max(20000).default(''),
   weakAreas: z.string().trim().max(4000).default(''),
-  dailyTimeLimitMin: z.number().int().min(5).max(240).default(30),
+  dailyTimeLimitMin: z.number().int().min(5).max(240).nullable().default(null),
   classroomId: z.uuid(),
 });
 

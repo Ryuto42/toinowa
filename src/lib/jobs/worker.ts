@@ -7,6 +7,7 @@ import type { JobRow, JobStepResult } from './types';
 import { jobHandler } from './registry';
 import './default-handlers';
 import './plan-handler';
+import './exam-handler';
 
 export const DEFAULT_LEASE_SECONDS = 180;
 export const MAX_TICK_MS = 100_000;

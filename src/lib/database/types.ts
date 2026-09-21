@@ -1220,6 +1220,70 @@ export interface Database {
           },
         ];
       };
+      exam_analyses: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          created_by: string;
+          student_id: string | null;
+          status: string;
+          images: Json | null;
+          baseline: Json;
+          result: Json | null;
+          error_message: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id: string;
+          tenant_id: string;
+          created_by: string;
+          student_id?: string | null;
+          status?: string;
+          images?: Json | null;
+          baseline?: Json;
+          result?: Json | null;
+          error_message?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          created_by?: string;
+          student_id?: string | null;
+          status?: string;
+          images?: Json | null;
+          baseline?: Json;
+          result?: Json | null;
+          error_message?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'exam_analyses_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'exam_analyses_student_id_fkey';
+            columns: ['student_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'exam_analyses_tenant_id_fkey';
+            columns: ['tenant_id'];
+            isOneToOne: false;
+            referencedRelation: 'tenants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       guard_events: {
         Row: {
           id: number;
@@ -2149,7 +2213,7 @@ export interface Database {
           tenant_id: string;
           grade: string | null;
           learning_preferences: Json;
-          daily_time_limit_min: number;
+          daily_time_limit_min: number | null;
           notification_settings: Json;
           consent_status: Json;
           current_difficulty: number;
@@ -2158,13 +2222,14 @@ export interface Database {
           learning_goal: string;
           exam_results: string;
           weak_areas: string;
+          exam_analysis_id: string | null;
         };
         Insert: {
           user_id: string;
           tenant_id: string;
           grade?: string | null;
           learning_preferences?: Json;
-          daily_time_limit_min?: number;
+          daily_time_limit_min?: number | null;
           notification_settings?: Json;
           consent_status?: Json;
           current_difficulty?: number;
@@ -2173,13 +2238,14 @@ export interface Database {
           learning_goal?: string;
           exam_results?: string;
           weak_areas?: string;
+          exam_analysis_id?: string | null;
         };
         Update: {
           user_id?: string;
           tenant_id?: string;
           grade?: string | null;
           learning_preferences?: Json;
-          daily_time_limit_min?: number;
+          daily_time_limit_min?: number | null;
           notification_settings?: Json;
           consent_status?: Json;
           current_difficulty?: number;
@@ -2188,8 +2254,16 @@ export interface Database {
           learning_goal?: string;
           exam_results?: string;
           weak_areas?: string;
+          exam_analysis_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'student_profiles_exam_analysis_id_fkey';
+            columns: ['exam_analysis_id'];
+            isOneToOne: false;
+            referencedRelation: 'exam_analyses';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'student_profiles_tenant_id_fkey';
             columns: ['tenant_id'];
@@ -2322,6 +2396,8 @@ export interface Database {
           status: UserStatus;
           created_at: string;
           must_change_password: boolean;
+          password_revision: number;
+          password_operation_until: string | null;
         };
         Insert: {
           id: string;
@@ -2333,6 +2409,8 @@ export interface Database {
           status?: UserStatus;
           created_at?: string;
           must_change_password?: boolean;
+          password_revision?: number;
+          password_operation_until?: string | null;
         };
         Update: {
           id?: string;
@@ -2344,6 +2422,8 @@ export interface Database {
           status?: UserStatus;
           created_at?: string;
           must_change_password?: boolean;
+          password_revision?: number;
+          password_operation_until?: string | null;
         };
         Relationships: [
           {
@@ -2455,6 +2535,37 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
+      apply_exam_analysis: {
+        Args: {
+          p_tenant: string;
+          p_analysis: string;
+        };
+        Returns: string;
+      };
+      attach_exam_analysis: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_student: string;
+          p_analysis: string;
+        };
+        Returns: void;
+      };
+      begin_password_change: {
+        Args: {
+          p_tenant: string;
+          p_user: string;
+        };
+        Returns: number;
+      };
+      begin_password_reset: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_user: string;
+        };
+        Returns: number;
+      };
       bump_ai_budget: {
         Args: {
           p_tenant: string;
@@ -2532,6 +2643,16 @@ export interface Database {
           p_min_similarity?: number;
         };
         Returns: Json[];
+      };
+      queue_exam_analysis: {
+        Args: {
+          p_tenant: string;
+          p_actor: string;
+          p_analysis: string;
+          p_images: Json;
+          p_baseline: Json;
+        };
+        Returns: void;
       };
       rls_auto_enable: {
         Args: Record<PropertyKey, never>;

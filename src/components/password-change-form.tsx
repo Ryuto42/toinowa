@@ -16,7 +16,7 @@ export function PasswordChangeForm() {
     } catch (e) { setError(e instanceof Error ? e.message : '通信に失敗しました'); }
     finally { setBusy(false); }
   }
-  return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5"><section className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold">パスワードを変更してください</h1><p className="mt-3 text-sm leading-7 text-slate-600">初回ログインでは、配られた初期パスワードを自分のパスワードに変更してから利用します。</p><form onSubmit={submit} className="mt-6 space-y-5">
+  return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-5"><section className="w-full max-w-lg rounded-2xl bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold">パスワードを変更してください</h1><p className="mt-3 text-sm leading-7 text-slate-600">初回ログイン・再発行後は、配られた初期パスワードを自分のパスワードに変更してから利用します。</p><form onSubmit={submit} className="mt-6 space-y-5">
     <label className="block text-sm font-bold">現在のパスワード<input required name="currentPassword" type="password" autoComplete="current-password" className="mt-2 w-full rounded-xl border p-3" /></label>
     <label className="block text-sm font-bold">新しいパスワード（12文字以上）<input required name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" className="mt-2 w-full rounded-xl border p-3" /></label>
     <label className="block text-sm font-bold">新しいパスワード（確認）<input required name="confirmation" type="password" minLength={12} maxLength={128} autoComplete="new-password" className="mt-2 w-full rounded-xl border p-3" /></label>
