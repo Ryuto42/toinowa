@@ -74,7 +74,8 @@ body:has(.chat-workspace) [data-shell-guide] { display: none; }
       box-shadow 280ms ease,
       color 280ms ease;
   }
-  a[href].nav-item:active { transform: scale(0.97); }
+  /* メニューは押しても縮めない。位置が動くと、現在地の帯の動きと混ざって見える。 */
+  a[href].nav-item:active { transform: none; }
 }
 
 /* キーボード操作でも押せる位置が分かるようにする。 */

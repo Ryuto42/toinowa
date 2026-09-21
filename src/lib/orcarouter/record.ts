@@ -40,6 +40,7 @@ async function write(rec: RunRecord): Promise<void> {
     resolved_model: meta.resolvedModel,
     orca_request_id: meta.orcaRequestId,
     input_tokens: meta.inputTokens,
+    cached_input_tokens: meta.cachedInputTokens ?? 0,
     output_tokens: meta.outputTokens,
     estimated_cost_usd: meta.costUsd,
     latency_ms: meta.latencyMs,

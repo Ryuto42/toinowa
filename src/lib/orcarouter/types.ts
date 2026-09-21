@@ -56,6 +56,8 @@ export interface CallMeta {
   /** X-Orca-Request-Id。GET /v1/generation?id= で確定コストを引ける */
   orcaRequestId: string | null;
   inputTokens: number;
+  /** 入力のうちプロンプトキャッシュから返った分。 */
+  cachedInputTokens?: number;
   outputTokens: number;
   /** usage.cost_usd の実測値。取れなければ 0（null にはしない） */
   costUsd: number;
