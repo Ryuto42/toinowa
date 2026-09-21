@@ -4,12 +4,9 @@ import { MobileNav, SidebarNav, type SidebarNavItem } from '@/components/sidebar
 import { LogoutButton } from '@/components/logout-button';
 import { FlashNotice } from '@/components/flash-notice';
 import { PageTransition } from '@/components/page-transition';
+import { BrandMark } from '@/components/brand-mark';
 
 export type NavItem = SidebarNavItem;
-
-function BrandMark() {
-  return <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#087c73] text-lg font-bold text-white shadow-sm">{BRAND.shortName.charAt(0) || 'S'}</span>;
-}
 
 export function AppShell(props: {
   roleLabel: string;
