@@ -46,16 +46,25 @@ export function HandoffForm({ studentId, teachers }: {
     }
   }
 
-  if (!teachers.length) return null;
+  // 候補が居ないときに黙って消えると、機能ごと無くなったように見える。
+  // 押せない理由まで出す。
+  if (!teachers.length) {
+    return <p className="text-sm text-slate-500">
+      引き継ぎ先の先生がまだ登録されていません。管理者に先生の追加を依頼してください。
+    </p>;
+  }
 
   if (!open) {
     return <button type="button" onClick={() => setOpen(true)}
-      className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700">
+      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400">
       別の先生へ引き継ぐ
     </button>;
   }
 
-  return <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-5">
+  // 見出しの右に置いているので、開いたときは幅を決めて折り返させる。
+  // 全幅にすると見出しを押し出し、狭いままだと入力欄が読めない。
+  return <form onSubmit={submit}
+    className="w-[34rem] max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-[0_18px_40px_-28px_rgba(23,35,61,0.45)]">
     <p className="font-bold">別の先生へ引き継ぐ</p>
     <p className="mt-1 text-sm text-slate-500">
       いまの理解度・つまずき・要フォローの項目を添えて送ります。相手が引き受けると記録に残ります。

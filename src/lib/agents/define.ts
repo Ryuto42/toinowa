@@ -21,6 +21,8 @@ export interface DefineAgentOptions<Input, Output> {
   degrade?: (input: Input) => Output;
   skipInputRuleCheck?: boolean;
   maxOutputTokens?: number;
+  /** ジョブから呼ぶもの（人が画面で待っていない）は長めに待たせる */
+  timeBudget?: 'interactive' | 'background';
   outputText?(output: Output): string;
 }
 
@@ -70,6 +72,7 @@ export function defineAgent<Input, Output>(options: DefineAgentOptions<Input, Ou
         schema: options.outputSchema,
         validateOutput,
         maxOutputTokens: options.maxOutputTokens,
+        timeBudget: options.timeBudget,
         degrade: options.degrade ? () => options.degrade!(input) : undefined,
         trace,
       });

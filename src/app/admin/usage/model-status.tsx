@@ -11,14 +11,23 @@ const ROUTER_LABELS: Record<string, string> = {
 
 const CLASSES: ModelClass[] = ['economy', 'standard', 'advanced', 'vision', 'audio', 'exam'];
 
+/** `google/gemini-2.5-flash` → `gemini-2.5-flash` */
+function bare(id: string): string {
+  return id.includes('/') ? id.slice(id.indexOf('/') + 1) : id;
+}
+
 /**
- * ゲートウェイが返す resolved_model はベンダー接頭辞を持たず、
- * 日付版（gpt-4o-mini-2024-07-18）になることもある。
- * 設定側のIDと素の一致で数えると、常に0件になる。
+ * ゲートウェイが返す resolved_model は形がそろわない。
+ * 直接モデルを指定したときは接頭辞なし、Named Router 経由だと
+ * `google/gemini-2.5-flash` のように接頭辞つきで返る。日付版になることもある。
+ *
+ * 片側だけ剥がして比べると、同じモデルを「設定側」と「実績のみ」で
+ * 二重に数えてしまう（React の key も衝突する）。両側を剥がしてから比べる。
  */
 function matchesRequested(resolved: string, requested: string): boolean {
-  const bare = requested.includes('/') ? requested.slice(requested.indexOf('/') + 1) : requested;
-  return resolved === bare || resolved.startsWith(`${bare}-`);
+  const left = bare(resolved);
+  const right = bare(requested);
+  return left === right || left.startsWith(`${right}-`);
 }
 
 export async function ModelStatus() {

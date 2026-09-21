@@ -113,6 +113,14 @@ export interface CallOptions<T extends z.ZodTypeAny | undefined = undefined> {
   validateOutput?: (output: T extends z.ZodTypeAny ? z.infer<T> : string) => void;
   maxOutputTokens?: number;
   temperature?: number;
+  /**
+   * 時間のかけ方。
+   *
+   * `interactive`（既定）は人が画面で待っているので短く切る。
+   * `background` はジョブから呼ぶもので、待っている人がいないぶん長く待てる。
+   * 短すぎると、モデルは生きているのに全段タイムアウトして degrade する。
+   */
+  timeBudget?: 'interactive' | 'background';
   trace: TraceCtx;
 }
 

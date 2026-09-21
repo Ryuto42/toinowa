@@ -246,6 +246,16 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
     throw err;
   }
 
+  // 1試行の上限と、梯子全体の上限。
+  // 画面で人が待つ呼び出しは短く切り、ジョブからの呼び出しは待てるだけ待つ。
+  // 短すぎると、モデルが生きているのに全段タイムアウトして degrade してしまう。
+  const background = opts.timeBudget === 'background' || opts.modelClass === 'exam';
+  const budget = background
+    // 合計はワーカーの maxDuration 120 秒より内側に置く。
+    // 外側が先に落ちると、degrade もジョブの後始末も走らない。
+    ? { attempt: 60_000, total: 100_000 }
+    : { attempt: 15_000, total: 45_000 };
+
   // ── 梯子の組み立て。無効化されたモデルは実際に外す ──
   let disabled: Set<string>;
   try { disabled = await disabledModels(opts.trace.tenantId); } catch (error) {
@@ -294,7 +304,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
           throw error;
         }
       }
-      const remainingMs = (opts.modelClass === 'exam' ? 65_000 : 45_000) - (performance.now() - t0);
+      const remainingMs = budget.total - (performance.now() - t0);
       if (remainingMs <= 0) { lastError = new Error('AI request deadline exceeded'); break ladderLoop; }
       const attemptStart = performance.now();
       let attemptRecorded = false;
@@ -325,7 +335,7 @@ export async function callModel<S extends z.ZodTypeAny | undefined = undefined>(
                   extra_body: { route: 'fallback', models: chain.slice(0, 5) },
                 }
               : {}),
-          } as never, { timeout: Math.min(opts.modelClass === 'exam' ? 60_000 : 15_000, Math.ceil(remainingMs)) })
+          } as never, { timeout: Math.min(budget.attempt, Math.ceil(remainingMs)) })
           .withResponse();
 
         // ── ヘッダは .withResponse() でしか読めない ──
