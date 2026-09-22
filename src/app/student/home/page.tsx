@@ -10,14 +10,16 @@ export default async function StudentHomePage() {
   const db = await createClient();
   const [profile, tasks, reviews, notifications, classrooms] = await Promise.all([
     db.from('student_profiles').select('*').eq('user_id', context.userId).maybeSingle(),
-    db.from('assignments').select('*, lessons(title,classroom_id)').eq('tenant_id', context.tenantId).in('status', ['published', 'completed']).order('due_at', { ascending: true }).limit(8),
+    db.from('assignments').select('*, lessons(title,classroom_id)').eq('tenant_id', context.tenantId).eq('status', 'published').order('due_at', { ascending: true }),
     db.from('review_schedules').select('*, concepts(name)').eq('student_id', context.userId).is('fulfilled_at', null).order('due_at').limit(5),
     db.from('notifications').select('*').eq('student_id', context.userId).is('read_at', null).order('created_at', { ascending: false }).limit(5),
     db.from('classrooms').select('id,subject').eq('tenant_id', context.tenantId),
   ]);
+  for (const result of [profile, tasks, reviews, notifications, classrooms]) if (result.error) throw new Error(result.error.message);
   // 生徒ごとの開封状態。行が無ければ未着手。
   const progress = await db.from('assignment_progress')
     .select('assignment_id,status').eq('student_id', context.userId);
+  if (progress.error) throw new Error(progress.error.message);
   const progressByAssignment = new Map((progress.data ?? []).map((row) => [row.assignment_id, row.status]));
   const activeTasks = (tasks.data ?? [])
     .filter((task) => task.status === 'published')
@@ -36,8 +38,8 @@ export default async function StudentHomePage() {
       <MetricCard label="連続学習" value={`${profile.data?.streak_days ?? 0}日`} note="1日1回の説明でのびます" />
     </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-      <Panel title="次に説明すること" description="期限と復習予定をまとめています">
-        {activeTasks.length ? <div className="space-y-3">{activeTasks.map((task) => <Link key={task.id} href={`/student/study/${task.id}`} className="block rounded-xl border border-slate-200 p-4 hover:border-emerald-400"><div className="flex items-center justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{task.lessons?.title ?? '課題'}</p>{task.lessons?.classroom_id && subjectByClassroom.get(task.lessons.classroom_id) ? <StatusPill tone="blue">{subjectByClassroom.get(task.lessons.classroom_id)}</StatusPill> : null}</div><p className="mt-1 text-xs text-slate-500">期限: {formatDate(task.due_at)} · {task.question_ids.length}テーマ</p></div>{(() => {
+      <Panel title="次に説明すること" description={activeTasks.length > 8 ? `未完了の${activeTasks.length}件から期限順に8件を表示しています。残りは「課題」で確認できます。` : "期限と復習予定をまとめています"}>
+        {activeTasks.length ? <div className="space-y-3">{activeTasks.slice(0, 8).map((task) => <Link key={task.id} href={`/student/study/${task.id}`} className="block rounded-xl border border-slate-200 p-4 hover:border-emerald-400"><div className="flex items-center justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{task.lessons?.title ?? '課題'}</p>{task.lessons?.classroom_id && subjectByClassroom.get(task.lessons.classroom_id) ? <StatusPill tone="blue">{subjectByClassroom.get(task.lessons.classroom_id)}</StatusPill> : null}</div><p className="mt-1 text-xs text-slate-500">期限: {formatDate(task.due_at)} · {task.question_ids.length}テーマ</p></div>{(() => {
           const state = progressByAssignment.get(task.id) ?? 'not_started';
           return state === 'in_progress'
             ? <StatusPill tone="blue">進行中</StatusPill>

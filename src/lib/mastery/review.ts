@@ -12,10 +12,12 @@ export async function scheduleReview(input: {
   if (input.score === null) return;
   const db = adminDb();
   const existing = await db.from('review_schedules')
-    .select('id,interval_days,ease,repetition')
+    .select('id,interval_days,ease,repetition,last_assessment_id')
     .eq('tenant_id', input.tenantId).eq('student_id', input.studentId).eq('concept_id', input.conceptId)
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
+  // 同じ評価の後処理を再開しても、復習回数と間隔をもう一度進めない。
+  if (existing.data?.last_assessment_id === input.assessmentId) return;
 
   const next = nextReview(input.score, existing.data
     ? { intervalDays: existing.data.interval_days, ease: Number(existing.data.ease), repetition: existing.data.repetition }

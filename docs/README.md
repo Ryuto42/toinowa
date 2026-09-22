@@ -4,6 +4,8 @@
 
 | 文書 | 内容 |
 |---|---|
+| [service-review-2026-09-22.md](service-review-2026-09-22.md) | ローカル実動作・5観点の採点・修正・提出前の残課題 |
+| [qiita-article-v3.md](qiita-article-v3.md) | 実際の一周・費用・判断の根拠を中心に短くした公開記事案 |
 | [evidence.md](evidence.md) | 5つの評価項目に対する共通の根拠、実測・実装・未検証の区別 |
 | [qiita-article-v2.md](qiita-article-v2.md) | レビューを反映した別版の記事案。元のqiita-article.mdは維持 |
 | [presentation-brief.md](presentation-brief.md) | 提出条件、記事・展示・4分ピッチの構成と素材 |
@@ -26,6 +28,6 @@
 
 - 現行の説明・発表用の主張は `evidence.md`、操作・仕様は `user-guide.md` と `feature-guide.md`。
 - 初回・v2・v3の模試比較は条件が違うため別記録として維持する。集計は [exam-benchmark-summary.json](data/exam-benchmark-summary.json) から再利用できる。
-- 自動テストの件数は [verification-2026-09-22.json](data/verification-2026-09-22.json) にコードのハッシュとともに記録。実AIの品質指標ではない。
+- 最新の自動テストの件数は [service-review-verification-2026-09-22.json](data/service-review-verification-2026-09-22.json) にコードのハッシュとともに記録。実AIの品質指標ではない。
 - 統合前の `hackathon-*.md` と `exam-model-benchmark-results.md` 等を並行更新しない。必要なテーマ・条件・発表案は上の共通資料へ統合した。旧本文はGit履歴 `9ae754b` に残っている。
 - 生徒の原資料・会話ログ・秘密値は公開資料へ入れない。キーや個人データを含まない集計を使う。

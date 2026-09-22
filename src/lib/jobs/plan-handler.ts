@@ -65,8 +65,10 @@ const buildPlan: JobHandler = async job => {
     if (result.meta.degraded || !result.data.tasks.length) throw new Error('学習計画を生成できませんでした。再試行します。');
     const current = history.latestDifficulty;
     const tasks = result.data.tasks.map(task => ({ ...task, difficulty: history.feedbackUsed && current ? Math.max(1, Math.min(5, Math.max(current - 1, Math.min(current + 1, task.difficulty)))) : task.difficulty }));
-    const start = new Date().toISOString().slice(0, 10);
-    const end = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
+    // 画面・連続学習と同じ日本時間の暦日を使う。早朝に昨日の計画を作らない。
+    const japanNow = Date.now() + 9 * 3600_000;
+    const start = new Date(japanNow).toISOString().slice(0, 10);
+    const end = new Date(japanNow + 6 * 86400000).toISOString().slice(0, 10);
     const notes = [
       ...(history.feedbackUsed ? [] : ['このクラスの完了済み評価がまだありません。初回の課題として範囲と難易度を確認してください。']),
       ...(result.data.needsTeacherReview ? ['情報の不足・矛盾があります。提案理由と授業範囲を確認してください。'] : []),

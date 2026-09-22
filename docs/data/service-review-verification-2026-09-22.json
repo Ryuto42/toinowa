@@ -1,0 +1,502 @@
+{
+  "recordedAt": "2026-09-21T19:56:07.165146+00:00",
+  "baseCommit": "29bfa61cdf68556593bae59d69563e3b1c6910d2",
+  "sourceState": "Uncommitted local changes. Not a deployment or main-branch verification.",
+  "sources": {
+    "scripts/check-chat-recovery.mjs": "67820adbbddc1dfa153f61bd89593da3e19fd7718060c7408de1173e45564547",
+    "src/app/admin/overview/page.tsx": "1016bd9582341be5b02dd10da3f2dfa68262a6caa7f62ffb4de666d8af557b61",
+    "src/app/api/conversations/[id]/messages/route.ts": "6ec385678485fcd26b509f57fbcc1e4ab4990661eec07d5e425eb0a9632dbda7",
+    "src/app/api/voice/transcribe/route.ts": "d8aae0b51a6bc41dde900a8d5744648c976ce7856ca5932a9fb98a8254204234",
+    "src/app/page.tsx": "478e4773276ab43d9e0046f623d9f5a926260bde208aa31585ae05be4b42a740",
+    "src/app/student/home/page.tsx": "2cecf1950f0e9ddf8f6715923866eb47c70ea742177e72343a4b30b8946c6cdc",
+    "src/app/teacher/dashboard/page.tsx": "6dc487ff9518211b3a5d5742f1bdacfa861325871dff2b865fe2c3c3cf97933b",
+    "src/components/landing-features.tsx": "c189c670244a313cdcc6ecbd2a2f734931bdd2cac1e8d30a04102bcf44e0f2b3",
+    "src/components/landing-preview.tsx": "e6ad728f4723ec7040e22a670c9dc50516a978a84c3c58b5b87bd92442fbd758",
+    "src/components/student/chat-client.tsx": "c297340e06682e6e8318fe8f6ca6f260b737d4091ffca6bb4fe02616ce1e3b08",
+    "src/components/usage-guide.tsx": "0d05ea07977e5922e0ab33214c1753a2b07da1866338d4afaad4ae6b382b5f0d",
+    "src/lib/agents/catalog.ts": "77368ff069c07211481c3c193304b1eee910484f8e3cb9e4135b4b023da26cdf",
+    "src/lib/conversation/service.ts": "1b36006ddd7ccaac286420cf8dc50ab6f6fcbdfa2f3ce0429df7a971cc4eb95c",
+    "src/lib/integrity/pace.ts": "0ef01bbbfe565dad22e1099e35c9c9ba579c38ce5efad28f1af1ca34e663a46f",
+    "src/lib/jobs/default-handlers.ts": "2c676fa93c640fa80a49c96f12866c2c86a9d4503785073be186ecb77e0bf285",
+    "src/lib/jobs/plan-handler.ts": "0e5f73c103c3a59da851f649eb1780de1096660fac217dd4c32cff7c027c01b5",
+    "src/lib/mastery/review.ts": "a7b57a9fb8f787f52ae20a847ec608993aeaf8a38e0e1ba0524f8865d36cde33",
+    "src/lib/materials/student-context.ts": "c6a8f52226500eec19f9a3c2086300ab0d16cdd18c1e0c235d56b073ffd27d56",
+    "tests/features/assessment-recovery.test.ts": "5adf96c6d8c1e5415cfe9ff0b7e2435fd4af0681b42d5337dcef19edfd0acaae",
+    "tests/features/dashboard-data.test.ts": "7e613ced468a5002e77657711146c5a7d43fa6a10d4e7a97b1537cf191adbb57",
+    "tests/features/student-context-privacy.test.ts": "c42da56bae9e456ad2c9d72dd2e611d59e38f71d35cd80f382c65183f13c1bd2",
+    "tests/features/voice-authorization.test.ts": "bb44a5be078f23b94eec3d190c1d2d28de143a291c02afb9cecae26baaeea4a2",
+    "tests/integrity/pace.test.ts": "eda112c752426acdde70f853e9d76372fb8074fbcd8434036627ad6cc21a8d83",
+    "tests/mastery/review-retry.test.ts": "6f2f09649f60b19d508aecfb0196dc1ec0ec6bc2a80740df5bb4bda985428804"
+  },
+  "originalArticle": {
+    "path": "docs/qiita-article.md",
+    "sha256": "3fe2fd8817e71eccac8250b7cd50cdbc0ae81c6081ab423d73ee9f428aa17d8c",
+    "unchanged": true
+  },
+  "tests": {
+    "command": "npm test -- --reporter=json --outputFile=<temporary report>",
+    "files": 46,
+    "total": 328,
+    "passed": 328,
+    "failed": 0,
+    "pending": 0,
+    "scope": "Mock AI responses; existing DB integration tests use temporary fixtures. Not AI quality or live attack success rate. Final chat-only sequence change additionally verified by the browser recovery script and build.",
+    "perFile": [
+      {
+        "path": "tests/agents/tools.test.ts",
+        "status": "passed",
+        "tests": 2
+      },
+      {
+        "path": "tests/golden/difficulty.test.ts",
+        "status": "passed",
+        "tests": 11
+      },
+      {
+        "path": "tests/golden/mastery.test.ts",
+        "status": "passed",
+        "tests": 14
+      },
+      {
+        "path": "tests/integrity/ai-text.test.ts",
+        "status": "passed",
+        "tests": 10
+      },
+      {
+        "path": "tests/integrity/pace.test.ts",
+        "status": "passed",
+        "tests": 9
+      },
+      {
+        "path": "tests/features/assessment-recovery.test.ts",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "path": "tests/features/conversation-undo.db.test.ts",
+        "status": "passed",
+        "tests": 2
+      },
+      {
+        "path": "tests/features/conversation-undo.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/features/dashboard-data.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/escalation-priority.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/exam-analysis.db.test.ts",
+        "status": "passed",
+        "tests": 7
+      },
+      {
+        "path": "tests/features/exam-extraction.test.ts",
+        "status": "passed",
+        "tests": 7
+      },
+      {
+        "path": "tests/features/exam-profile.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/exam-review.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/features/exam-verification.test.ts",
+        "status": "passed",
+        "tests": 10
+      },
+      {
+        "path": "tests/features/exam-worker.test.ts",
+        "status": "passed",
+        "tests": 7
+      },
+      {
+        "path": "tests/features/feedback.test.ts",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "path": "tests/features/individual-management.db.test.ts",
+        "status": "passed",
+        "tests": 8
+      },
+      {
+        "path": "tests/features/lesson-preparation-integration.test.ts",
+        "status": "passed",
+        "tests": 1
+      },
+      {
+        "path": "tests/features/lesson-preparation-worker.test.ts",
+        "status": "passed",
+        "tests": 7
+      },
+      {
+        "path": "tests/features/lesson-preparation.db.test.ts",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "path": "tests/features/planning.test.ts",
+        "status": "passed",
+        "tests": 6
+      },
+      {
+        "path": "tests/features/student-care-route.test.ts",
+        "status": "passed",
+        "tests": 8
+      },
+      {
+        "path": "tests/features/student-care.test.ts",
+        "status": "passed",
+        "tests": 22
+      },
+      {
+        "path": "tests/features/student-context-privacy.test.ts",
+        "status": "passed",
+        "tests": 1
+      },
+      {
+        "path": "tests/features/student-credentials.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/student-login-sequence.db.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/tutorial-api.test.ts",
+        "status": "passed",
+        "tests": 18
+      },
+      {
+        "path": "tests/features/tutorial-flow.test.ts",
+        "status": "passed",
+        "tests": 12
+      },
+      {
+        "path": "tests/features/tutorial-language.test.ts",
+        "status": "passed",
+        "tests": 14
+      },
+      {
+        "path": "tests/features/tutorial.db.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/features/voice-authorization.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/features/voice-input.test.ts",
+        "status": "passed",
+        "tests": 9
+      },
+      {
+        "path": "tests/features/voice-recording.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/features/voice-transcription.test.ts",
+        "status": "passed",
+        "tests": 2
+      },
+      {
+        "path": "tests/features/wellbeing.test.ts",
+        "status": "passed",
+        "tests": 5
+      },
+      {
+        "path": "tests/features/work-review-api.test.ts",
+        "status": "passed",
+        "tests": 3
+      },
+      {
+        "path": "tests/mastery/review-retry.test.ts",
+        "status": "passed",
+        "tests": 1
+      },
+      {
+        "path": "tests/mastery/review.test.ts",
+        "status": "passed",
+        "tests": 6
+      },
+      {
+        "path": "tests/orcarouter/call.test.ts",
+        "status": "passed",
+        "tests": 20
+      },
+      {
+        "path": "tests/orcarouter/errors.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/security/exam-injection-protocol.test.ts",
+        "status": "passed",
+        "tests": 12
+      },
+      {
+        "path": "tests/security/injection.test.ts",
+        "status": "passed",
+        "tests": 20
+      },
+      {
+        "path": "tests/security/rls.test.ts",
+        "status": "passed",
+        "tests": 11
+      },
+      {
+        "path": "tests/api/http.test.ts",
+        "status": "passed",
+        "tests": 4
+      },
+      {
+        "path": "tests/jobs/worker.test.ts",
+        "status": "passed",
+        "tests": 6
+      }
+    ]
+  },
+  "build": {
+    "command": "npm run build -- --webpack",
+    "exitCode": 0,
+    "logSha256": "0b0d342a2911f9644728ab5ea229ed7dc0afadaed7c45faf9373762da468ce4f"
+  },
+  "lint": {
+    "scope": "Changed source and tests, plus scripts/check-chat-recovery.mjs; not a repository-wide lint claim",
+    "exitCode": 0
+  },
+  "authenticatedUi": {
+    "baseUrl": "http://localhost:3000",
+    "roles": [
+      "student",
+      "teacher",
+      "admin"
+    ],
+    "routes": [
+      {
+        "role": "student",
+        "path": "/student/home",
+        "status": 200
+      },
+      {
+        "role": "student",
+        "path": "/student/study",
+        "status": 200
+      },
+      {
+        "role": "student",
+        "path": "/student/records",
+        "status": 200
+      },
+      {
+        "role": "student",
+        "path": "/student/notifications",
+        "status": 200
+      },
+      {
+        "role": "student",
+        "path": "/student/settings",
+        "status": 200
+      },
+      {
+        "role": "student",
+        "path": "/student/guide",
+        "status": 200
+      },
+      {
+        "role": "teacher",
+        "path": "/teacher/dashboard",
+        "status": 200
+      },
+      {
+        "role": "teacher",
+        "path": "/teacher/students",
+        "status": 200
+      },
+      {
+        "role": "teacher",
+        "path": "/teacher/interventions",
+        "status": 200
+      },
+      {
+        "role": "teacher",
+        "path": "/teacher/handoffs",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/overview",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/users",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/classrooms",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/usage",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/limits",
+        "status": 200
+      },
+      {
+        "role": "admin",
+        "path": "/admin/settings",
+        "status": 200
+      }
+    ],
+    "finalDashboardChecks": [
+      {
+        "role": "teacher",
+        "path": "/teacher/dashboard",
+        "status": 200,
+        "weeklyAnswers": 10,
+        "errors": []
+      },
+      {
+        "role": "admin",
+        "path": "/admin/overview",
+        "status": 200,
+        "weeklyAnswers": 16,
+        "errors": []
+      },
+      {
+        "role": "student",
+        "path": "/student/home",
+        "status": 200,
+        "errors": []
+      }
+    ],
+    "studentComposer": {
+      "width": 390,
+      "heights": [
+        844,
+        520
+      ],
+      "inputVisible": true,
+      "horizontalOverflow": false
+    },
+    "note": "One teacher assignment-page networkidle wait timed out due to auto-refresh; DOM-based retry succeeded. Draft denial is a not-found screen, not necessarily HTTP 404 under Next streaming."
+  },
+  "chatRecovery": {
+    "command": "node scripts/check-chat-recovery.mjs",
+    "cases": 4,
+    "passed": 4,
+    "liveModelCalls": 0,
+    "scenarios": [
+      "unsaved text restored without automatic resend",
+      "saved exchange recovered once",
+      "saved exchange correctly recognized after undo",
+      "offline send locked until history can be checked"
+    ]
+  },
+  "workflow": {
+    "startedAt": "2026-09-21T19:27:25.458Z",
+    "uiVerifiedAt": "2026-09-21T19:43:28.236Z",
+    "input": "Synthetic lesson memo about slopes and intercepts; responses written by reviewer. Not real learner outcome research.",
+    "draftObservedSeconds": 9.276,
+    "studentTurns": 5,
+    "conversationCompleted": true,
+    "assignmentCompleted": true,
+    "finalAssessments": 1,
+    "assessmentReviewStatus": "pending_review",
+    "nextPlans": 1,
+    "nextAssignmentRemainsDraft": true,
+    "studentFeedbackSimplified": true,
+    "unapprovedAdviceWithheld": true,
+    "assessmentJob": {
+      "attempt": 1,
+      "status": "succeeded",
+      "cached": true,
+      "initialFailureCause": "not established"
+    },
+    "cost": {
+      "calls": 14,
+      "knownCostUsd": 0.00704,
+      "unknownCostCalls": 0,
+      "byRequestType": {
+        "build_learning_plan": {
+          "calls": 2,
+          "costUsd": 0.001266,
+          "models": [
+            "gemini-2.5-flash-lite"
+          ]
+        },
+        "assess_answer": {
+          "calls": 1,
+          "costUsd": 0.003984,
+          "models": [
+            "google/gemini-2.5-flash"
+          ]
+        },
+        "learning_support": {
+          "calls": 5,
+          "costUsd": 0.00087,
+          "models": [
+            "gemini-2.5-flash-lite"
+          ]
+        },
+        "student_care": {
+          "calls": 5,
+          "costUsd": 0.000768,
+          "models": [
+            "gemini-2.5-flash-lite"
+          ]
+        },
+        "ai_text_judge": {
+          "calls": 1,
+          "costUsd": 0.000152,
+          "models": [
+            "gemini-2.5-flash-lite"
+          ]
+        }
+      },
+      "source": "agent_runs.estimated_cost_usd filtered to the test student and this review time interval",
+      "limitations": "One application cycle. Not billing settlement, account balance, all-purpose mean, or part of the separate $2 exam benchmark ledger."
+    }
+  },
+  "lateChanges": {
+    "description": "After the live cycle, prompts were tightened to avoid advising untaught material; fallback questions and Japanese plan dates were corrected. A second paid end-to-end cycle was not performed."
+  },
+  "submission": {
+    "repositoryVisibilityAtReview": "PRIVATE",
+    "loggedOutRepositoryAccess": "404",
+    "publishedArticleUrlVerified": false,
+    "formSubmitted": false,
+    "publishedOrDeployed": false
+  },
+  "limitations": [
+    "Local server uses configured shared Supabase and OrcaRouter; not an isolated production clone.",
+    "No mass concurrent user test or real provider-outage drill.",
+    "No live image injection evaluation in this review.",
+    "Model advice and tutoring benefits need further evaluation with teachers and students.",
+    "Completion update and final-assessment enqueue are not one database transaction."
+  ]
+}

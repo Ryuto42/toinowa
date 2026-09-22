@@ -30,6 +30,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
   const [busy, setBusy] = useState(false);
   const [completed, setCompleted] = useState(initialCompleted);
   const [error, setError] = useState('');
+  const [needsRecovery, setNeedsRecovery] = useState(false);
+  const pendingRecovery = useRef<{ content: string; spoken: boolean; afterSeq: number } | null>(null);
+  const sending = useRef(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   // 話している最中の書き起こし。まだ送っていないので、見た目だけ吹き出しに出す。
   const [speaking, setSpeaking] = useState(false);
@@ -51,10 +54,42 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     if (log && followLatest.current) log.scrollTop = log.scrollHeight;
   }, [messages, busy, completed, voiceDraft]);
 
+  // 返信の通信が途切れても、保存済みの回答をもう一度送らない。
+  // サーバーの履歴を確かめてから、未保存のときだけ入力欄へ戻す。
+  async function recoverSend() {
+    const pending = pendingRecovery.current;
+    if (!pending) return;
+    setNeedsRecovery(true);
+    try {
+      const response = await fetch('/api/conversations/' + conversationId + '/messages', { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error();
+      const result = await response.json() as { messages: ChatMessage[]; conversation?: { state?: string; undo_blocked_message_id?: string | null } };
+      if (!Array.isArray(result.messages)) throw new Error();
+      const saved = result.messages.some(row => row.actor === 'student' && row.seq > pending.afterSeq);
+      const done = result.conversation?.state === 'completed';
+      setMessages(result.messages);
+      sequence.current = Math.max(0, ...result.messages.map(row => row.seq));
+      setCompleted(done);
+      setCanUndo(canUndoSavedExchange(result.messages, done, result.conversation?.undo_blocked_message_id));
+      if (!saved) {
+        setInput(current => !current || current === pending.content ? pending.content : `${pending.content}\n${current}`);
+        spokenInputRef.current = pending.spoken;
+      } else {
+        setError(result.messages.at(-1)?.actor === 'agent'
+          ? '保存されていた返信を読み直しました。'
+          : '送信内容は保存されていますが、返信を受け取れませんでした。取り消して編集するか、続きの説明を送れます。');
+      }
+      pendingRecovery.current = null;
+      setNeedsRecovery(false);
+    } catch {
+      setError('通信が途切れ、送信状況を確認できませんでした。接続が戻ったら「送信状況を確認」を押してください。');
+    }
+  }
+
   async function send(event: { preventDefault: () => void }) {
     event.preventDefault();
     const content = input.trim();
-    if (!content || speaking || busy || undoing || completed) return;
+    if (!content || speaking || busy || sending.current || needsRecovery || undoing || completed) return;
     setInput('');
     const spoken = spokenInputRef.current;
     spokenInputRef.current = false;
@@ -63,7 +98,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
 
   async function sendText(raw: string, spoken = false) {
     const content = raw.trim();
-    if (!content || busy || undoing || completed) return;
+    if (!content || busy || sending.current || needsRecovery || undoing || completed) return;
+    sending.current = true;
+    pendingRecovery.current = { content, spoken, afterSeq: sequence.current };
     followLatest.current = true;
     const measured = telemetry.consume();
     setBusy(true);
@@ -93,7 +130,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       if (!response.ok || !response.body) {
         const body = await response.json().catch(() => ({})) as { message?: string };
         setError(body.message ?? '応答を受け取れませんでした。');
-        setBusy(false);
+        await recoverSend();
         return;
       }
 
@@ -104,8 +141,10 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let receivedDone = false;
       const consume = (block: string) => {
         if (block.startsWith('event: done')) {
+          receivedDone = true;
           const dataLine = block.split('\n').find((line) => line.startsWith('data: '));
           if (!dataLine) return;
           const payload = JSON.parse(dataLine.slice(6)) as { conversationCompleted?: boolean };
@@ -131,11 +170,16 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
         if (done) break;
       }
       if (buffer.trim()) consume(buffer);
+      if (!receivedDone) throw new Error('incomplete response');
+      pendingRecovery.current = null;
       setStreamingId(null);
       setBusy(false);
       setCanUndo(true);
     } catch {
-      setError('通信に失敗しました。もう一度送信してください。');
+      setError('返信を受け取れませんでした。');
+      await recoverSend();
+    } finally {
+      sending.current = false;
       setStreamingId(null);
       setBusy(false);
     }
@@ -152,7 +196,9 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       // 画面からも最後の「生徒→AI」を外し、書いた文章を入力欄に戻す
       setMessages((current) => {
         const lastStudent = [...current].reverse().find((message) => message.actor === 'student');
-        return lastStudent ? current.filter((message) => message.seq < lastStudent.seq) : current;
+        const retained = lastStudent ? current.filter((message) => message.seq < lastStudent.seq) : current;
+        sequence.current = Math.max(0, ...retained.map(message => message.seq));
+        return retained;
       });
       setInput(result.restoredText ?? '');
       setCanUndo(false);
@@ -194,7 +240,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
     {completed ? <Link href="/student/study" className="shrink-0 rounded-xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white">課題へ戻る</Link> : <div className="chat-composer shrink-0 space-y-2">
       <div className="flex items-center gap-2">
       <form onSubmit={event => void send(event)} className="relative flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-sm transition focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/15">
-        {canUndo ? <button type="button" onClick={undo} disabled={undoing || busy || speaking} className="chat-undo-button absolute bottom-full right-3 z-10 min-h-6 rounded-t-md border border-b-0 border-slate-200 bg-white px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:text-slate-400">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button> : null}
+        {canUndo ? <button type="button" onClick={undo} disabled={undoing || busy || speaking || needsRecovery} className="chat-undo-button absolute bottom-full right-3 z-10 min-h-6 rounded-t-md border border-b-0 border-slate-200 bg-white px-2 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:text-slate-400">{undoing ? '取り消しています…' : '↩ 直前の送信を取り消す'}</button> : null}
         <label className="sr-only" htmlFor="chat-input">メッセージ入力</label>
         <textarea id="chat-input" readOnly={speaking} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           telemetry.onKeyDown();
@@ -204,7 +250,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
             void send(event);
           }
         }} onPaste={telemetry.onPaste} rows={2} maxLength={8000} placeholder={tutorial ? "好きなことなど、気軽に書いてみよう" : "自分の言葉で教えてみよう"} aria-describedby="chat-input-help" className="h-14 min-h-12 min-w-0 flex-1 resize-none border-0 bg-transparent px-0 py-1 text-base outline-none" />
-        <button type="submit" disabled={busy || undoing || speaking || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
+        <button type="submit" disabled={busy || undoing || speaking || needsRecovery || !input.trim()} aria-label={busy ? 'AIが返事を考えています' : '送信'} className="inline-flex min-h-12 w-[104px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-2 text-base font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:bg-slate-200 disabled:text-slate-500">
           {busy ? <><Spinner /><span>考え中</span></> : <span className="inline-flex -translate-x-px items-center gap-1"><svg aria-hidden="true" viewBox="4 2 16 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-4 shrink-0"><path d="M12 19V5m-6 6 6-6 6 6" /></svg><span>送信</span></span>}
         </button>
       </form>
@@ -212,7 +258,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
           認識が終わったら入力欄で確認し、手入力と同じ送信操作をする。 */}
       <VoiceInput
         conversationId={conversationId}
-        disabled={busy || undoing}
+        disabled={busy || undoing || needsRecovery}
         // 質問全文は渡さない。無音をその文章で埋める誤認識を防ぐ。
         topic={initialMessages.find(item => item.actor === 'agent')?.content_redacted.match(/^「([^」]{1,100})」について/)?.[1]}
         previousText={() => voiceDraftRef.current}
@@ -242,6 +288,7 @@ export function ChatClient({ conversationId, initialMessages, initialCompleted =
       </div>
       <p id="chat-input-help" className="px-1 text-xs leading-4 text-slate-500">書けたら「送信」を押してね。マイクを押すと声で入力できます。もう一度押して止めたら、文字を確認して送信してね。<span className="hidden sm:inline"> Enterでも送信 ／ Shift+Enterで改行</span></p>
     </div>}
+    {needsRecovery ? <button type="button" disabled={busy} onClick={() => void recoverSend()} className="shrink-0 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900">送信状況を確認</button> : null}
     {error ? <p role="alert" className="max-h-16 shrink-0 overflow-y-auto text-sm text-rose-700">{error}</p> : null}
   </div>;
 }

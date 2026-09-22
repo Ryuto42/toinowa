@@ -234,7 +234,8 @@ export async function appendMessage(input: {
   }
   if (input.channelMessageId) {
     const existing = await adminDb().from('messages').select('*').eq('tenant_id', input.context.tenantId)
-      .eq('channel_message_id', input.channelMessageId).maybeSingle();
+      .eq('conversation_id', input.conversationId).eq('channel_message_id', input.channelMessageId).maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
     if (existing.data) return existing.data;
   }
   let masked = input.content;

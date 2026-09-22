@@ -38,7 +38,7 @@ export default async function Home() {
             </h1>
             <p className="lp-in mt-6 max-w-[30rem] text-[0.95rem] leading-8 text-[#59647a] sm:text-base"
               style={{ '--lp-delay': '110ms' } as React.CSSProperties}>
-              答えが合っていても、いざ人に説明しようとすると言葉が止まる。その止まったところが、その子のつまずきです。{BRAND.shortName}はそのつまずきをすぐに見つけます。
+              先生は授業の記録を渡すだけ。AIが生徒ごとの復習を準備し、生徒の説明から理解を確かめ、次の学習計画につなげます。先生は内容を確認して配信し、必要な指導に集中できます。
             </p>
             <div className="lp-in mt-9 flex flex-wrap items-center gap-3"
               style={{ '--lp-delay': '220ms' } as React.CSSProperties}>

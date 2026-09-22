@@ -48,9 +48,9 @@ function hasRepeatedQuestion(message: string, previousMessages: Array<{ actor: s
 function fallbackQuestion(focus: typeof FOCUS_BY_TURN[number]): string {
   switch (focus) {
     case 'relationship': return '今教えてくれたことは、どうつながっているのかな？';
-    case 'example': return '身近なたとえを、もう一つだけ教えてほしいな！';
-    case 'boundary': return 'その説明が当てはまらない場合もあるのかな？';
-    case 'summary': return '最後に、この概念をひとことでまとめて教えてほしいな！';
+    case 'example': return '授業で扱った例で説明すると、どうなるかな？';
+    case 'boundary': return '今の説明で、特に間違えやすいところはどこかな？';
+    case 'summary': return 'ここまでの説明で大事なことを、自分の言葉でまとめてもらえるかな？';
     case 'finish': return '教えてくれてありがとう！';
   }
 }
@@ -60,7 +60,8 @@ export async function GET(request: Request, route: Context) {
     const context = await requireAuth();
     const conversationId = uuidParam((await route.params).id);
     const afterSeq = Number(new URL(request.url).searchParams.get('afterSeq') ?? 0);
-    return json({ messages: await listMessages(context, conversationId, Number.isFinite(afterSeq) ? afterSeq : 0) });
+    const [conversation, messages] = await Promise.all([getConversation(context, conversationId), listMessages(context, conversationId, Number.isFinite(afterSeq) ? afterSeq : 0)]);
+    return json({ messages, conversation: { state: conversation.state, undo_blocked_message_id: conversation.undo_blocked_message_id } });
   } catch (error) {
     // 危険な入力を遮断したときは、遮断して終わりにせず先生へ上げる。
     // 生徒が困っている合図かもしれず、放置してよい種類の失敗ではない。
