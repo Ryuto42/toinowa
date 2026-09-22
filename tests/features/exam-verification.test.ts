@@ -62,4 +62,23 @@ describe('exam evidence and complementary duplicate verification', () => {
     expect(result.reviewRequired).toBe(true); expect(result.proposal.text).toContain('60/100');
     expect(result.proposal.learningGoal).toBe(''); expect(inspectExamPages([p]).accepted).toEqual([]);
   });
+  it('sends rows whose subject could not be read to review instead of applying them', () => {
+    for (const section of ['subject', 'aggregate', 'converted', 'unit'] as const) {
+      for (const subject of ['', '   ']) {
+        const result = inspectExamRows([{
+          rows: [row({
+            section,
+            subject,
+            unit: section === 'unit' ? '大問1' : null,
+            question: section === 'unit' ? '1' : null,
+            nationalDeviation: section === 'converted' || section === 'unit' ? null : 45,
+          })],
+          uncertainties: [],
+        }]);
+        expect(result.accepted).toEqual([]); expect(result.issues).not.toHaveLength(0);
+      }
+    }
+    const proposal = buildExamProposal([page([row({ subject: '', score: 41, nationalDeviation: 45 })])]);
+    expect(proposal.reviewRequired).toBe(true); expect(proposal.reviewReasons).not.toHaveLength(0);
+  });
 });

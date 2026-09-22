@@ -4,8 +4,8 @@ import { examAnalysisResultSchema, type ExamAnalysisResult } from './exam-analys
 const points = z.number().min(0).max(10000).nullable();
 export const examRowSchema = z.object({
   section: z.enum(['subject', 'aggregate', 'converted', 'unit']),
-  // unitの設問がどの教科か図から読み取れない場合、モデルは空文字を返す。
-  // 表示側は filter(Boolean) で落とすので、ここで弾いてページ全体を捨てない。
+  // どの教科か図から読み取れない場合、モデルは空文字を返す。スキーマでは弾かず
+  // （ページ全体を捨てないため）、inspectExamRows で確認待ちに回す。
   subject: z.string().max(100),
   unit: z.string().max(100).nullable(),
   question: z.string().max(20).nullable(),
@@ -58,9 +58,9 @@ export function inspectExamRows(pages: ExamExtraction[]) {
   const normalize = (value: string | null) => (value ?? '').normalize('NFKC').replace(/[\s・、,]/g, '');
   const fields = ['score', 'maxScore', 'nationalDeviation', 'nationalMeanPoints'] as const;
   for (const row of pages.flatMap(page => validateExamExtraction(page).rows)) {
-    const label = [row.subject, row.question, row.unit].filter(Boolean).join(' ');
+    const label = [row.subject, row.question, row.unit].filter(Boolean).join(' ') || '科目不明の行';
     const key = JSON.stringify([row.section, normalize(row.subject), normalize(row.question), normalize(row.unit)]);
-    const invalid = row.uncertain || (row.maxScore !== null && row.maxScore <= 0) ||
+    const invalid = row.uncertain || !row.subject.trim() || (row.maxScore !== null && row.maxScore <= 0) ||
       (row.score !== null && row.maxScore !== null && row.score > row.maxScore) ||
       (row.nationalMeanPoints !== null && (row.section !== 'unit' || row.maxScore === null || row.nationalMeanPoints > row.maxScore)) ||
       (['unit', 'converted'].includes(row.section) && row.nationalDeviation !== null) ||

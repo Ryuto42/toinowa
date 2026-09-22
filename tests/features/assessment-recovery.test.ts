@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JobRow } from '@/lib/jobs/types';
-const m = vi.hoisted(() => ({ responses: new Map<string, unknown[]>(), run: vi.fn(), compute: vi.fn(), complete: vi.fn(), streak: vi.fn(), schedule: vi.fn(), plan: vi.fn(), detector: vi.fn(), filters: [] as unknown[] }));
+const m = vi.hoisted(() => ({ responses: new Map<string, unknown[]>(), run: vi.fn(), compute: vi.fn(), complete: vi.fn(), streak: vi.fn(), schedule: vi.fn(), plan: vi.fn(), detector: vi.fn(), filters: [] as unknown[], inserts: [] as Array<{ table: string; values: unknown }> }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/database/admin', () => ({ adminDb: () => ({ from: (table: string) => {
   const data = m.responses.get(table)?.shift();
-  const q = { select: () => q, eq: () => q, gt: () => q, order: () => q, limit: () => q, single: () => q, maybeSingle: () => q, not: () => q, in: () => q, insert: () => q,
+  const q = { select: () => q, eq: () => q, gt: () => q, order: () => q, limit: () => q, single: () => q, maybeSingle: () => q, not: () => q, in: () => q, insert: (values: unknown) => { m.inserts.push({ table, values }); return q; },
     neq: (...args: unknown[]) => { m.filters.push(args); return q; }, then: (resolve: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(resolve) };
   return q;
 } }) }));
@@ -27,7 +27,7 @@ function fixture(cached = true, seconds = 20) {
   m.responses.set('messages', [{ id: 'message', actor: 'student', content_redacted: '説明', seq: 1 }].map(row => [row]));
 }
 beforeEach(() => {
-  vi.clearAllMocks(); m.responses.clear(); m.filters.length = 0; fixture();
+  vi.clearAllMocks(); m.responses.clear(); m.filters.length = 0; m.inserts.length = 0; fixture();
   m.complete.mockResolvedValue(undefined); m.schedule.mockResolvedValue(undefined);
   m.run.mockResolvedValue({ data: { score: 0.8, reasoningQuality: 0.8, feedback: '説明できました', strongPoints: [], attentionPoints: [], evidence: [], misconceptions: [], dimensionScores: {}, studentFeedback: {} }, meta: { runId: 'run', degraded: false } });
   m.compute.mockReturnValue({ score: 0.8, confidence: 0.9, components: [], needsReview: false });
@@ -52,5 +52,19 @@ describe('保存後の評価ジョブの復旧', () => {
     fixture(false, seconds); await jobHandler('run_assessment')!(job);
     expect(m.compute).toHaveBeenCalledWith(expect.objectContaining({ recent: expect.objectContaining({ score: 0.8 }), history: { scores: [0.9] } }));
     expect(m.filters).toContainEqual(['reviewer_status', 'rejected']);
+  });
+  it.each([
+    [0.49, 'pending_review'],
+    [0.51, 'auto_approved'],
+  ] as const)('確信度がしきい値の前後 (%s) でレビュー状態を分ける', async (confidence, reviewerStatus) => {
+    fixture(false); m.compute.mockReturnValue({ score: 0.8, confidence, components: [], needsReview: confidence < 0.5 });
+    await jobHandler('run_assessment')!(job);
+    expect(m.inserts.find((entry) => entry.table === 'assessments')?.values).toEqual(expect.objectContaining({ reviewer_status: reviewerStatus }));
+  });
+  it('縮退応答は確信度が高くても自動承認しない', async () => {
+    fixture(false); m.run.mockResolvedValue({ data: { score: 0.8, reasoningQuality: 0.8, feedback: '評価できません', strongPoints: [], attentionPoints: [], evidence: [], misconceptions: [], dimensionScores: {}, studentFeedback: {} }, meta: { runId: 'run', degraded: true } });
+    m.compute.mockReturnValue({ score: 0.8, confidence: 0.9, components: [], needsReview: false });
+    await jobHandler('run_assessment')!(job);
+    expect(m.inserts.find((entry) => entry.table === 'assessments')?.values).toEqual(expect.objectContaining({ reviewer_status: 'pending_review', score: null }));
   });
 });

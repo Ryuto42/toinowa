@@ -10,3 +10,4 @@
 | [exam-model-benchmark.md](exam-model-benchmark.md) | 模試読み取りモデルの比較実験（設計と初回結果） |
 | [exam-model-benchmark-improvement.md](exam-model-benchmark-improvement.md) | 読み取りと提案生成を分けた追加検証（構造化抽出v2） |
 | [exam-reading-reliability.md](exam-reading-reliability.md) | 検証・復旧の実装と採用判断（模試読み取りの現在の結論） |
+| [exam-injection-live-summary.md](exam-injection-live-summary.md) | 画像インジェクション実測の条件と結果（短縮版） |

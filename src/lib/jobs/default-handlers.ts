@@ -13,8 +13,7 @@ import { markCompleted, updateStreak } from '@/lib/progress/service';
 import { scheduleReview } from '@/lib/mastery/review';
 import { pushToStudent } from '@/lib/notifications/push';
 
-/** これ未満の確信度は先生の確認待ちにする（設計書12.2）。 */
-const LOW_CONFIDENCE = 0.6;
+import { LOW_CONFIDENCE_THRESHOLD } from '@/lib/mastery/types';
 import type { DifficultyLevel } from '@/lib/mastery/types';
 import type { Json } from '@/lib/database/types';
 
@@ -187,7 +186,9 @@ registerJobHandler('run_assessment', async (job) => {
     recommended_difficulty: question.data.difficulty,
     difficulty_reason: analysisNote,
     // 観測が少ない・成分がばらついている評価は自動で確定させず、先生の確認へ回す。
-    reviewer_status: mastery.confidence < LOW_CONFIDENCE ? 'pending_review' : 'auto_approved',
+    // 縮退した応答は score を保存していないので、確信度に関わらず自動承認しない。
+    reviewer_status: result.meta.degraded || mastery.confidence < LOW_CONFIDENCE_THRESHOLD
+      ? 'pending_review' : 'auto_approved',
     agent_run_id: result.meta.runId,
   }).select('id').single();
   if (inserted.error || !inserted.data) throw new Error(inserted.error?.message ?? 'assessment insert failed');
