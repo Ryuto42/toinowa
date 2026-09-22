@@ -90,5 +90,12 @@ export interface MasteryResult {
   needsReview: boolean;
 }
 
-/** これを下回る確信度の評価は必ず先生レビューに回す（設計書11章・18.5） */
-export const LOW_CONFIDENCE_THRESHOLD = 0.6;
+/**
+ * これを下回る確信度の評価は必ず先生レビューに回す（設計書11章・18.5）。
+ *
+ * transfer は模試の類題がある時だけ、delayed は現状どこからも埋まらない。
+ * 通常のTeach Backだけだと coverage は recent+history の 0.55 が上限になるため、
+ * 0.6のままだと確信度が volume・consistency に関わらず常にしきい値を割ってしまう。
+ * recent+historyのみでも十分な観測数・一貫性があれば先生レビューを抜けられるよう、0.5に下げる。
+ */
+export const LOW_CONFIDENCE_THRESHOLD = 0.5;

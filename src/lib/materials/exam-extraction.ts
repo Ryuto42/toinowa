@@ -4,7 +4,9 @@ import { examAnalysisResultSchema, type ExamAnalysisResult } from './exam-analys
 const points = z.number().min(0).max(10000).nullable();
 export const examRowSchema = z.object({
   section: z.enum(['subject', 'aggregate', 'converted', 'unit']),
-  subject: z.string().min(1).max(100),
+  // unitの設問がどの教科か図から読み取れない場合、モデルは空文字を返す。
+  // 表示側は filter(Boolean) で落とすので、ここで弾いてページ全体を捨てない。
+  subject: z.string().max(100),
   unit: z.string().max(100).nullable(),
   question: z.string().max(20).nullable(),
   score: points,
@@ -134,7 +136,9 @@ export const examPageSchema = z.object({
 export type ExamPage = z.infer<typeof examPageSchema>;
 export function validateExamPage(value: unknown): ExamPage {
   const page = examPageSchema.parse(value);
-  if (page.tables.length > 16 || page.uncertainties.length > 12 || page.uncertainties.some(s => s.length > 300)) throw new Error('模試の抽出量が上限を超えました');
+  if (page.tables.length > 16 || page.uncertainties.length > 12) throw new Error('模試の抽出量が上限を超えました');
+  // 個々の注釈が長いだけなら、内容は捨てずに切り詰める（summarizeExamExtractionと同じ扱い）。
+  page.uncertainties = page.uncertainties.map(s => s.slice(0, 300));
   if (page.tables.reduce((n, t) => n + t.rows.length, 0) > 100) throw new Error('模試の行数が上限を超えました');
   for (const table of page.tables) {
     for (const key of Object.keys(evidenceShape) as (keyof typeof evidenceShape)[]) if (table[key].length > 200) throw new Error('表見出しが長すぎます');
