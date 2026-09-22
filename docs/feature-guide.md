@@ -94,7 +94,7 @@ npm run dev
 ```
 
 ```bash
-npm test            # ゴールデンテストを含む全体（46ファイル・328件）
+npm test            # ゴールデンテストを含む全体（46ファイル・334件）
 npm run lint
 npx next typegen && npx tsc --noEmit
 npm run build

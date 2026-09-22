@@ -60,7 +60,7 @@ export default async function AssessmentDetailPage({ params }: PageProps<'/teach
     />
 
     {row.reviewer_status === 'pending_review' ? <div role="status" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">
-      観測が少なく、AIの確信度は{confidence}%です。根拠を見て、必要なら下で点数を修正してください。
+      観測が少なく、AIの確信度は{confidence}%です。根拠を見て、問題がなければ「この内容で確定する」、直したいときは点数を上書きしてください。確定するまで生徒には結果が返りません。
     </div> : null}
 
     <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
@@ -71,7 +71,7 @@ export default async function AssessmentDetailPage({ params }: PageProps<'/teach
           <p className="font-bold text-[#1c6e60]">先生の判断</p>
           <p className="mt-1 whitespace-pre-wrap leading-7">{row.override_note}</p>
         </div> : null}
-        <AssessmentOverride assessmentId={row.id} initialScore={score === null ? null : Number(score)} />
+        <AssessmentOverride assessmentId={row.id} initialScore={score === null ? null : Number(score)} pendingReview={row.reviewer_status === 'pending_review'} />
       </Panel>
 
       <Panel title="観点別の内訳">
