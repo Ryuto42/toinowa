@@ -126,7 +126,7 @@ function jsonParse(raw: string): unknown {
  *   rung3  構造化出力の検証失敗 → 修復プロンプト1回
  *   rung4  全滅 → degrade() でルールベース応答
  *
- * 実測で分かっている注意点（docs/orcarouter-findings.md）:
+ * 実測で分かっている注意点（docs/qiita-article.md 6章）:
  *   ・x-orca-fallback-level は成功時「そもそも返らない」。0 ではなく不在
  *   ・usage.cost_usd は無料モデルでは返らない。取れなければ 0 とする
  *   ・推論モデルは出力の大半が reasoning トークンになる。max_tokens を絞りすぎない
