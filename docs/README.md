@@ -4,7 +4,6 @@
 
 | 文書 | 内容 |
 |---|---|
-| [service-review-2026-09-22.md](service-review-2026-09-22.md) | ローカル実動作・5観点の採点・修正・提出前の残課題 |
 | [qiita-article-v3.md](qiita-article-v3.md) | 実際の一周・費用・判断の根拠を中心に短くした公開記事案 |
 | [evidence.md](evidence.md) | 5つの評価項目に対する共通の根拠、実測・実装・未検証の区別 |
 | [qiita-article-v2.md](qiita-article-v2.md) | レビューを反映した別版の記事案。元のqiita-article.mdは維持 |
