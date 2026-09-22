@@ -31,7 +31,7 @@ export function LandingPreview() {
         <div className="border-r border-[#d8ebe6] bg-[#def3ed] px-2.5 py-4 sm:px-3">
           <div className="flex items-center gap-1.5 px-1">
             <Image src="/brand/logo.png" alt="" width={20} height={20} className="shrink-0" unoptimized />
-            <span className="truncate text-[10px] font-bold text-[#17233d]">先生モード</span>
+            <span className="truncate text-[10px] font-bold text-[#17233d]">Teacher</span>
           </div>
           <div className="mt-4 space-y-1">
             {NAV.map((item, index) => <p key={item}

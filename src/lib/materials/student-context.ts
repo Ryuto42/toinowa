@@ -1,4 +1,5 @@
 import 'server-only';
+import { isLearningMessage } from '@/lib/security/student-care';
 import { createClient } from '@/lib/database/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database/types';
@@ -15,7 +16,7 @@ export async function topicStudentContext(context: AuthContext, studentId: strin
   if (conversations.error) throw new Error(conversations.error.message);
   const ids = conversations.data.map(row => row.id);
   const [messages, assessments] = ids.length ? await Promise.all([
-    db.from('messages').select('conversation_id,actor,content_redacted,seq').eq('tenant_id', context.tenantId).in('conversation_id', ids).order('created_at', { ascending: false }).limit(36),
+    db.from('messages').select('conversation_id,actor,content_redacted,seq,safety_flags').eq('tenant_id', context.tenantId).in('conversation_id', ids).order('created_at', { ascending: false }).limit(36),
     db.from('assessments').select('score,override_score,override_note,reviewer_status,confidence,component_scores,misconceptions,difficulty_at_time,difficulty_reason,concepts(name)').eq('tenant_id', context.tenantId).eq('student_id', studentId).eq('is_final', true).neq('reviewer_status', 'rejected').in('conversation_id', ids).order('created_at', { ascending: false }).limit(3),
   ]) : [{ data: [], error: null }, { data: [], error: null }];
   if (messages.error) throw new Error(messages.error.message);
@@ -25,7 +26,7 @@ export async function topicStudentContext(context: AuthContext, studentId: strin
     goal: profile.data?.learning_goal?.slice(0, 600),
     examResults: profile.data?.exam_results?.slice(0, 2500),
     weakAreas: profile.data?.weak_areas?.slice(0, 800),
-    conversations: ids.map(id => ({ messages: (messages.data ?? []).filter(row => row.conversation_id === id).sort((a, b) => a.seq - b.seq).slice(0, 8).map(row => ({ speaker: row.actor, text: row.content_redacted.slice(0, 400) })) })),
+    conversations: ids.map(id => ({ messages: (messages.data ?? []).filter(isLearningMessage).filter(row => row.conversation_id === id).sort((a, b) => a.seq - b.seq).slice(0, 8).map(row => ({ speaker: row.actor, text: row.content_redacted.slice(0, 400) })) })),
     feedback: (assessments.data ?? []).map(row => ({ concept: row.concepts?.name?.slice(0, 200), score: row.override_score ?? row.score, teacherCorrection: row.override_note?.slice(0, 500), status: row.reviewer_status, confidence: row.confidence, observations: row.reviewer_status === 'overridden' ? undefined : JSON.stringify({components:row.component_scores,misconceptions:row.misconceptions}).slice(0,1000), difficulty: row.difficulty_at_time, analysis: row.reviewer_status === 'overridden' ? undefined : row.difficulty_reason?.slice(0, 1000) })),
   };
   return { text: JSON.stringify(history), conversationsUsed: ids.length, feedbackUsed: assessments.data?.length ?? 0, latestDifficulty: assessments.data?.[0]?.difficulty_at_time };

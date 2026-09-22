@@ -1,13 +1,6 @@
 /**
- * 回答にかかった時間から、学習の手応えを推定する。
- *
- * I/O もLLMも使わない純関数。理解度スコアに掛ける係数を返す。
- *
- * 考え方: 速すぎても遅すぎても「自分で考えて書いた説明」から遠ざかる。
- *   速すぎる → 貼り付け、あるいは考えずに書いている
- *   遅すぎる → 詰まっている、または離席している
- * ただし**減点は控えめにする**。時間は状況に左右されやすく、
- * 単独で結論を出せる証拠ではないため、最大でも15%しか動かさない。
+ * 入力ペースは先生が確認する補助情報。音声・端末・年齢・離席の影響があるため、
+ * 学力や本人性の確定、理解度スコアの自動減点には使わない。
  */
 
 /** 生徒が日本語を打つ速度の目安（文字/秒）。これで「妥当な所要時間」を見積もる。 */
@@ -21,8 +14,6 @@ export type PaceVerdict = 'too_fast' | 'expected' | 'too_slow' | 'unknown';
 
 export interface PaceResult {
   verdict: PaceVerdict;
-  /** 理解度の直近成分に掛ける係数 0.85..1.0 */
-  factor: number;
   /** 想定所要時間に対する実測の比 */
   ratio: number | null;
   /** 生徒と先生に見せる日本語の説明 */
@@ -31,7 +22,7 @@ export interface PaceResult {
 
 export function evaluatePace(chars: number, elapsedSec: number | null): PaceResult {
   if (elapsedSec === null || elapsedSec <= 0 || chars < MIN_CHARS_FOR_PACE) {
-    return { verdict: 'unknown', factor: 1, ratio: null, reason: '' };
+    return { verdict: 'unknown', ratio: null, reason: '' };
   }
   const expected = chars / CHARS_PER_SECOND;
   const ratio = elapsedSec / expected;
@@ -39,25 +30,23 @@ export function evaluatePace(chars: number, elapsedSec: number | null): PaceResu
   if (ratio < 0.3) {
     return {
       verdict: 'too_fast',
-      factor: 0.85,
       ratio,
-      reason: `${chars}文字の説明を${Math.round(elapsedSec)}秒で送信しています。自分で組み立てた説明か確認が必要です。`,
+      reason: `${chars}文字の説明を${Math.round(elapsedSec)}秒で送信しています。音声入力や貼り付け等でも短くなります。必要なら入力方法を確認してください。`,
     };
   }
   if (elapsedSec > ABSENT_SECONDS || ratio > 4) {
     return {
       verdict: 'too_slow',
-      factor: 0.9,
       ratio,
-      reason: `1つの説明に${Math.round(elapsedSec / 60)}分かかっています。どこで詰まったか確認するとよさそうです。`,
+      reason: `1つの説明に${Math.round(elapsedSec / 60)}分かかっています。離席や入力環境の影響もあります。必要なら様子を確認してください。`,
     };
   }
-  return { verdict: 'expected', factor: 1, ratio, reason: '' };
+  return { verdict: 'expected', ratio, reason: '' };
 }
 
-/** 会話全体の複数回答をまとめて1つの係数にする（最も低いものを採る） */
+/** 確認の手がかりを1件選ぶ。スコアへの重み付けはしない。 */
 export function combinePace(results: PaceResult[]): PaceResult {
   const scored = results.filter((item) => item.verdict !== 'unknown');
-  if (!scored.length) return { verdict: 'unknown', factor: 1, ratio: null, reason: '' };
-  return scored.reduce((worst, item) => (item.factor < worst.factor ? item : worst));
+  if (!scored.length) return { verdict: 'unknown', ratio: null, reason: '' };
+  return scored.find(item => item.verdict === 'too_fast') ?? scored.find(item => item.verdict === 'too_slow') ?? scored[0];
 }

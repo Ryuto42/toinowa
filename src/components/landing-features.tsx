@@ -91,7 +91,7 @@ function ShotEvidence() {
   return <Frame>
     <div className="flex items-center justify-between">
       <p className="text-[0.62rem] font-bold text-[#8090a5]">この説明の評価</p>
-      <span className="rounded-full bg-[#e8f8f3] px-2.5 py-1 text-[0.6rem] font-bold text-[#217d6e]">本人の説明とみられます</span>
+      <span className="rounded-full bg-[#e8f8f3] px-2.5 py-1 text-[0.6rem] font-bold text-[#217d6e]">根拠の発言を確認</span>
     </div>
     <p className="mt-2 text-2xl font-bold tabular-nums text-[#17233d]">72<span className="ml-0.5 text-sm text-[#8090a5]">点</span></p>
     <div className="mt-3 space-y-2">
@@ -129,7 +129,7 @@ export const LANDING_FEATURES: Array<{ title: string; body: string; shot: () => 
   },
   {
     title: '「なんとなく理解している」で終わらせない',
-    body: '観点ごとの理解度と、そう判断した根拠の発言が残ります。言いよどみや書く速さから、本人の言葉かどうかの手がかりも添えます。',
+    body: '観点ごとの理解度と、判断の根拠となった発言を先生へ返します。話す速さだけで理解を決めず、先生が確認・修正した内容を次の提案にも反映します。',
     shot: ShotEvidence,
   },
 ];

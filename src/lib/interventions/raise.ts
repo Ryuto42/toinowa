@@ -34,7 +34,7 @@ export async function raiseEscalation(input: RaiseInput): Promise<string | null>
   const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
 
   try {
-    let existing = db.from('escalations').select('id,payload')
+    let existing = db.from('escalations').select('id,payload,priority,title')
       .eq('tenant_id', input.tenantId)
       .eq('kind', input.kind)
       .in('status', ['open', 'acknowledged'])
@@ -51,10 +51,16 @@ export async function raiseEscalation(input: RaiseInput): Promise<string | null>
       const previous = found.data.payload && typeof found.data.payload === 'object' && !Array.isArray(found.data.payload)
         ? found.data.payload as Record<string, unknown> : {};
       const occurrences = Number(previous.occurrences ?? 1) + 1;
-      await db.from('escalations').update({
+      const rank: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+      const promote = rank[input.priority] < rank[found.data.priority as Priority];
+      const updated = await db.from('escalations').update({
+        ...(promote ? { priority: input.priority, title: input.title } : {}),
         // 繰り返し起きていること自体が情報なので回数を残す
-        payload: { ...previous, ...(input.payload ?? {}), occurrences, last_seen_at: new Date().toISOString() } as Json,
-      }).eq('id', found.data.id);
+        payload: { ...previous, ...(rank[input.priority] > rank[found.data.priority as Priority]
+          ? { latest_observation: input.payload ?? {} } : input.payload ?? {}),
+          occurrences, last_seen_at: new Date().toISOString() } as Json,
+      }).eq('id', found.data.id).eq('tenant_id', input.tenantId);
+      if (updated.error) throw new Error(updated.error.message);
       return found.data.id;
     }
 

@@ -76,7 +76,7 @@ export function ModelControl({ models, tierLabel, primary }: {
         </p>
       </div>
       <button type="button" onClick={open} aria-haspopup="dialog"
-        className="shrink-0 rounded-xl border border-emerald-700 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
+        className="shrink-0 rounded-lg border border-emerald-700 px-3 py-1.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-50">
         モデルの稼働を管理
       </button>
     </div>

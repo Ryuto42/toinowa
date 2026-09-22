@@ -69,3 +69,6 @@ next-env.d.ts
 
 # 生成物の作業ディレクトリ
 /output/
+
+# 撮影用の Chrome プロファイル（ログイン状態が入る）
+/.playwright-profile/

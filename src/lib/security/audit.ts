@@ -48,8 +48,8 @@ export function recordGuardEvent(input: {
   rule: string;
   matchedExcerpt?: string | null;
   blockedTools?: string[];
-}): void {
-  void Promise.resolve(
+}): Promise<void> {
+  return Promise.resolve(
     adminDb()
       .from('guard_events')
       .insert({

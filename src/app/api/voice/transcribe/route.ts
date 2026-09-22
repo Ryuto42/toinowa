@@ -8,6 +8,7 @@ import { preCheck } from '@/lib/security/guard';
 import { reportSafetyBlock } from '@/lib/security/escalate';
 import { SafetyBlocked } from '@/lib/orcarouter/errors';
 import { MAX_AUDIO_BYTES, looksLikeAudio } from '@/lib/voice/audio';
+import { getConversation } from '@/lib/conversation/service';
 import { transcribeChunk } from '@/lib/voice/transcribe';
 
 /** 1分あたりの書き起こし回数。3.5秒ごとに1回送る想定の倍を上限にする。 */
@@ -31,6 +32,9 @@ export async function POST(request: Request) {
     if (context.role !== 'student') throw new ForbiddenError('音声入力を使えるのは生徒だけです');
 
     const body = await parseJson(request, bodySchema);
+    const conversation = await getConversation(context, body.conversationId);
+    if (conversation.student_id !== context.userId) throw new ForbiddenError();
+    if (conversation.state !== 'active') return json({ message: 'この対話は終了しています。' }, { status: 409 });
     const bytes = Buffer.from(body.audio, 'base64');
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_AUDIO_BYTES) {
       return json({ message: '音声が長すぎます。短く区切って話してください。' }, { status: 413 });
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
         const { tenantId, userId } = context;
         after(() => reportSafetyBlock({ error, tenantId, studentId: userId }));
       }
-      return json({ message: '読み上げた内容は送れませんでした。先生に確認をお願いしています。' }, { status: 400 });
+      return json({ message: '安全性の確認で文字への変換を止めました。困っていることがあれば、文字で入力するか先生に相談してください。' }, { status: 400 });
     }
     return routeError(error);
   }

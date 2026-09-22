@@ -9,7 +9,7 @@ export default async function AdminOverviewPage() {
   const db = await createClient();
   const weekAgo = new Date(new Date().getTime() - 7 * 86_400_000).toISOString();
   const [weekAnswers, students, assignments, answers, assessments, escalations, runs, spend] = await Promise.all([
-    db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).gte('created_at', weekAgo),
+    db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).gte('answered_at', weekAgo),
     db.from('users').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('role', 'student').eq('status', 'active'),
     db.from('assignments').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId).eq('status', 'published'),
     db.from('answers').select('id', { count: 'exact', head: true }).eq('tenant_id', context.tenantId),
@@ -19,6 +19,7 @@ export default async function AdminOverviewPage() {
     adminDb().from('agent_runs').select('id,status,agent_name,created_at').eq('tenant_id', context.tenantId).order('created_at', { ascending: false }).limit(5),
     adminDb().rpc('today_ai_spend', { p_tenant: context.tenantId }),
   ]);
+  for (const result of [weekAnswers, students, assignments, answers, assessments, escalations, runs, spend]) if (result.error) throw new Error(result.error.message);
   const todaySpend = Number(spend.data ?? 0);
   return <div>
     <PageTitle title="ダッシュボード" description="対応が必要なこと、AIの費用、学習の動きをまとめて確認します。" />
