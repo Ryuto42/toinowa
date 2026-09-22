@@ -52,19 +52,25 @@ export default async function TeacherAssignmentsPage() {
   });
   const drafts = works.filter(work => work.status === 'draft');
   const live = works.filter(work => work.status !== 'draft');
-  const pending = (jobs.data ?? []).some(row => row.status === 'queued' || row.status === 'leased');
+  // 準備状況は「進行中」か「再試行が要る」ときだけ出す。
+  // 全部成功した授業記録まで残すと、終わっているのに動いているように見えたままになる。
+  const preparationRows = availablePreparations.map(row => {
+    const own = (jobs.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id);
+    return { row, own,
+      done: own.filter(job => job.status === 'succeeded' && !jsonRecord(job.state).cancelledByArchive).length,
+      cancelled: own.filter(job => jsonRecord(job.state).cancelledByArchive).length,
+      failed: (dead.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id).length,
+      running: own.some(job => job.status === 'queued' || job.status === 'leased') };
+  }).filter(item => item.running || item.failed);
+  const pending = preparationRows.some(item => item.running);
   return <div className="space-y-6">
     <PageTitle title="課題" description="授業記録を渡すと、AIが生徒別の課題と学習計画を準備します。"
       action={<CreateWorkDialog
         classrooms={(classrooms.data ?? []).filter(c=>!c.individual_student_id)}
         students={personalStudents}
       />} />
-    {availablePreparations.length ? <Panel title="AIの準備状況" description="画面を閉じても、受け付けた授業記録から準備を続けます。">
-      <div className="space-y-3">{availablePreparations.map(row => {
-        const own = (jobs.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id);
-        const done = own.filter(job => job.status === 'succeeded' && !jsonRecord(job.state).cancelledByArchive).length;
-        const cancelled = own.filter(job => jsonRecord(job.state).cancelledByArchive).length;
-        const failed = (dead.data ?? []).filter(job => jsonRecord(job.payload).preparationId === row.id).length;
+    {preparationRows.length ? <Panel title="AIの準備状況" description="準備中と、再試行が必要なものだけを表示しています。画面を閉じても準備は続きます。">
+      <div className="space-y-3">{preparationRows.map(({ row, done, cancelled, failed }) => {
         return <div key={row.id} className="rounded-xl border border-slate-200 p-4"><p className="font-bold">{row.title}</p><p className="mt-1 text-sm text-slate-600">{formatDateTime(row.created_at)} · {done} / {row.student_ids.length}人の課題を準備済み{failed ? ` · ${failed}人分は準備できませんでした` : ''}{cancelled ? ` · ${cancelled}人分は利用停止により中止` : ''}</p>{failed ? <p className="mt-2 text-sm text-amber-800">用意できた課題は下に残っています。予算・AI稼働状況を確認してから、失敗分だけを再試行できます。</p> : null}{failed ? <RetryPreparation id={row.id} /> : null}</div>;
       })}</div><PreparationRefresh active={pending} />
     </Panel> : null}
